@@ -37,3 +37,7 @@ Desktop.ini
 # ── Environment / Secrets ───────────────────────────
 .env
 .env.*
+
+# Build outputs
+收益计算器.exe
+收益计算器.spec
