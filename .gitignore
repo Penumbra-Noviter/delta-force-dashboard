@@ -1,0 +1,39 @@
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+.Python
+*.so
+
+# ── Virtual environments ───────────────────────────
+venv/
+.venv/
+env/
+
+# ── PyInstaller ─────────────────────────────────────
+build/
+dist/
+*.manifest
+
+# ── Data backups ────────────────────────────────────
+*.bak
+*.bak.*
+*.tmp
+
+# ── IDE / Editor ────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS ──────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ── Environment / Secrets ───────────────────────────
+.env
+.env.*
