@@ -80,15 +80,15 @@ QLabel#titleLabel {{
 }}
 QLabel#dateLabel {{
     color: {fg_muted};
-    font-size: 10px;
+    font-size: 12px;
 }}
 QLabel#hintLabel {{
     color: {placeholder};
-    font-size: 8px;
+    font-size: 10px;
 }}
 QLabel#savedIndicator {{
     color: {fg_pos};
-    font-size: 9px;
+    font-size: 10px;
 }}
 
 /* ═══════════════════════════════════════════
@@ -122,7 +122,7 @@ QLineEdit::placeholder {{
    ═══════════════════════════════════════════ */
 QPushButton {{
     border: none;
-    border-radius: 4px;
+    border-radius: 5px;
     padding: 6px 20px;
     font-size: 12px;
 }}
@@ -134,6 +134,10 @@ QPushButton#saveBtn {{
 }}
 QPushButton#saveBtn:hover {{
     background-color: {btn_hover};
+}}
+QPushButton#saveBtn:pressed {{
+    background-color: {btn_hover};
+    padding: 9px 28px 7px 28px;
 }}
 QPushButton#saveBtn:disabled {{
     background-color: {muted_bg};
@@ -147,11 +151,21 @@ QPushButton#cancelEditBtn {{
 QPushButton#cancelEditBtn:hover {{
     background-color: {separator};
 }}
+QPushButton#reuseBtn {{
+    background-color: {muted_bg};
+    color: {fg_label};
+    padding: 6px 14px;
+    font-size: 11px;
+}}
+QPushButton#reuseBtn:hover {{
+    background-color: {separator};
+    color: {table_text_bold};
+}}
 QPushButton#themeBtn, QPushButton#pinBtn {{
     background-color: {muted_bg};
     color: {fg_muted};
     padding: 4px 10px;
-    font-size: 9px;
+    font-size: 10px;
 }}
 QPushButton#themeBtn:hover, QPushButton#pinBtn:hover {{
     background-color: {separator};
@@ -170,10 +184,10 @@ QTableWidget {{
     color: {table_text};
     gridline-color: {separator};
     border: none;
-    font-size: 10px;
+    font-size: 11px;
 }}
 QTableWidget::item {{
-    padding: 4px 8px;
+    padding: 6px 8px;
 }}
 QTableWidget::item:hover {{
     background-color: {t.get("TABLE_ROW_HOVER_BG", muted_bg)};
@@ -189,7 +203,7 @@ QHeaderView::section {{
     border: none;
     border-bottom: 1px solid {separator};
     font-weight: bold;
-    font-size: 10px;
+    font-size: 11px;
 }}
 
 /* ═══════════════════════════════════════════

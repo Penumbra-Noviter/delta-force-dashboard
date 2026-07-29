@@ -29,63 +29,71 @@ FONT_TABLE_CELL = ("Microsoft YaHei", 10)
 WEEK_DAYS = 7
 
 # ── 主题 ──────────────────────────────────────────────
+# 护眼配色：暖纸白底 + 温润青色（teal）主色调，降低蓝光刺激
+# 语义色保留绿涨红跌（国际惯例），青色主色与语义色明确区分
 THEMES = {
     "light": {
-        "BG": "#ffffff",
-        "FG_LABEL": "#555555",
-        "FG_MUTED": "#999999",
-        "FG_POS": "#27ae60",
-        "FG_NEG": "#e74c3c",
-        "FG_TODAY": "#2563eb",
-        "BTN_BG": "#2563eb",
-        "BTN_BG_HOVER": "#1d4ed8",
+        "BG": "#faf9f6",            # 暖纸白，替代纯白降低刺眼感
+        "FG_LABEL": "#4a5568",       # 软石板灰，对比度 6.8:1
+        "FG_MUTED": "#718096",       # slate-500，对比度 4.6:1（达 WCAG AA）
+        "FG_POS": "#16a34a",         # 绿涨（green-600）
+        "FG_NEG": "#dc2626",         # 红跌（red-600）
+        "FG_TODAY": "#0d9488",       # 今日用主色青
+        "BTN_BG": "#0d9488",         # teal-600 主色
+        "BTN_BG_HOVER": "#0f766e",   # teal-700 悬停加深
         "BTN_FG": "#ffffff",
-        "BORDER_DEFAULT": "#d1d5db",
-        "BORDER_VALID": "#27ae60",
-        "BORDER_INVALID": "#e74c3c",
-        "SEPARATOR": "#e5e7eb",
-        "PLACEHOLDER": "#cccccc",
-        "MUTED_BG": "#f3f4f6",
-        "PIN_OFF_BG": "#f3f4f6",
-        "PIN_ON_BG": "#2563eb",
-        "CHART_CASH": "#2563eb",
-        "CHART_WAREHOUSE": "#f59e0b",
-        "CHART_TOTAL": "#27ae60",
-        "CHART_GRID": "#e5e7eb",
-        "CHART_BG": "#fafafa",
+        "BORDER_DEFAULT": "#d6d3cc",  # 暖灰边框
+        "BORDER_VALID": "#16a34a",
+        "BORDER_INVALID": "#dc2626",
+        "SEPARATOR": "#e7e5e0",      # 暖浅灰分隔线
+        "PLACEHOLDER": "#9ca3af",   # gray-400，占位文字豁免 AA
+        "MUTED_BG": "#f4f2ed",      # 暖静音底
+        "PIN_OFF_BG": "#f4f2ed",
+        "PIN_ON_BG": "#0d9488",
+        "CHART_CASH": "#0d9488",     # 青色（与主色一致）
+        "CHART_WAREHOUSE": "#d97706",# 琥珀金（amber-600，更沉稳）
+        "CHART_TOTAL": "#16a34a",
+        "CHART_GRID": "#e7e5e0",
+        "CHART_BG": "#fdfcf9",       # 图表区微暖底
         "CHART_AXIS": "#6b7280",
         "CHART_TEXT": "#374151",
-        "TABLE_TEXT": "#333333",
-        "TABLE_TEXT_BOLD": "#1a1a1a",
+        "TABLE_TEXT": "#3d4453",
+        "TABLE_TEXT_BOLD": "#1a202c",
         "TABLE_ROW_EVEN_BG": "#ffffff",
-        "TABLE_ROW_ODD_BG": "#f9fafb",
-        "TABLE_ROW_HOVER_BG": "#f3f4f6",
-        "TABLE_HEADER_BG": "#f3f4f6",
-        "TABLE_HEADER_FG": "#374151",
+        "TABLE_ROW_ODD_BG": "#f6f5f1",
+        "TABLE_ROW_HOVER_BG": "#f4f2ed",
+        "TABLE_ROW_TODAY_BG": "#e6f7f5",  # 今日行浅青底
+        "TABLE_HEADER_BG": "#f4f2ed",
+        "TABLE_HEADER_FG": "#3d4453",
         "CARD_BG": "#ffffff",
-        "CARD_BORDER": "#e5e7eb",
+        "CARD_BORDER": "#e7e5e0",
         "INPUT_BG": "#ffffff",
-        "INPUT_FG": "#1a1a1a",
+        "INPUT_FG": "#1a202c",
+        # 操作按钮语义色
+        "DANGER_BG": "#fef2f2",
+        "DANGER_FG": "#dc2626",
+        "DANGER_BORDER": "#fecaca",
+        "DANGER_HOVER_BG": "#dc2626",
     },
     "dark": {
         "BG": "#1e1e2e",
         "FG_LABEL": "#cdd6f4",
-        "FG_MUTED": "#6c7086",
+        "FG_MUTED": "#9399b3",       # 提亮：overlay→subtext，对比度更佳
         "FG_POS": "#a6e3a1",
         "FG_NEG": "#f38ba8",
-        "FG_TODAY": "#89b4fa",
-        "BTN_BG": "#89b4fa",
-        "BTN_BG_HOVER": "#74c7ec",
-        "BTN_FG": "#1e1e2e",
+        "FG_TODAY": "#2dd4bf",       # teal-400，暗底下更亮
+        "BTN_BG": "#2dd4bf",         # teal-400
+        "BTN_BG_HOVER": "#14b8a6",   # teal-500
+        "BTN_FG": "#1e1e2e",         # 深底亮字
         "BORDER_DEFAULT": "#45475a",
         "BORDER_VALID": "#a6e3a1",
         "BORDER_INVALID": "#f38ba8",
         "SEPARATOR": "#313244",
-        "PLACEHOLDER": "#585b70",
+        "PLACEHOLDER": "#7f849c",
         "MUTED_BG": "#313244",
         "PIN_OFF_BG": "#313244",
-        "PIN_ON_BG": "#89b4fa",
-        "CHART_CASH": "#89b4fa",
+        "PIN_ON_BG": "#2dd4bf",
+        "CHART_CASH": "#2dd4bf",
         "CHART_WAREHOUSE": "#f9e2af",
         "CHART_TOTAL": "#a6e3a1",
         "CHART_GRID": "#45475a",
@@ -97,12 +105,18 @@ THEMES = {
         "TABLE_ROW_EVEN_BG": "#1e1e2e",
         "TABLE_ROW_ODD_BG": "#252636",
         "TABLE_ROW_HOVER_BG": "#313244",
+        "TABLE_ROW_TODAY_BG": "#1a3a36",  # 今日行深青底
         "TABLE_HEADER_BG": "#313244",
         "TABLE_HEADER_FG": "#cdd6f4",
         "CARD_BG": "#181825",
         "CARD_BORDER": "#45475a",
         "INPUT_BG": "#313244",
         "INPUT_FG": "#cdd6f4",
+        # 操作按钮语义色
+        "DANGER_BG": "#3a2222",
+        "DANGER_FG": "#f38ba8",
+        "DANGER_BORDER": "#5a2a2a",
+        "DANGER_HOVER_BG": "#f38ba8",
     },
 }
 

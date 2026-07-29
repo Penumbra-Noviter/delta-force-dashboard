@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QModelIndex
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -26,7 +26,9 @@ from formatting import format_money
 from calculator import DayRecord, ProfitCalculatorLogic
 
 COLUMNS = ["日期", "现金", "仓库（总收益）", "较前日", "收益率", "盈亏", "操作"]
-COL_WIDTHS = [80, 100, 110, 100, 80, 55, 120]
+# 最小列宽（Stretch 模式下的保底宽度，保证内容不被硬截断）
+# 总最小宽 ≈ 515px，远小于常见窗口宽度
+COL_MIN_WIDTHS = [60, 80, 90, 85, 70, 100, 120]
 # Column indices
 COL_DATE = 0
 COL_CASH = 1
@@ -38,14 +40,15 @@ COL_ACTIONS = 6
 
 
 class PnLBadge(QWidget):
-    """盈亏标签 Badge：绿底"盈"/红底"亏"/灰底"—"。"""
+    """盈亏标签 Badge：绿底"盈 +2.4%"/红底"亏 -1.3%"/灰底"—"。"""
 
     def __init__(
         self, label: str, bg_color: str, fg_color: str = "#ffffff", parent=None
     ) -> None:
         super().__init__(parent)
+        self.setMinimumWidth(80)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 2, 6, 2)
+        layout.setContentsMargins(4, 2, 4, 2)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._label = QLabel(label)
@@ -54,8 +57,8 @@ class PnLBadge(QWidget):
             f"""
             background-color: {bg_color};
             color: {fg_color};
-            border-radius: 8px;
-            padding: 2px 8px;
+            border-radius: 9px;
+            padding: 2px 10px;
             font-size: 10px;
             font-weight: bold;
         """
@@ -73,7 +76,17 @@ class _DaySubTable(QTableWidget):
         super().__init__(parent)
         self.setColumnCount(len(COLUMNS))
         self.setHorizontalHeaderLabels(COLUMNS)
-        self.horizontalHeader().setStretchLastSection(False)
+
+        # ── 自适应列宽策略：Interactive + 手动比例分配 ──
+        # Stretch 模式下 Qt 会均分列宽，对初始宽度不敏感
+        # 改用 Interactive 模式，在 resizeEvent 中按 COL_MIN_WIDTHS 比例分配
+        self.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Interactive
+        )
+        # 横向滚动条：空间不足时自动出现（兜底，永不截断）
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         self.verticalHeader().hide()
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -82,9 +95,50 @@ class _DaySubTable(QTableWidget):
         self.setShowGrid(True)
         self.setMouseTracking(True)
 
-        # Font
-        cell_font = QFont("Microsoft YaHei", 9)
+        # Font（基础字号，实际由 QSS 覆盖）
+        cell_font = QFont("Microsoft YaHei", 10)
         self.setFont(cell_font)
+
+    def mousePressEvent(self, event) -> None:
+        """点击空白区（非单元格、非按钮）时清除选中高亮。"""
+        index = self.indexAt(event.position().toPoint())
+        if not index.isValid():
+            self.clearSelection()
+            self.setCurrentIndex(QModelIndex())
+        super().mousePressEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        """窗口大小变化时按比例重分列宽，保证盈亏列不被压缩。"""
+        super().resizeEvent(event)
+        self._apply_proportional_widths()
+
+    def _apply_proportional_widths(self) -> None:
+        """根据视口宽度按 COL_MIN_WIDTHS 比例分配各列宽度。"""
+        viewport_w = self.viewport().width()
+        total_min = sum(COL_MIN_WIDTHS)
+
+        if viewport_w <= 0:
+            return
+
+        if viewport_w >= total_min:
+            # 空间充足：按比例缩放，所有列等比放大
+            scale = viewport_w / total_min
+            allocated = 0
+            for ci, min_w in enumerate(COL_MIN_WIDTHS):
+                w = int(min_w * scale)
+                allocated += w
+                self.setColumnWidth(ci, w)
+            # 取整误差补偿：从最宽的操作列扣除 1-2px，防止滚动条闪烁
+            if allocated > viewport_w:
+                diff = allocated - viewport_w
+                ci_act = COL_ACTIONS
+                self.setColumnWidth(
+                    ci_act, max(COL_MIN_WIDTHS[ci_act], self.columnWidth(ci_act) - diff)
+                )
+        else:
+            # 空间不足：保持最小宽度，启用横向滚动条
+            for ci, min_w in enumerate(COL_MIN_WIDTHS):
+                self.setColumnWidth(ci, min_w)
 
     def draw(self, records: list, today: str, prev_warehouse: float | None = None) -> None:
         """根据 records 绘制单栏表格。
@@ -98,29 +152,36 @@ class _DaySubTable(QTableWidget):
 
         for ri, (date_str, record) in enumerate(records):
             is_today = date_str == today
-            bg_color = QColor(
-                get_color("TABLE_ROW_EVEN_BG" if ri % 2 == 0 else "TABLE_ROW_ODD_BG")
-            )
+            # 今日行用浅青底，其他行用交替底
+            if is_today:
+                row_bg = QColor(get_color("TABLE_ROW_TODAY_BG"))
+            else:
+                row_bg = QColor(
+                    get_color("TABLE_ROW_EVEN_BG" if ri % 2 == 0 else "TABLE_ROW_ODD_BG")
+                )
 
             # 0: 日期
             date_display = f"{date_str[-5:]} 今天" if is_today else date_str[-5:]
             date_color = get_color("FG_TODAY") if is_today else get_color("TABLE_TEXT")
             item = QTableWidgetItem(date_display)
             item.setForeground(QColor(date_color))
+            item.setBackground(row_bg)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.setItem(ri, COL_DATE, item)
 
             # 1: 现金
             item = QTableWidgetItem(format_money(record.cash))
             item.setForeground(QColor(get_color("TABLE_TEXT")))
+            item.setBackground(row_bg)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.setItem(ri, COL_CASH, item)
 
             # 2: 仓库（总收益）
             item = QTableWidgetItem(format_money(record.warehouse))
             item.setForeground(QColor(get_color("TABLE_TEXT_BOLD")))
+            item.setBackground(row_bg)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            bold_font = QFont("Microsoft YaHei", 9, QFont.Weight.Bold)
+            bold_font = QFont("Microsoft YaHei", 10, QFont.Weight.Bold)
             item.setFont(bold_font)
             self.setItem(ri, COL_WAREHOUSE, item)
 
@@ -142,23 +203,28 @@ class _DaySubTable(QTableWidget):
 
             item = QTableWidgetItem(diff)
             item.setForeground(QColor(delta_color))
+            item.setBackground(row_bg)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.setItem(ri, COL_DIFF, item)
 
             # 4: 收益率
-            rate_str, rate_color = ProfitCalculatorLogic.format_rate(
-                ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
-            )
+            rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
+            rate_str, rate_color = ProfitCalculatorLogic.format_rate(rate)
             item = QTableWidgetItem(rate_str)
             item.setForeground(QColor(rate_color))
+            item.setBackground(row_bg)
             item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.setItem(ri, COL_RATE, item)
 
-            # 5: 盈亏标签
+            # 5: 盈亏标签（合并收益率：盈 +2.4% / 亏 -1.3% / —）
             pnl_text, pnl_bg = ProfitCalculatorLogic.get_pnl_label(
                 prev_warehouse, record.warehouse
             )
-            badge = PnLBadge(pnl_text, pnl_bg)
+            if pnl_text == "—":
+                badge_text = "—"
+            else:
+                badge_text = f"{pnl_text} {rate_str}"
+            badge = PnLBadge(badge_text, pnl_bg)
             self.setCellWidget(ri, COL_PNL, badge)
 
             # 6: 操作按钮
@@ -167,12 +233,10 @@ class _DaySubTable(QTableWidget):
 
             prev_warehouse = record.warehouse
 
-        # 列宽
-        for ci, w in enumerate(COL_WIDTHS):
-            self.setColumnWidth(ci, w)
-
         # 纵向自适应行高
         self.resizeRowsToContents()
+        # 按比例分配列宽（窗口首次显示时 resizeEvent 可能还未触发）
+        self._apply_proportional_widths()
 
     def _create_action_buttons(
         self, date_str: str, record: DayRecord
@@ -188,6 +252,10 @@ class _DaySubTable(QTableWidget):
         btn_hover = get_color("BTN_BG_HOVER")
         neg_color = get_color("FG_NEG")
         muted_bg = get_color("MUTED_BG")
+        danger_bg = get_color("DANGER_BG")
+        danger_fg = get_color("DANGER_FG")
+        danger_border = get_color("DANGER_BORDER")
+        danger_hover = get_color("DANGER_HOVER_BG")
 
         edit_btn = QPushButton("编辑")
         edit_btn.setFixedHeight(22)
@@ -216,18 +284,18 @@ class _DaySubTable(QTableWidget):
         delete_btn.setFixedHeight(22)
         delete_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: #fee2e2;
-                color: {neg_color};
-                border: 1px solid #fecaca;
+                background-color: {danger_bg};
+                color: {danger_fg};
+                border: 1px solid {danger_border};
                 border-radius: 4px;
                 padding: 1px 8px;
                 font-size: 10px;
                 font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: {neg_color};
+                background-color: {danger_hover};
                 color: #ffffff;
-                border-color: {neg_color};
+                border-color: {danger_hover};
             }}
         """)
         delete_btn.clicked.connect(

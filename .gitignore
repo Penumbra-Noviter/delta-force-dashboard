@@ -29,6 +29,9 @@ dist/
 *.swo
 *~
 
+# ── Agent tooling (local memory, not project code) ─
+.serena/
+
 # ── OS ──────────────────────────────────────────────
 Thumbs.db
 Desktop.ini

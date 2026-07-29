@@ -120,11 +120,14 @@ class InputPanel(QWidget):
 
     save_requested = Signal()  # 由按钮或 Enter 触发，主窗口处理
     cancel_requested = Signal()
+    reuse_requested = Signal()  # 复用最近一条记录
+    reuse_cancel_requested = Signal()  # 取消复用
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._editing = False
         self._editing_date: str | None = None
+        self._reusing = False  # 是否处于复用状态
 
         self._build()
 
@@ -173,6 +176,12 @@ class InputPanel(QWidget):
         btn_layout.setContentsMargins(0, 0, 0, 0)
         btn_layout.setSpacing(8)
 
+        self.reuse_btn = QPushButton("复用昨日")
+        self.reuse_btn.setObjectName("reuseBtn")
+        self.reuse_btn.setToolTip("填入最近一条记录的数据，便于微调")
+        self.reuse_btn.clicked.connect(self._on_reuse_btn_clicked)
+        btn_layout.addWidget(self.reuse_btn)
+
         self.save_btn = QPushButton("保存今日数据")
         self.save_btn.setObjectName("saveBtn")
         self.save_btn.setEnabled(False)
@@ -191,6 +200,12 @@ class InputPanel(QWidget):
 
         btn_layout.addStretch()
         main_layout.addWidget(btn_widget)
+
+        # ── Tab 顺序：现金 → 仓库 → 复用 → 保存 → 取消 ──
+        self.setTabOrder(self.cash_entry, self.warehouse_entry)
+        self.setTabOrder(self.warehouse_entry, self.reuse_btn)
+        self.setTabOrder(self.reuse_btn, self.save_btn)
+        self.setTabOrder(self.save_btn, self.cancel_edit_btn)
 
         # ── 输入校验联动 ──
         self.cash_entry.validity_changed.connect(self._update_save_btn_state)
@@ -237,6 +252,7 @@ class InputPanel(QWidget):
             }}
         """)
         self.cancel_edit_btn.show()
+        self.reuse_btn.hide()
         self.saved_indicator.setText("")
         self._update_save_btn_state()
         self.cash_entry.setFocus()
@@ -252,6 +268,7 @@ class InputPanel(QWidget):
         # 清除内联样式以恢复 QSS
         self.save_btn.setStyleSheet("")
         self.cancel_edit_btn.hide()
+        self.reuse_btn.show()
         self.saved_indicator.setText("")
         self._update_save_btn_state()
         self.cash_entry.setFocus()
@@ -262,12 +279,74 @@ class InputPanel(QWidget):
     def get_editing_date(self) -> str | None:
         return self._editing_date
 
+    # ── 复用模式 ──
+
+    def _on_reuse_btn_clicked(self) -> None:
+        """复用按钮点击：非复用状态→发起复用；复用状态→取消复用。"""
+        if self._reusing:
+            self.reuse_cancel_requested.emit()
+        else:
+            self.reuse_requested.emit()
+
+    def set_reuse_mode(self) -> None:
+        """进入复用模式：按钮变为「取消复用」红色样式。"""
+        self._reusing = True
+        self.reuse_btn.setText("取消复用")
+        self.reuse_btn.setToolTip("清除已复用的数据")
+        self.reuse_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {get_color('DANGER_BG')};
+                color: {get_color('DANGER_FG')};
+                border: 1px solid {get_color('DANGER_BORDER')};
+                border-radius: 5px;
+                padding: 6px 14px;
+                font-size: 11px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {get_color('DANGER_HOVER_BG')};
+                color: #ffffff;
+            }}
+        """)
+
+    def cancel_reuse(self) -> None:
+        """退出复用模式，恢复按钮为「复用昨日」。"""
+        self._reusing = False
+        self.reuse_btn.setText("复用昨日")
+        self.reuse_btn.setToolTip("填入最近一条记录的数据，便于微调")
+        self.reuse_btn.setStyleSheet("")
+
+    def is_reusing(self) -> bool:
+        return self._reusing
+
     # ── 指示器 ──
 
     def set_saved_indicator(self, text: str) -> None:
         self.saved_indicator.setText(text)
 
     def focus_cash(self) -> None:
+        self.cash_entry.setFocus()
+
+    # ── 批量填值 / 清空（供主窗口调用）──
+
+    def fill_values(self, cash: float, warehouse: float) -> None:
+        """填入指定金额并选中现金框，便于微调。不触发焦点格式化。"""
+        self.cash_entry._formatting = True
+        self.cash_entry.setText(format_input_value(cash))
+        self.cash_entry._formatting = False
+
+        self.warehouse_entry._formatting = True
+        self.warehouse_entry.setText(format_input_value(warehouse))
+        self.warehouse_entry._formatting = False
+
+        self._update_save_btn_state()
+        self.cash_entry.setFocus()
+        self.cash_entry.selectAll()
+
+    def clear_fields(self) -> None:
+        """清空输入框但保留已保存指示器，用于保存后快速录入下一条。"""
+        self.cash_entry.clear()
+        self.warehouse_entry.clear()
         self.cash_entry.setFocus()
 
     # ── 获取输入值 ──

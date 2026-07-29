@@ -72,6 +72,20 @@ class ChartWidget(QWidget):
         # 填充边界曲线（持久化避免重建 FillBetweenItem）
         self._fill_curve_top: pg.PlotCurveItem | None = None
         self._fill_curve_bottom: pg.PlotCurveItem | None = None
+        # 端点数值标注
+        self._endpoint_label_top: pg.TextItem | None = None
+        self._endpoint_label_bottom: pg.TextItem | None = None
+        # hover 十字线 + 数值标签
+        self._vline_top: pg.InfiniteLine | None = None
+        self._vline_bottom: pg.InfiniteLine | None = None
+        self._hover_label_top: pg.TextItem | None = None
+        self._hover_label_bottom: pg.TextItem | None = None
+        self._proxy_top = None
+        self._proxy_bottom = None
+        # 缓存当前数据（供 hover 查最近点）
+        self._dates: list[str] = []
+        self._warehouse_vals: list[float] = []
+        self._cash_vals: list[float] = []
 
     def draw(self, records: list) -> None:
         """渲染或更新图表。记录 ≥ 2 → 双图模式，< 2 → 提示文字。"""
@@ -119,6 +133,11 @@ class ChartWidget(QWidget):
         warehouse_vals = [r[1].warehouse for r in records]
         x = list(range(len(dates)))
 
+        # 缓存数据供 hover 查最近点
+        self._dates = dates
+        self._warehouse_vals = warehouse_vals
+        self._cash_vals = cash_vals
+
         cw_color = get_color("CHART_WAREHOUSE")
         cc_color = get_color("CHART_CASH")
         chart_bg = get_color("CHART_BG")
@@ -158,6 +177,29 @@ class ChartWidget(QWidget):
             brush=pg.mkBrush(color=cw_color, alpha=50),
         )
         self._plot_widget_top.addItem(self._fill_warehouse)
+
+        # 端点数值标注（最后一个数据点）
+        self._endpoint_label_top = pg.TextItem(
+            text=self._format_value(warehouse_vals[-1]),
+            color=cw_color,
+            anchor=(0, 0.5),
+        )
+        self._endpoint_label_top.setPos(x[-1], warehouse_vals[-1])
+        self._plot_widget_top.addItem(self._endpoint_label_top)
+
+        # hover 竖线 + 数值标签
+        self._vline_top = pg.InfiniteLine(
+            angle=90, movable=False,
+            pen=pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine),
+        )
+        self._vline_top.setVisible(False)
+        self._plot_widget_top.addItem(self._vline_top)
+
+        self._hover_label_top = pg.TextItem(
+            text="", color=label_color, fill=chart_bg,
+        )
+        self._hover_label_top.setVisible(False)
+        self._plot_widget_top.addItem(self._hover_label_top)
 
         # Y 轴自适应
         self._set_adaptive_ylim(self._plot_widget_top, warehouse_vals)
@@ -204,6 +246,29 @@ class ChartWidget(QWidget):
         )
         self._plot_widget_bottom.addItem(self._fill_cash)
 
+        # 端点数值标注
+        self._endpoint_label_bottom = pg.TextItem(
+            text=self._format_value(cash_vals[-1]),
+            color=cc_color,
+            anchor=(0, 0.5),
+        )
+        self._endpoint_label_bottom.setPos(x[-1], cash_vals[-1])
+        self._plot_widget_bottom.addItem(self._endpoint_label_bottom)
+
+        # hover 竖线 + 数值标签
+        self._vline_bottom = pg.InfiniteLine(
+            angle=90, movable=False,
+            pen=pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine),
+        )
+        self._vline_bottom.setVisible(False)
+        self._plot_widget_bottom.addItem(self._vline_bottom)
+
+        self._hover_label_bottom = pg.TextItem(
+            text="", color=label_color, fill=chart_bg,
+        )
+        self._hover_label_bottom.setVisible(False)
+        self._plot_widget_bottom.addItem(self._hover_label_bottom)
+
         # Y 轴自适应
         self._set_adaptive_ylim(self._plot_widget_bottom, cash_vals)
 
@@ -219,8 +284,74 @@ class ChartWidget(QWidget):
         c_layout.addWidget(self._plot_widget_bottom)
         self._layout.addWidget(self._bottom_container, 1)
 
+        # ── hover 信号绑定（SignalProxy 限频 60fps，避免性能损耗）──
+        self._proxy_top = pg.SignalProxy(
+            self._plot_widget_top.scene().sigMouseMoved,
+            rateLimit=60,
+            slot=lambda evt: self._on_mouse_moved(evt, self._plot_widget_top, "top"),
+        )
+        self._proxy_bottom = pg.SignalProxy(
+            self._plot_widget_bottom.scene().sigMouseMoved,
+            rateLimit=60,
+            slot=lambda evt: self._on_mouse_moved(evt, self._plot_widget_bottom, "bottom"),
+        )
+
         # ── 右键菜单 ──
         self._setup_context_menu()
+
+    @staticmethod
+    def _format_value(v: float) -> str:
+        """格式化图表数值为 K/M/B 财务单位（与 Y 轴一致）。"""
+        if v >= 1e9:
+            return f"¥{v / 1e9:.2f}B"
+        if v >= 1e6:
+            return f"¥{v / 1e6:.2f}M"
+        if v >= 1e3:
+            return f"¥{v / 1e3:.1f}K"
+        return f"¥{v:.0f}"
+
+    def _on_mouse_moved(self, evt, plot_widget, which: str) -> None:
+        """鼠标移动时显示最近数据点的竖线 + 数值标签。"""
+        if not self._dates:
+            return
+        pos = evt[0]  # SignalProxy 将原始事件包装为元组
+        vb = plot_widget.plotItem.vb
+        if vb is None:
+            return
+        mouse_point = vb.mapSceneToView(pos)
+        mouse_x = mouse_point.x()
+        n = len(self._dates)
+
+        if which == "top":
+            vline = self._vline_top
+            label = self._hover_label_top
+            vals = self._warehouse_vals
+            color = get_color("CHART_WAREHOUSE")
+        else:
+            vline = self._vline_bottom
+            label = self._hover_label_bottom
+            vals = self._cash_vals
+            color = get_color("CHART_CASH")
+
+        # 鼠标离开数据范围时隐藏
+        if mouse_x < -0.5 or mouse_x > n - 0.5:
+            if vline is not None:
+                vline.setVisible(False)
+            if label is not None:
+                label.setVisible(False)
+            return
+
+        idx = max(0, min(n - 1, round(mouse_x)))
+        if vline is not None:
+            vline.setPos(idx)
+            vline.setVisible(True)
+        if label is not None:
+            label.setText(
+                f"{self._dates[idx]}  {self._format_value(vals[idx])}",
+                color=color,
+            )
+            label.setPos(idx, vals[idx])
+            label.setVisible(True)
 
     def _update_chart(self, records: list) -> None:
         """原地更新数据（不重建 PlotWidget / FillBetweenItem）。"""
@@ -234,6 +365,11 @@ class ChartWidget(QWidget):
         warehouse_vals = [r[1].warehouse for r in records]
         x = list(range(len(dates)))
 
+        # 更新缓存数据供 hover 查最近点
+        self._dates = dates
+        self._warehouse_vals = warehouse_vals
+        self._cash_vals = cash_vals
+
         # 更新曲线数据（FillBetweenItem 通过 sigPlotChanged 自动跟随）
         if self._curve_top is not None:
             self._curve_top.setData(x, warehouse_vals)
@@ -243,6 +379,14 @@ class ChartWidget(QWidget):
             self._curve_bottom.setData(x, cash_vals)
         if self._fill_curve_bottom is not None:
             self._fill_curve_bottom.setData(x, cash_vals)
+
+        # 更新端点数值标注
+        if self._endpoint_label_top is not None and warehouse_vals:
+            self._endpoint_label_top.setText(self._format_value(warehouse_vals[-1]))
+            self._endpoint_label_top.setPos(x[-1], warehouse_vals[-1])
+        if self._endpoint_label_bottom is not None and cash_vals:
+            self._endpoint_label_bottom.setText(self._format_value(cash_vals[-1]))
+            self._endpoint_label_bottom.setPos(x[-1], cash_vals[-1])
 
         # 更新 Y 轴范围
         self._set_adaptive_ylim(self._plot_widget_top, warehouse_vals)
@@ -341,6 +485,18 @@ class ChartWidget(QWidget):
         self._curve_bottom = None
         self._fill_warehouse = None
         self._fill_cash = None
+        # 清理端点标注与 hover 元素
+        self._endpoint_label_top = None
+        self._endpoint_label_bottom = None
+        self._vline_top = None
+        self._vline_bottom = None
+        self._hover_label_top = None
+        self._hover_label_bottom = None
+        self._proxy_top = None
+        self._proxy_bottom = None
+        self._dates = []
+        self._warehouse_vals = []
+        self._cash_vals = []
 
     def apply_theme(self) -> None:
         """主题切换后增量更新颜色；无需销毁重建图表。"""
@@ -362,11 +518,15 @@ class ChartWidget(QWidget):
         if self._plot_widget_top is not None:
             self._plot_widget_top.setBackground(chart_bg)
 
-            # 曲线颜色
-            if self._curve_top is not None:
-                self._curve_top.setPen(pg.mkPen(color=cw_color, width=2.5))
-                self._curve_top.setSymbolPen(cw_color)
-                self._curve_top.setSymbolBrush(cw_color)
+            # 曲线颜色（pen + symbol 通过 setData 一次性更新）
+            if self._curve_top is not None and self._warehouse_vals:
+                _x = list(range(len(self._warehouse_vals)))
+                self._curve_top.setData(
+                    _x, self._warehouse_vals,
+                    pen=pg.mkPen(color=cw_color, width=2.5),
+                    symbol="s", symbolSize=6,
+                    symbolBrush=cw_color, symbolPen=cw_color,
+                )
 
             # 填充颜色
             if self._fill_warehouse is not None:
@@ -386,11 +546,15 @@ class ChartWidget(QWidget):
         if self._plot_widget_bottom is not None:
             self._plot_widget_bottom.setBackground(chart_bg)
 
-            # 曲线颜色
-            if self._curve_bottom is not None:
-                self._curve_bottom.setPen(pg.mkPen(color=cc_color, width=2.5, style=Qt.PenStyle.DashLine))
-                self._curve_bottom.setSymbolPen(cc_color)
-                self._curve_bottom.setSymbolBrush(cc_color)
+            # 曲线颜色（pen + symbol 通过 setData 一次性更新）
+            if self._curve_bottom is not None and self._cash_vals:
+                _x = list(range(len(self._cash_vals)))
+                self._curve_bottom.setData(
+                    _x, self._cash_vals,
+                    pen=pg.mkPen(color=cc_color, width=2.5, style=Qt.PenStyle.DashLine),
+                    symbol="o", symbolSize=6,
+                    symbolBrush=cc_color, symbolPen=cc_color,
+                )
 
             # 填充颜色
             if self._fill_cash is not None:
@@ -405,6 +569,26 @@ class ChartWidget(QWidget):
             grid_color = get_color("CHART_GRID")
             self._plot_widget_bottom.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
             self._plot_widget_bottom.getAxis("left").setPen(pg.mkPen(color=grid_color))
+
+        # ── 端点标注与 hover 标签颜色 ──
+        if self._endpoint_label_top is not None and self._warehouse_vals:
+            self._endpoint_label_top.setText(
+                self._format_value(self._warehouse_vals[-1]), color=cw_color
+            )
+        if self._endpoint_label_bottom is not None and self._cash_vals:
+            self._endpoint_label_bottom.setText(
+                self._format_value(self._cash_vals[-1]), color=cc_color
+            )
+        if self._vline_top is not None:
+            self._vline_top.setPen(pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine))
+        if self._vline_bottom is not None:
+            self._vline_bottom.setPen(pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine))
+        if self._hover_label_top is not None:
+            self._hover_label_top.setColor(label_color)
+            self._hover_label_top.fill = pg.mkBrush(chart_bg)
+        if self._hover_label_bottom is not None:
+            self._hover_label_bottom.setColor(label_color)
+            self._hover_label_bottom.fill = pg.mkBrush(chart_bg)
 
         # 强制重绘
         if self._plot_widget_top is not None:

@@ -212,6 +212,15 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(input_card)
         root_layout.addSpacing(8)
 
+        # ── 7日汇总条 ──
+        self._summary_label = QLabel("")
+        self._summary_label.setObjectName("summaryLabel")
+        self._summary_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        root_layout.addWidget(self._summary_label)
+        root_layout.addSpacing(6)
+
         # ── 表格（卡片容器）──
         table_card = self._build_card()
         table_card_layout = QVBoxLayout(table_card)
@@ -260,6 +269,8 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         self.input_panel.save_requested.connect(self.save_today)
         self.input_panel.cancel_requested.connect(self._cancel_edit)
+        self.input_panel.reuse_requested.connect(self._reuse_last_record)
+        self.input_panel.reuse_cancel_requested.connect(self._cancel_reuse)
         self.table.edit_requested.connect(self._start_edit)
         self.table.delete_requested.connect(self._delete_record)
 
@@ -380,7 +391,8 @@ class MainWindow(QMainWindow):
         self._rotate_weekly()
         self.store.save(self.data)
 
-        if self._editing_date:
+        was_editing = self._editing_date is not None
+        if was_editing:
             self._cancel_edit()
 
         self.refresh_display()
@@ -393,6 +405,11 @@ class MainWindow(QMainWindow):
             self.input_panel.set_saved_indicator(
                 f"✓ {save_date[-5:]} 已更新 — 仓库总收益 {format_money(warehouse)}"
             )
+
+        # 非编辑模式保存后清空输入框并回焦，便于连续录入
+        if not was_editing:
+            self.input_panel.clear_fields()
+            self.input_panel.cancel_reuse()
 
     def _rotate_weekly(self) -> None:
         """保持最多 7 天数据。"""
@@ -419,11 +436,39 @@ class MainWindow(QMainWindow):
 
     def _start_edit(self, date_str: str, record: DayRecord) -> None:
         self._editing_date = date_str
+        self.input_panel.cancel_reuse()
         self.input_panel.set_edit_mode(date_str, record.cash, record.warehouse)
 
     def _cancel_edit(self) -> None:
         self._editing_date = None
         self.input_panel.cancel_edit()
+
+    def _reuse_last_record(self) -> None:
+        """复用最近一条历史记录填入输入框，便于微调后保存。"""
+        result = self.logic.last_record_before(self.today)
+        if result is None:
+            # 今日之前无数据，退而取今日本身（极少见）
+            today_record = self.logic.get_record(self.today)
+            if today_record is None:
+                self.input_panel.set_saved_indicator("暂无可复用的历史数据")
+                return
+            self.input_panel.fill_values(today_record.cash, today_record.warehouse)
+            self.input_panel.set_saved_indicator(
+                f"已复用今日数据，请微调后保存"
+            )
+            self.input_panel.set_reuse_mode()
+            return
+        date_str, record = result
+        self.input_panel.fill_values(record.cash, record.warehouse)
+        self.input_panel.set_saved_indicator(
+            f"已复用 {date_str[-5:]} 数据，请微调后保存"
+        )
+        self.input_panel.set_reuse_mode()
+
+    def _cancel_reuse(self) -> None:
+        """取消复用：清空输入框，恢复按钮为「复用昨日」。"""
+        self.input_panel.clear_fields()
+        self.input_panel.cancel_reuse()
 
     def _delete_record(self, date_str: str) -> None:
         reply = QMessageBox.question(
@@ -452,5 +497,44 @@ class MainWindow(QMainWindow):
 
     def refresh_display(self) -> None:
         records = self._get_records()
+        self._update_summary(records)
         self.table.draw(records, self.today)
         self.chart.draw(records)
+
+    def _update_summary(self, records: list) -> None:
+        """计算并显示 7 日总盈亏金额。
+
+        records 为按日期升序排列的 (date_str, DayRecord) 列表。
+        总盈亏 = 末日仓库值 - 首日仓库值。
+        """
+        if len(records) < 2:
+            first_wh = records[0][1].warehouse if len(records) == 1 else None
+            if first_wh is None:
+                self._summary_label.setText("7日总盈亏：数据不足")
+            else:
+                self._summary_label.setText(
+                    f"7日总盈亏：{format_money(first_wh)}（仅 1 条记录）"
+                )
+            self._summary_label.setStyleSheet(
+                f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
+            )
+            return
+
+        first_wh = records[0][1].warehouse
+        last_wh = records[-1][1].warehouse
+        total = last_wh - first_wh
+
+        if total > 0:
+            text = f"7日总盈亏：+{format_money(total)}"
+            color = get_color("FG_POS")
+        elif total < 0:
+            text = f"7日总盈亏：{format_money(total)}"
+            color = get_color("FG_NEG")
+        else:
+            text = f"7日总盈亏：{format_money(total)}"
+            color = get_color("FG_MUTED")
+
+        self._summary_label.setText(text)
+        self._summary_label.setStyleSheet(
+            f"color: {color}; font-size: 13px; font-weight: bold;"
+        )
