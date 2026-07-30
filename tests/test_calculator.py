@@ -4,8 +4,7 @@ Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计�
 
 import pytest
 
-from calculator import DayRecord, ProfitCalculatorLogic
-from config import get_color
+from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
 
 
 # ── DayRecord ────────────────────────────────────────
@@ -286,50 +285,50 @@ def test_calculate_rate_large():
 # ── ProfitCalculatorLogic.format_rate ────────────────
 
 def test_format_rate_positive():
-    text, color = ProfitCalculatorLogic.format_rate(5.0)
+    text, signal = ProfitCalculatorLogic.format_rate(5.0)
     assert text == "+5.0%"
-    assert color == get_color("FG_POS")
+    assert signal == RateSignal.POSITIVE
 
 
 def test_format_rate_negative():
-    text, color = ProfitCalculatorLogic.format_rate(-3.2)
+    text, signal = ProfitCalculatorLogic.format_rate(-3.2)
     assert text == "-3.2%"
-    assert color == get_color("FG_NEG")
+    assert signal == RateSignal.NEGATIVE
 
 
 def test_format_rate_zero():
-    text, color = ProfitCalculatorLogic.format_rate(0.0)
+    text, signal = ProfitCalculatorLogic.format_rate(0.0)
     assert text == "0.0%"
-    assert color == get_color("FG_MUTED")
+    assert signal == RateSignal.NEUTRAL
 
 
 def test_format_rate_none():
-    text, color = ProfitCalculatorLogic.format_rate(None)
+    text, signal = ProfitCalculatorLogic.format_rate(None)
     assert text == "—"
-    assert color == get_color("FG_MUTED")
+    assert signal == RateSignal.NONE
 
 
 # ── ProfitCalculatorLogic.get_pnl_label ──────────────
 
 def test_pnl_label_profit():
-    label, color = ProfitCalculatorLogic.get_pnl_label(400.0, 420.0)
+    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 420.0)
     assert label == "盈"
-    assert color == get_color("FG_POS")
+    assert signal == PnL信号.盈
 
 
 def test_pnl_label_loss():
-    label, color = ProfitCalculatorLogic.get_pnl_label(400.0, 380.0)
+    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 380.0)
     assert label == "亏"
-    assert color == get_color("FG_NEG")
+    assert signal == PnL信号.亏
 
 
 def test_pnl_label_no_change():
-    label, color = ProfitCalculatorLogic.get_pnl_label(400.0, 400.0)
+    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 400.0)
     assert label == "—"
-    assert color == get_color("FG_MUTED")
+    assert signal == PnL信号.平
 
 
 def test_pnl_label_no_prev():
-    label, color = ProfitCalculatorLogic.get_pnl_label(None, 420.0)
+    label, signal = ProfitCalculatorLogic.get_pnl_label(None, 420.0)
     assert label == "—"
-    assert color == get_color("FG_MUTED")
+    assert signal == PnL信号.无

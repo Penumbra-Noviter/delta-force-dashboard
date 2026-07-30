@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+__all__ = ["PnLBadge", "TableWidget"]
+
 from PySide6.QtCore import Qt, Signal, QModelIndex
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
@@ -23,7 +25,23 @@ from PySide6.QtWidgets import (
 
 from app.theme import get_color
 from formatting import format_money
-from calculator import DayRecord, ProfitCalculatorLogic
+from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
+
+# ── 信号 → 主题颜色映射 ──────────────────────────────
+# 业务层返回语义信号，UI 层在此映射为当前主题的具体颜色值
+_SIGNAL_TO_COLOR = {
+    RateSignal.POSITIVE: get_color("FG_POS"),
+    RateSignal.NEGATIVE: get_color("FG_NEG"),
+    RateSignal.NEUTRAL: get_color("FG_MUTED"),
+    RateSignal.NONE: get_color("FG_MUTED"),
+}
+
+_PNL_TO_COLOR = {
+    PnL信号.盈: get_color("FG_POS"),
+    PnL信号.亏: get_color("FG_NEG"),
+    PnL信号.平: get_color("FG_MUTED"),
+    PnL信号.无: get_color("FG_MUTED"),
+}
 
 COLUMNS = ["日期", "现金", "仓库（总收益）", "较前日", "收益率", "盈亏", "操作"]
 # 最小列宽（Stretch 模式下的保底宽度，保证内容不被硬截断）
@@ -209,7 +227,8 @@ class _DaySubTable(QTableWidget):
 
             # 4: 收益率
             rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
-            rate_str, rate_color = ProfitCalculatorLogic.format_rate(rate)
+            rate_str, rate_signal = ProfitCalculatorLogic.format_rate(rate)
+            rate_color = _SIGNAL_TO_COLOR.get(rate_signal, get_color("FG_MUTED"))
             item = QTableWidgetItem(rate_str)
             item.setForeground(QColor(rate_color))
             item.setBackground(row_bg)
@@ -217,9 +236,10 @@ class _DaySubTable(QTableWidget):
             self.setItem(ri, COL_RATE, item)
 
             # 5: 盈亏标签（合并收益率：盈 +2.4% / 亏 -1.3% / —）
-            pnl_text, pnl_bg = ProfitCalculatorLogic.get_pnl_label(
+            pnl_text, pnl_signal = ProfitCalculatorLogic.get_pnl_label(
                 prev_warehouse, record.warehouse
             )
+            pnl_bg = _PNL_TO_COLOR.get(pnl_signal, get_color("FG_MUTED"))
             if pnl_text == "—":
                 badge_text = "—"
             else:
@@ -315,6 +335,10 @@ class TableWidget(QWidget):
 
     edit_requested = Signal(str, object)  # date_str, DayRecord
     delete_requested = Signal(str)  # date_str
+
+    def columnCount(self) -> int:
+        """委派给左子表的列数（双栏列数相同）。"""
+        return self._left_table.columnCount()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

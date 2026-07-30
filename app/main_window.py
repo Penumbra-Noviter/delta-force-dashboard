@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+__all__ = ["MainWindow"]
+
 import json
 import platform
 from datetime import datetime
@@ -58,12 +60,13 @@ if platform.system() == "Windows":
 class MainWindow(QMainWindow):
     """收益计算器主窗口。"""
 
-    def __init__(self) -> None:
+    def __init__(self, store: DataStore | None = None,
+                 logic: ProfitCalculatorLogic | None = None) -> None:
         super().__init__()
 
-        self.store = DataStore()
+        self.store = store or DataStore()
         self.data = self.store.load()
-        self.logic = ProfitCalculatorLogic(self.data)
+        self.logic = logic or ProfitCalculatorLogic(self.data)
         self.today = datetime.now().strftime(DATE_FORMAT)
         self._pinned = False
         self._editing_date: str | None = None

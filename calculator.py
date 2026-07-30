@@ -6,15 +6,34 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Optional
 
-from config import DATE_FORMAT, get_color
+from config import DATE_FORMAT
 from formatting import format_money
 
 __all__ = [
     "DayRecord",
     "ProfitCalculatorLogic",
+    "RateSignal",
+    "PnL信号",
 ]
+
+
+class RateSignal(Enum):
+    """收益率信号枚举——UI 层根据信号映射颜色。"""
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+    NONE = "none"
+
+
+class PnL信号(Enum):
+    """盈亏信号枚举——UI 层根据信号映射颜色。"""
+    盈 = "profit"
+    亏 = "loss"
+    平 = "neutral"
+    无 = "none"
 
 
 @dataclass(frozen=True)
@@ -108,33 +127,31 @@ class ProfitCalculatorLogic:
         return (current_warehouse - prev_warehouse) / prev_warehouse * 100
 
     @staticmethod
-    def format_rate(rate: float | None) -> tuple[str, str]:
+    def format_rate(rate: float | None) -> tuple[str, RateSignal]:
         """
-        根据收益率返回 (格式化字符串, 颜色) 二元组。
-        rate 为 None 时返回 ("—", muted_color)。
+        根据收益率返回 (格式化字符串, 信号) 二元组。
+        UI 层应将信号映射为当前主题颜色。
         """
         if rate is None:
-            return "—", get_color("FG_MUTED")
+            return "—", RateSignal.NONE
         if rate > 0:
-            return f"+{rate:.1f}%", get_color("FG_POS")
+            return f"+{rate:.1f}%", RateSignal.POSITIVE
         if rate < 0:
-            return f"{rate:.1f}%", get_color("FG_NEG")
-        return "0.0%", get_color("FG_MUTED")
+            return f"{rate:.1f}%", RateSignal.NEGATIVE
+        return "0.0%", RateSignal.NEUTRAL
 
     @staticmethod
     def get_pnl_label(
         prev_warehouse: float | None, current_warehouse: float
-    ) -> tuple[str, str]:
+    ) -> tuple[str, PnL信号]:
         """
-        根据前后日仓库价值判断盈亏，返回 (标签, 背景色) 二元组。
-        - 盈 → ("盈", green_bg)  绿底
-        - 亏 → ("亏", red_bg)  红底
-        - — → ("—", muted_bg)    灰底
+        根据前后日仓库价值判断盈亏，返回 (标签, 信号) 二元组。
+        UI 层应将信号映射为当前主题颜色。
         """
         if prev_warehouse is None:
-            return "—", get_color("FG_MUTED")
+            return "—", PnL信号.无
         if current_warehouse > prev_warehouse:
-            return "盈", get_color("FG_POS")
+            return "盈", PnL信号.盈
         if current_warehouse < prev_warehouse:
-            return "亏", get_color("FG_NEG")
-        return "—", get_color("FG_MUTED")
+            return "亏", PnL信号.亏
+        return "—", PnL信号.平

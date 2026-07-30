@@ -307,13 +307,13 @@ def test_ui_initialization() -> None:
     except Exception as e:
         check("chart.draw() 无 crash", False, str(e))
 
-    # 7 列表头名称
-    headers = [table.horizontalHeaderItem(i).text() for i in range(7)]
+    # 7 列表头名称（双栏同构，使用左表验证）
+    headers = [table._left_table.horizontalHeaderItem(i).text() for i in range(7)]
     expected = ["日期", "现金", "仓库（总收益）", "较前日", "收益率", "盈亏", "操作"]
     check("7 列表头名称正确", headers == expected)
 
-    # 检查盈亏标签的单元格
-    pnl_widget = table.cellWidget(0, 5)
+    # 检查盈亏标签的单元格（取左侧表格第一条记录）
+    pnl_widget = table._left_table.cellWidget(0, 5)
     check("盈亏列有 PnLBadge widget", pnl_widget is not None)
 
     win.close()
