@@ -100,7 +100,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - 置顶切换：`windowFlags() ^ WindowStaysOnTopHint`
 - 数据流：`save_today()` → parse → validate → save → 旋转 7 日 → 持久化 → 刷新表格+图表
 - 编辑模式：`_start_edit()` → 回填数据到输入面板，修改后 `save_today()` 写回原日期
-- 删除模式：确认对话框 → `del self.data[date]` → 持久化 → 刷新
+- 删除模式：确认对话框 → `logic.delete_record(date)` → 持久化 → 刷新
 
 #### `calculator.py`（~107 行）
 纯业务逻辑，无 UI 依赖：
@@ -109,6 +109,9 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - `ProfitCalculatorLogic.save_record(date, cash, warehouse)`：写数据
 - `ProfitCalculatorLogic.last_record_before(date)`：向前回溯最近有效记录（跳过空/无效日）
 - `ProfitCalculatorLogic.get_weekly_records(end_date, days=7)`：获取连续 N 天数据（含 None 占位）
+- `ProfitCalculatorLogic.delete_record(date)`：删除单日记录（不存在时返回 False）
+- `ProfitCalculatorLogic.rotate_weekly(days=7)`：7 日保留策略，超过上限删除最旧记录
+- `ProfitCalculatorLogic.summary(end_date, days=7)`：7 日窗口总盈亏（末日−首日仓库值）
 - `ProfitCalculatorLogic.format_diff(diff)`：返回 `(符号, 格式化金额, 颜色)` 三元组
 
 #### `config.py`（~154 行）
@@ -206,7 +209,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 
 1. **主题切换**：模块级常量（`FG_POS` 等）在 `import` 时固定为 light 主题，运行时切换主题必须调用 `get_color(key)` 而非直接引用常量。
 2. **matplotlib 延迟加载**：`ChartManager.deferred_draw()` 在窗口 `after(100)` 才加载 mpl，避免阻塞 Tkinter 初始化。
-3. **7 日限制**：`_rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删，确保不超过 7 条。
+3. **7 日限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删，确保不超过 7 条。
 4. **day_record.total**：`total` 直接返回 `warehouse`（不是 warehouse + cash）。现金是 warehouse 的组成部分。
 5. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入。
 6. **增量 vs 全量图更新**：`ChartManager._update_chart()` 只更新线条数据和轴范围，不重建 Figure；但 `fill_between` 的 PolyCollection 不支持原地更新，每次通过 `remove()` + 重建实现。

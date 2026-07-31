@@ -6,6 +6,59 @@
 
 ---
 
+### 2026-07-31 | fix | verify_all.py | settings.json 污染修复：测试期间隔离真实设置文件
+
+**症状**：跑完 `verify_all.py` 后 `settings.json` 被改写（theme/pinned/geometry 残留测试态），需手动 `git restore settings.json`
+
+**根因**：每个 UI 测试 `win.close()` → `closeEvent()` → `_save_settings()` 写真实 `SETTINGS_FILE`；`test_theme_toggle` / `test_pin_toggle` 等未做临时替换，测试态主题被持久化（`test_settings_persistence` 虽已替换，但只在单测内局部生效）
+
+**修复**：
+- `main()` 启动时把 `app.main_window.SETTINGS_FILE` 重定向到 `tmp_dir/settings.json`，`finally` 中恢复引用——真实文件全程零读写，即使脚本被强杀也无污染窗口
+- 附带收益：测试从「读用户真实设置」变为「确定性默认态」，`test_pin_toggle` 不再受用户已置顶状态影响
+- 顺带删除 `verify_all.py` 死 import `from config import SETTINGS_FILE`（无引用）
+
+**验证**：pytest 116/116 ✅ | verify_all 跑完 `git status` 无 `settings.json` / `data.json` 改动（同 4 项既有失败，与本次无关）
+
+---
+
+### 2026-07-31 | C2 | calculator.py + app/main_window.py + verify_all.py + tests | DayRecord 生命周期收敛到 logic 层
+
+**变更**：
+- `calculator.py`: `ProfitCalculatorLogic` 新增三个公共方法，成为工作 dict 的唯一所有者
+  - `delete_record(date_str)` — 删除记录，返回是否存在
+  - `rotate_weekly(days=WEEK_DAYS)` — 7 日保留策略（原 `MainWindow._rotate_weekly`）
+  - `summary(end_date, days)` — 7 日窗口总盈亏算术（原 `_update_summary` 业务部分），返回 `(记录数, 总盈亏)`
+- `app/main_window.py`: 视图减负，只做协调
+  - 删除 `self.data` 持有与 `_rotate_weekly`；构造时经 `ProfitCalculatorLogic(self.store.load())` 一次注入数据对象
+  - `save_today` / `_delete_record` 走 `logic.save_record` / `logic.rotate_weekly` / `logic.delete_record`，持久化改用 `store.save(logic.data)`
+  - `_update_summary` 不再接收 records、不做算术，改为读取 `logic.summary()` 仅格式化展示
+- `verify_all.py`: `win.data` → `win.logic.data`，`win._rotate_weekly()` → `win.logic.rotate_weekly()`（适配新 API）
+- `tests/test_calculator.py`: 新增 10 项测试（delete_record ×2 / rotate_weekly ×2 / summary ×6）
+
+**验证**：pytest 116/116 ✅ | verify_all 通过（同 4 项既有失败，与本次改动无关，已 A/B 确认基线一致）
+
+**code-review（C2，双轴并行）**：
+- ✅ Spec：8/8 需求全部落地，行为与重构前逐点等价（0→数据不足 / 1→仅1条 / ≥2→末日−首日）；"工作 dict 唯一所有者"成立（`main_window.py` 无残留 `self.data` 突变）；无循环 import
+- ✅ Standards：无文档规范违规；`ProfitCalculatorLogic` 三新方法 type hints + docstring 齐全，UI/业务分离改善
+- ⚠️ 待处理小项（judgement call）：
+  1. `_update_summary` 引入 4 行重复块（`数据不足` 与 `仅1条` 两分支 setStyleSheet 相同）→ 可合并
+  2. `PROJECT_REFERENCE.md:212` 仍引用已删除的 `MainWindow._rotate_weekly()`（同文件已改，漏网）
+  3. `TO-TICKETS.md` 清空 T-01~T-05 工单体非 C2 规格要求（拟意清扫，待确认保留）
+- 📌 工作区改动未提交（C2 + 文档 + TO-TICKETS 清理），待确认后 commit
+
+---
+
+### 2026-07-31 | 打包 | dist/收益计算器.exe | 重新打包（含 C1 主题色修复）
+
+**产物**：`dist/收益计算器.exe`（83.3 MB，单文件）
+
+**验证**：
+- pytest 106/106 通过 ✅
+- exe 启动烟测通过（进程正常常驻后强制结束）✅
+- warn-收益计算器.txt 仅剩 Windows 无关的 POSIX 模块与可选 scipy 缺失，无实质风险
+
+---
+
 ### 2026-07-31 | C1 | app/table_widget.py + tests/test_table_theme.py | 修复表格主题色 import 期冻结
 
 **变更**：
