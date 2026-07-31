@@ -193,6 +193,11 @@ QLabel#savedIndicator {{
     color: {fg_pos};
     font-size: 10px;
 }}
+QLabel#todayStatusLabel {{
+    color: {fg_today};
+    font-size: 10px;
+    font-weight: bold;
+}}
 
 /* ═══════════════════════════════════════════
    LineEdit
@@ -264,13 +269,13 @@ QPushButton#reuseBtn:hover {{
     background-color: {separator};
     color: {table_text_bold};
 }}
-QPushButton#themeBtn, QPushButton#pinBtn {{
+QPushButton#themeBtn, QPushButton#pinBtn, QPushButton#exportBtn {{
     background-color: {muted_bg};
     color: {fg_muted};
     padding: 4px 10px;
     font-size: 10px;
 }}
-QPushButton#themeBtn:hover, QPushButton#pinBtn:hover {{
+QPushButton#themeBtn:hover, QPushButton#pinBtn:hover, QPushButton#exportBtn:hover {{
     background-color: {separator};
 }}
 QPushButton#pinBtn[active="true"] {{

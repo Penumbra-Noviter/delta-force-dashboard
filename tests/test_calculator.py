@@ -436,3 +436,73 @@ def test_summary_invalid_date():
     count, total = logic.summary("bad-date")
     assert count == 0
     assert total is None
+
+
+# ── ProfitCalculatorLogic.export_csv ────────────────
+
+def test_export_csv_empty():
+    """无数据时只有表头行。"""
+    csv_text = ProfitCalculatorLogic({}).export_csv()
+    assert csv_text == "日期,现金,仓库,较前日,收益率\n"
+
+
+def test_export_csv_header():
+    """表头列顺序：日期/现金/仓库/较前日/收益率。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    lines = logic.export_csv().splitlines()
+    assert lines[0] == "日期,现金,仓库,较前日,收益率"
+
+
+def test_export_csv_single_record():
+    """仅一条记录时较前日/收益率为 "—"。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    lines = logic.export_csv().splitlines()
+    assert len(lines) == 2
+    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+
+
+def test_export_csv_multiple_records():
+    """多记录：按日期升序，较前日与收益率相对前一日计算。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+            "2026-07-21": {"cash": 150.0, "warehouse": 240.0},
+            "2026-07-22": {"cash": 120.0, "warehouse": 210.0},
+        }
+    )
+    lines = logic.export_csv().splitlines()
+    assert len(lines) == 4
+    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+    # 较前日 = 240 - 200 = 40；收益率 = (240-200)/200*100 = 20.0% → "+20.0%"
+    assert lines[2] == "2026-07-21,150.0,240.0,40.0,+20.0%"
+    # 较前日 = 210 - 240 = -30；收益率 = -12.5% → "-12.5%"
+    assert lines[3] == "2026-07-22,120.0,210.0,-30.0,-12.5%"
+
+
+def test_export_csv_sorted_order():
+    """导出按日期升序排列（输入无序时亦然）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-22": {"cash": 120.0, "warehouse": 210.0},
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+            "2026-07-21": {"cash": 150.0, "warehouse": 240.0},
+        }
+    )
+    dates = [line.split(",")[0] for line in logic.export_csv().splitlines()[1:]]
+    assert dates == ["2026-07-20", "2026-07-21", "2026-07-22"]
+
+
+def test_export_csv_skips_malformed_records():
+    """格式异常的记录被跳过，且不参与前日对比。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+            "2026-07-21": {"cash": "abc", "warehouse": 240.0},  # 无效
+            "2026-07-22": {"cash": 120.0, "warehouse": 250.0},
+        }
+    )
+    lines = logic.export_csv().splitlines()
+    assert len(lines) == 3  # 表头 + 2 条有效记录
+    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+    # 07-22 相对 07-20：较前日 = 250 - 200 = 50；收益率 = 25.0%
+    assert lines[2] == "2026-07-22,120.0,250.0,50.0,+25.0%"
