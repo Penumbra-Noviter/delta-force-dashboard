@@ -44,7 +44,7 @@ from app.theme import (
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 from data_store import DataStore
-from formatting import format_money, parse_money_input
+from formatting import format_money, format_short_date, parse_money_input
 from calculator import DayRecord, ProfitCalculatorLogic
 
 # DPI scaling on Windows
@@ -405,7 +405,7 @@ class MainWindow(QMainWindow):
             )
         else:
             self.input_panel.set_saved_indicator(
-                f"✓ {save_date[-5:]} 已更新 — 仓库总收益 {format_money(warehouse)}"
+                f"✓ {format_short_date(save_date)} 已更新 — 仓库总收益 {format_money(warehouse)}"
             )
 
         # 非编辑模式保存后清空输入框并回焦，便于连续录入
@@ -455,7 +455,7 @@ class MainWindow(QMainWindow):
         date_str, record = result
         self.input_panel.fill_values(record.cash, record.warehouse)
         self.input_panel.set_saved_indicator(
-            f"已复用 {date_str[-5:]} 数据，请微调后保存"
+            f"已复用 {format_short_date(date_str)} 数据，请微调后保存"
         )
         self.input_panel.set_reuse_mode()
 

@@ -1,16 +1,47 @@
 """
-金额格式化与输入清洗工具。
+格式化与输入清洗工具（金额、日期短格式）。
 """
 
 from __future__ import annotations
 
 __all__ = [
+    "format_compact",
     "format_money",
+    "format_short_date",
     "parse_money_input",
     "is_valid_money_input",
     "format_input_value",
     "unformat_input_value",
 ]
+
+
+# 财务单位因子（K/M/B）——解析与格式化共用，避免各处硬编码漂移
+_K = 1_000
+_M = 1_000_000
+_B = 1_000_000_000
+
+
+def format_compact(value: float, *, prefix: str = "") -> str:
+    """把数值格式化为紧凑的 K/M/B 财务单位（SI 阈值）。
+
+    与 format_money 的表格展示约定不同：此处 K ≥ 1e3、M ≥ 1e6、B ≥ 1e9，
+    低于 1e3 显示为整数。图表 Y 轴刻度（prefix=""）与 hover/端点标注
+    （prefix="¥"）共用此实现，保证两处阈值与精度不再各自漂移。
+
+    示例：
+        format_compact(1_500)                     → "1.5K"
+        format_compact(460_900_000)               → "460.9M"
+        format_compact(88_541_000, prefix="¥")    → "¥88.5M"
+    """
+    for factor, unit in ((_B, "B"), (_M, "M"), (_K, "K")):
+        if value >= factor:
+            return f"{prefix}{value / factor:.1f}{unit}"
+    return f"{prefix}{value:.0f}"
+
+
+def format_short_date(date_str: str) -> str:
+    """把完整日期 "YYYY-MM-DD" 截取为短格式 "MM-DD"（表格/图表标题展示用）。"""
+    return date_str[-5:]
 
 
 def format_money(value: float | None) -> str:
@@ -27,10 +58,10 @@ def format_money(value: float | None) -> str:
     sign = "-" if value < 0 else ""
     abs_v = abs(value)
 
-    if abs_v >= 100_000_000:
-        return f"¥{sign}{abs_v / 1_000_000:,.1f}M"
-    if abs_v >= 1_000_000:
-        return f"¥{sign}{abs_v / 1_000:,.1f}K"
+    if abs_v >= 100 * _M:
+        return f"¥{sign}{abs_v / _M:,.1f}M"
+    if abs_v >= _M:
+        return f"¥{sign}{abs_v / _K:,.1f}K"
     return f"¥{sign}{abs_v:,.2f}"
 
 
@@ -49,7 +80,7 @@ def parse_money_input(text: str) -> float | None:
 
     multiplier = 1
     upper = text.upper()
-    for suffix, factor in [("K", 1_000), ("M", 1_000_000), ("B", 1_000_000_000)]:
+    for suffix, factor in [("K", _K), ("M", _M), ("B", _B)]:
         if upper.endswith(suffix):
             multiplier = factor
             text = text[:-1].strip()

@@ -5,8 +5,10 @@ Tests for formatting.py — 金额格式化与输入清洗。
 import pytest
 
 from formatting import (
+    format_compact,
     format_input_value,
     format_money,
+    format_short_date,
     is_valid_money_input,
     parse_money_input,
     unformat_input_value,
@@ -52,6 +54,61 @@ def test_format_money_large():
     # 负数
     assert format_money(-5_000_000) == "¥-5,000.0K"
     assert format_money(-200_000_000) == "¥-200.0M"
+
+# ── format_compact（图表 K/M/B，SI 阈值）──────────────
+
+def test_format_compact_small():
+    """低于 1e3 显示为整数，无单位。"""
+    assert format_compact(0) == "0"
+    assert format_compact(999) == "999"
+
+
+def test_format_compact_k():
+    """K ≥ 1e3，1 位小数。"""
+    assert format_compact(1_000) == "1.0K"
+    assert format_compact(1_500) == "1.5K"
+    assert format_compact(88_541) == "88.5K"
+
+
+def test_format_compact_m():
+    """M ≥ 1e6。"""
+    assert format_compact(1_000_000) == "1.0M"
+    assert format_compact(1_500_000) == "1.5M"
+    assert format_compact(460_900_000) == "460.9M"
+
+
+def test_format_compact_b():
+    """B ≥ 1e9。"""
+    assert format_compact(1_000_000_000) == "1.0B"
+    assert format_compact(1_500_000_000) == "1.5B"
+
+
+def test_format_compact_boundary():
+    """阈值边界：恰在 1e3 / 1e6 上下。"""
+    assert format_compact(999) == "999"
+    assert format_compact(1_000) == "1.0K"
+    assert format_compact(999_900) == "999.9K"
+    assert format_compact(1_000_000) == "1.0M"
+
+
+def test_format_compact_prefix():
+    """prefix 用于 hover/端点标注（带 ¥）。"""
+    assert format_compact(88_541_000, prefix="¥") == "¥88.5M"
+    assert format_compact(1_500, prefix="¥") == "¥1.5K"
+    assert format_compact(999, prefix="¥") == "¥999"
+
+
+def test_format_compact_negative():
+    """负数落入整数分支（与旧轴实现一致），不产生单位。"""
+    assert format_compact(-1_500) == "-1500"
+    assert format_compact(-10) == "-10"
+
+# ── format_short_date（日期短格式）────────────────────
+
+def test_format_short_date():
+    """完整日期 "YYYY-MM-DD" 截取为 "MM-DD"。"""
+    assert format_short_date("2026-07-31") == "07-31"
+    assert format_short_date("2026-01-05") == "01-05"
 
 
 # ── parse_money_input ────────────────────────────────

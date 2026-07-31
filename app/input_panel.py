@@ -24,6 +24,7 @@ from app.theme import get_color, get_theme
 from formatting import (
     format_input_value,
     format_money,
+    format_short_date,
     is_valid_money_input,
     parse_money_input,
     unformat_input_value,
@@ -240,7 +241,7 @@ class InputPanel(QWidget):
         self.warehouse_entry.setText(f"{warehouse:.2f}")
         self.warehouse_entry._formatting = False
 
-        self.save_btn.setText(f"更新数据（{date_str[-5:]}）")
+        self.save_btn.setText(f"更新数据（{format_short_date(date_str)}）")
         edit_color = get_color("CHART_WAREHOUSE")
         self.save_btn.setStyleSheet(f"""
             QPushButton#saveBtn {{

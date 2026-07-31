@@ -30,23 +30,14 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import get_color, get_theme
+from formatting import format_compact, format_short_date
 
 
 class KMBAxisItem(pg.AxisItem):
     """自定义 Y 轴，将数值显示为 K/M/B 财务单位。"""
 
     def tickStrings(self, values, scale, spacing):
-        strings = []
-        for v in values:
-            if v >= 1e9:
-                strings.append(f"{v / 1e9:.1f}B")
-            elif v >= 1e6:
-                strings.append(f"{v / 1e6:.1f}M")
-            elif v >= 1e3:
-                strings.append(f"{v / 1e3:.1f}K")
-            else:
-                strings.append(f"{v:.0f}")
-        return strings
+        return [format_compact(v) for v in values]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -339,14 +330,8 @@ class _ChartPanel(QWidget):
 
     @staticmethod
     def _format_value(v: float) -> str:
-        """格式化图表数值为 K/M/B 财务单位（与 Y 轴一致）。"""
-        if v >= 1e9:
-            return f"¥{v / 1e9:.2f}B"
-        if v >= 1e6:
-            return f"¥{v / 1e6:.2f}M"
-        if v >= 1e3:
-            return f"¥{v / 1e3:.1f}K"
-        return f"¥{v:.0f}"
+        """格式化图表数值为紧凑 K/M/B（与 Y 轴共用 format_compact，带 ¥ 前缀）。"""
+        return format_compact(v, prefix="¥")
 
     @staticmethod
     def _set_adaptive_ylim(plot_widget: pg.PlotWidget, values: list) -> None:
@@ -392,7 +377,7 @@ class ChartWidget(QWidget):
         n = len(records)
 
         if n >= 2:
-            dates = [r[0][-5:] for r in records]
+            dates = [format_short_date(r[0]) for r in records]
             cash_vals = [r[1].cash for r in records]
             warehouse_vals = [r[1].warehouse for r in records]
             x = list(range(len(dates)))

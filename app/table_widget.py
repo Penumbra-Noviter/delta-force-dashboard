@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import get_color
-from formatting import format_money
+from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
 
 # ── 信号 → 主题颜色键映射 ──────────────────────────────
@@ -195,7 +195,7 @@ class _DaySubTable(QTableWidget):
                 )
 
             # 0: 日期
-            date_display = f"{date_str[-5:]} 今天" if is_today else date_str[-5:]
+            date_display = f"{format_short_date(date_str)} 今天" if is_today else format_short_date(date_str)
             date_color = get_color("FG_TODAY") if is_today else get_color("TABLE_TEXT")
             item = QTableWidgetItem(date_display)
             item.setForeground(QColor(date_color))
@@ -407,14 +407,14 @@ class TableWidget(QWidget):
         # 更新标题（配色在渲染时解析，随主题切换即时生效）
         self._left_title.setStyleSheet(_TITLE_STYLE.format(get_color("FG_MUTED")))
         if left_records:
-            left_range = f"{left_records[0][0][-5:]} ~ {left_records[-1][0][-5:]}"
+            left_range = f"{format_short_date(left_records[0][0])} ~ {format_short_date(left_records[-1][0])}"
             self._left_title.setText(f"前{len(left_records)}天数据 ({left_range})")
         else:
             self._left_title.setText("暂无数据")
 
         self._right_title.setStyleSheet(_TITLE_STYLE.format(get_color("FG_MUTED")))
         if right_records:
-            right_range = f"{right_records[0][0][-5:]} ~ {right_records[-1][0][-5:]}"
+            right_range = f"{format_short_date(right_records[0][0])} ~ {format_short_date(right_records[-1][0])}"
             self._right_title.setText(f"后{len(right_records)}天数据 ({right_range})")
         else:
             self._right_title.setText("")
