@@ -11,25 +11,21 @@ from __future__ import annotations
 
 __all__ = ["ChartWidget"]
 
-import os
 from datetime import datetime
 
-import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QAction, QFont
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QMenu,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
-from app.theme import get_color, get_theme
+from app.theme import get_color
 from formatting import format_compact, format_short_date
 
 

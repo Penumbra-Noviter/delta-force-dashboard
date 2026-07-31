@@ -12,14 +12,12 @@ import json
 import os
 import sys
 import tempfile
-import traceback
 from pathlib import Path
-from unittest.mock import patch
 
 # ── 在 import 任何 Qt 模块前设置 offscreen ──
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -28,7 +26,7 @@ PROJECT_ROOT = Path("D:/Desktop/Craft/Profit Calculator").resolve()
 os.chdir(str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.theme import THEMES, get_color, get_theme, set_theme
+from app.theme import THEMES
 from data_store import DataStore
 from formatting import (
     format_input_value,
@@ -37,7 +35,7 @@ from formatting import (
     parse_money_input,
     unformat_input_value,
 )
-from calculator import DayRecord, ProfitCalculatorLogic
+from calculator import ProfitCalculatorLogic
 
 
 # ═══════════════════════════════════════════════
@@ -371,13 +369,13 @@ def test_edit_mode() -> None:
         return
 
     win._start_edit("2026-07-25", rec)
-    check("edit 后 _editing_date 设置", win.input_panel.get_editing_date() == "2026-07-25")
+    check("edit 后 get_editing_date() 设置", win.input_panel.get_editing_date() == "2026-07-25")
     check("edit 后按钮文字含更新", "更新数据" in win.input_panel.save_btn.text())
     check("取消编辑按钮可见", not win.input_panel.cancel_edit_btn.isHidden())
 
     # 取消编辑
     win._cancel_edit()
-    check("取消后 _editing_date 清空", win.input_panel.get_editing_date() is None)
+    check("取消后 get_editing_date() 清空", win.input_panel.get_editing_date() is None)
     check("取消后按钮恢复", win.input_panel.save_btn.text() == "保存今日数据")
     check("取消编辑按钮隐藏", not win.input_panel.cancel_edit_btn.isVisible())
 

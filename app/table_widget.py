@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QPushButton,
-    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -25,7 +24,7 @@ from PySide6.QtWidgets import (
 
 from app.theme import get_color
 from formatting import format_money, format_short_date
-from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
+from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnLSignal
 
 # ── 信号 → 主题颜色键映射 ──────────────────────────────
 # 业务层返回语义信号；这里只做「信号 → 主题键」的静态映射。
@@ -39,10 +38,10 @@ _SIGNAL_TO_KEY = {
 }
 
 _PNL_TO_KEY = {
-    PnL信号.盈: "FG_POS",
-    PnL信号.亏: "FG_NEG",
-    PnL信号.平: "FG_MUTED",
-    PnL信号.无: "FG_MUTED",
+    PnLSignal.盈: "FG_POS",
+    PnLSignal.亏: "FG_NEG",
+    PnLSignal.平: "FG_MUTED",
+    PnLSignal.无: "FG_MUTED",
 }
 
 
@@ -51,7 +50,7 @@ def _signal_color(signal: RateSignal) -> str:
     return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
 
 
-def _pnl_color(signal: PnL信号) -> str:
+def _pnl_color(signal: PnLSignal) -> str:
     """盈亏信号 → 当前主题颜色（渲染时解析）。"""
     return get_color(_PNL_TO_KEY.get(signal, "FG_MUTED"))
 

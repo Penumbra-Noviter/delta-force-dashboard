@@ -15,26 +15,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
-from app.theme import get_color, get_theme
+from app.theme import get_color
 from formatting import (
     format_input_value,
-    format_money,
     format_short_date,
     is_valid_money_input,
     parse_money_input,
     unformat_input_value,
 )
-
-# Font sizes (same as original Tkinter config)
-FONT_INPUT = 13
-FONT_LABEL = 11
-FONT_BUTTON = 12
-FONT_META = 9
 
 
 class MoneyLineEdit(QLineEdit):
@@ -355,7 +347,11 @@ class InputPanel(QWidget):
     # ── 获取输入值 ──
 
     def get_cash_value(self) -> float | None:
-        """解析当前现金输入并返回金额；空输入返回 None，非法输入抛出 ValueError。"""
+        """解析当前现金输入并返回金额。
+
+        空输入或清洗后为空的文本（如 'abc'）返回 None；
+        结构性非法数字（如 '1.2.3'）抛出 ValueError。
+        """
         return parse_money_input(self.cash_entry.text())
 
     def get_cash_raw(self) -> str:
@@ -363,7 +359,11 @@ class InputPanel(QWidget):
         return self.cash_entry.text()
 
     def get_warehouse_value(self) -> float | None:
-        """解析当前仓库价值输入并返回金额；空输入返回 None，非法输入抛出 ValueError。"""
+        """解析当前仓库价值输入并返回金额。
+
+        空输入或清洗后为空的文本（如 'abc'）返回 None；
+        结构性非法数字（如 '1.2.3'）抛出 ValueError。
+        """
         return parse_money_input(self.warehouse_entry.text())
 
     def get_warehouse_raw(self) -> str:

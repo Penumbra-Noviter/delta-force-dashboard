@@ -335,12 +335,6 @@ pyqtgraph 双曲线图组件。
 | `SETTINGS_FILE` | `settings.json` | 设置文件路径 |
 | `DATE_FORMAT` | `"%Y-%m-%d"` | 日期格式 |
 | `WEEK_DAYS` | `7` | 数据保留天数 |
-| `FONT_TITLE` | `("Microsoft YaHei", 18, "bold")` | 标题字体 |
-| `FONT_LABEL` | `("Microsoft YaHei", 11)` | 标签字体 |
-| `FONT_INPUT` | `("Microsoft YaHei", 13)` | 输入字体 |
-| `FONT_TABLE_HEADER` | `("Microsoft YaHei", 10, "bold")` | 表头字体 |
-| `FONT_TABLE_CELL` | `("Microsoft YaHei", 10)` | 表格字体 |
-| `THEMES` | `dict` | `light` / `dark` 两套色板，各 ~30 个语义化 token |
 
 **主题 color token 说明**：
 

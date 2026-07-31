@@ -118,7 +118,8 @@ def unformat_input_value(text: str) -> str:
     value = parse_money_input(text)
     if value is None:
         return ""
-    return f"{value:.2f}".rstrip("0").rstrip(".") if "." in f"{value:.2f}" else f"{value:.0f}"
+    # f"{value:.2f}" 恒含小数点 → 原三元 else 分支（:.0f）是死代码
+    return f"{value:.2f}".rstrip("0").rstrip(".")
 
 
 def _normalize_numeric_string(text: str) -> str:

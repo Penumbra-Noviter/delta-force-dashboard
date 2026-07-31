@@ -10,13 +10,12 @@ from enum import Enum
 from typing import Optional
 
 from config import DATE_FORMAT, WEEK_DAYS
-from formatting import format_money
 
 __all__ = [
     "DayRecord",
     "ProfitCalculatorLogic",
     "RateSignal",
-    "PnL信号",
+    "PnLSignal",
 ]
 
 
@@ -28,7 +27,7 @@ class RateSignal(Enum):
     NONE = "none"
 
 
-class PnL信号(Enum):
+class PnLSignal(Enum):
     """盈亏信号枚举——UI 层根据信号映射颜色。"""
     盈 = "profit"
     亏 = "loss"
@@ -143,18 +142,18 @@ class ProfitCalculatorLogic:
     @staticmethod
     def get_pnl_label(
         prev_warehouse: float | None, current_warehouse: float
-    ) -> tuple[str, PnL信号]:
+    ) -> tuple[str, PnLSignal]:
         """
         根据前后日仓库价值判断盈亏，返回 (标签, 信号) 二元组。
         UI 层应将信号映射为当前主题颜色。
         """
         if prev_warehouse is None:
-            return "—", PnL信号.无
+            return "—", PnLSignal.无
         if current_warehouse > prev_warehouse:
-            return "盈", PnL信号.盈
+            return "盈", PnLSignal.盈
         if current_warehouse < prev_warehouse:
-            return "亏", PnL信号.亏
-        return "—", PnL信号.平
+            return "亏", PnLSignal.亏
+        return "—", PnLSignal.平
 
     def delete_record(self, date_str: str) -> bool:
         """删除某日记录；不存在时返回 False。"""

@@ -6,6 +6,31 @@
 
 ---
 
+### 2026-07-31 | C6 | 全项目 | 浅层残留清扫
+
+**变更**：
+- 删除 `app/config.py` 空壳文件（grep 全仓确认零引用）
+- `config.py`: 删除 7 个无消费者的 `FONT_*` 元组常量，docstring 同步（`WEEK_DAYS` 等保留）
+- `calculator.py`: `PnL信号` → `PnLSignal`（Serena rename_symbol，全仓 3 文件同步）
+- `formatting.py`: `unformat_input_value` 死分支清理（`f"{v:.2f}"` 恒含小数点，三元 `else` 不可达）
+- 死 import 清理 6 文件：`main_window.py`（QTimer/QFont/QSizePolicy/QSpacerItem/APP_DIR/get_theme）、`chart_widget.py`（os/numpy/QFont/QHBoxLayout/QSizePolicy/get_theme）、`input_panel.py`（QSizePolicy/get_theme/format_money + 4 个死 `FONT_*` 本地常量）、`table_widget.py`（QSizePolicy）、`calculator.py`（format_money）、`verify_all.py`（traceback/patch/QTimer/get_color/get_theme/set_theme/DayRecord）
+- `CODE_WIKI.md`: 删除 config.py 常量表 FONT_* 行（含已迁走的 THEMES 行）
+
+**验证**：pytest 134/134 ✅ | verify_all 通过（同 4 项既有基线失败）| AST 扫描无残留死 import
+
+---
+
+### 2026-07-31 | C7~C9 | app/input_panel.py + verify_all.py + tests | C4 评审后续三项
+
+**变更**：
+- **C7**（docstring 契约修正）：`get_cash_value()`/`get_warehouse_value()` docstring 改为「结构性非法数字抛 ValueError；清洗后为空的文本（如 `'abc'`）返回 None」——与 `parse_money_input` 实际语义对齐，消除「空输入」与「垃圾输入」的 docstring 误导
+- **C8**（检查标签改名）：`verify_all.py` `test_edit_mode` 两条 check 标签 `_editing_date` → `get_editing_date()`，不再指向已删除的 `MainWindow._editing_date` 实现细节
+- **C9**（seam 静态守卫）：新增 `test_main_window_has_no_direct_entry_access`——AST 扫描 `main_window.py` 源码，断言无 `cash_entry`/`warehouse_entry` 直取、无 `parse_money_input` 调用，即使行为等价测试回归也会被拦截
+
+**验证**：pytest 134/134 ✅（新增 1 项）| verify_all 通过（同 4 项既有基线失败）
+
+---
+
 ### 2026-07-31 | C4 | app/input_panel.py + app/main_window.py + verify_all.py + tests | InputPanel seam 成真
 
 **变更**：

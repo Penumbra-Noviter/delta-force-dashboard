@@ -6,7 +6,8 @@ C4 将 MainWindow 对输入面板的访问收敛到公开 API：
 - 编辑状态单方归属 InputPanel（is_editing()/get_editing_date()），MainWindow 不再持有 _editing_date。
 
 本文件动态断言 getter 语义、编辑状态归属、save_today 行为等价，
-并用 hasattr 静态检查防止 MainWindow._editing_date 复发。
+并用静态检查防止 seam 回归：hasattr 防 MainWindow._editing_date 复发，
+AST 源码守卫防直取输入框 / parse_money_input（C9）。
 """
 
 from __future__ import annotations
@@ -130,6 +131,41 @@ def test_editing_state_owned_by_input_panel(qapp):
 def test_main_window_has_no_editing_date_attr(main_window):
     """MainWindow 不得再持有 _editing_date（C4 收敛，防复发）。"""
     assert not hasattr(main_window, "_editing_date")
+
+
+def test_main_window_has_no_direct_entry_access(main_window):
+    """main_window.py 不得直取输入框或调用 parse_money_input（C9 源码级守卫）。
+
+    行为等价测试（如 test_save_today_uses_public_getters）即使回归到
+    cash_entry.text() + parse_money_input 也会通过；本测试用 AST 扫描源码，
+    拦截任何绕过 InputPanel 公开 getter 的访问路径。
+    """
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    tree = ast.parse(inspect.getsource(mw))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr in {
+            "cash_entry",
+            "warehouse_entry",
+        }:
+            violations.append(
+                f"L{node.lineno}: 直取输入框 {node.attr}（绕过公开 getter）"
+            )
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "parse_money_input"
+        ):
+            violations.append(
+                f"L{node.lineno}: 调用 parse_money_input（应走公开 getter）"
+            )
+    assert violations == [], (
+        f"main_window.py 绕过 InputPanel 公开 API：{violations}"
+    )
 
 
 def test_main_window_delegates_edit_state(main_window):

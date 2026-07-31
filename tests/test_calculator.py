@@ -4,7 +4,7 @@ Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计�
 
 import pytest
 
-from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
+from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnLSignal
 
 
 # ── DayRecord ────────────────────────────────────────
@@ -313,25 +313,25 @@ def test_format_rate_none():
 def test_pnl_label_profit():
     label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 420.0)
     assert label == "盈"
-    assert signal == PnL信号.盈
+    assert signal == PnLSignal.盈
 
 
 def test_pnl_label_loss():
     label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 380.0)
     assert label == "亏"
-    assert signal == PnL信号.亏
+    assert signal == PnLSignal.亏
 
 
 def test_pnl_label_no_change():
     label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 400.0)
     assert label == "—"
-    assert signal == PnL信号.平
+    assert signal == PnLSignal.平
 
 
 def test_pnl_label_no_prev():
     label, signal = ProfitCalculatorLogic.get_pnl_label(None, 420.0)
     assert label == "—"
-    assert signal == PnL信号.无
+    assert signal == PnLSignal.无
 
 
 # ── ProfitCalculatorLogic.delete_record ────────────

@@ -12,8 +12,8 @@ import json
 import platform
 from datetime import datetime
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QFont, QKeySequence
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -22,15 +22,12 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
-    QSpacerItem,
     QVBoxLayout,
     QWidget,
 )
 
 from app.chart_widget import ChartWidget
 from config import (
-    APP_DIR,
     DATE_FORMAT,
     SETTINGS_FILE,
     WEEK_DAYS,
@@ -38,7 +35,6 @@ from config import (
 from app.theme import (
     generate_qss,
     get_color,
-    get_theme,
     set_theme,
 )
 from app.input_panel import InputPanel
