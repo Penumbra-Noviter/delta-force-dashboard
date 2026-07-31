@@ -6,6 +6,18 @@
 
 ---
 
+### 2026-08-01 | 打包 | dist/收益计算器.exe | 重新打包（含 O-01~O-05）
+
+**产物**：`dist/收益计算器.exe`（83.3 MB，单文件，PyInstaller `--clean` 重建）
+
+**验证**：
+- pytest 165/165 通过 ✅
+- exe 启动烟测通过：双进程常驻（PyInstaller 单文件父子结构）→ 二次启动被单实例锁拦截（进程数保持 2）→ 强制结束干净退出 ✅
+- `profit_calculator.log` 日志通道就绪：O-01 的 `logging.basicConfig` 按 warning 惰性写文件，无异常时不生成文件属预期
+- `dist/` 残留 `settings.json`（上次烟测遗留）已清理
+
+---
+
 ### 2026-08-01 | O 系列（并行分发）| 全项目 | O-01~O-05 优化落地
 
 **模式**：O-04/05 论证不依赖 O-01~O-03，分两个 worktree 并行开发（A：O-01~O-03；B：O-04~O-05），合并冲突仅一处（`main_window.py` 模块级 logger 命名 `logger`/`_logger` → 收敛为 `logger`）。
