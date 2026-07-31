@@ -6,6 +6,46 @@
 
 ---
 
+### 2026-08-01 | C5 | tests/ + 全项目 | verify_all 影子测试并入 pytest
+
+**变更**：
+- 盘点 `verify_all.py` 14 节，确定迁移顺序：
+  - 第 1~3 节（calculator/formatting/datastore 叶子测试）→ 已被 `test_calculator.py`/`test_formatting.py`/`test_data_store.py` 覆盖，直接删除
+  - 第 4~11、13~14 节（UI 烟测）→ 迁移至新文件 `tests/test_ui_smoke.py`（offscreen，参照 `test_table_theme.py` 首个 Qt fixture）
+- 迁移改造点（深度私有访问 → 公开 seam，C4 契约）：
+  - 保存：`cash_entry.setText()` → `input_panel.fill_values()`（公开）
+  - 编辑：`win._start_edit()` → `input_panel.set_edit_mode()`（公开）
+  - 删除：`win._delete_record()` → `table.delete_requested.emit()`（公开信号）
+  - 主题/置顶：`win._toggle_theme()`/`_toggle_pin()` → `theme_btn.click()`/`pin_btn.click()`
+  - 输入校验：去抖 QTimer 异步 → 用 C4 seam `refresh_validity()` 同步断言
+  - 失焦格式化：手动模拟 → 派发真实 `focusOutEvent`
+  - 几何恢复：旧格式 `680x900+100+50` 与空 geometry 两种恢复无 crash
+- 删除 `verify_all.py`（831 行影子脚本）；settings.json 隔离、data.json 备份/恢复逻辑随之移除（pytest fixture 天然隔离，不再需要手动 backup/restore）
+- 文档同步：`CODE_WIKI.md`（7.1 用例数更新 + 7.2 改写为 pytest 烟测表 + 文件树 + 顶部测试状态）、`CONSENSUS.md`（4.3 验收标准）
+
+**验证**：pytest 147/147（134 既有 + 13 新增）✅ | `git status` 无 settings.json/data.json 污染
+
+---
+
+### 2026-08-01 | C5 评审修复 | tests/ + README + PROJECT_REFERENCE | code-review 后续修复
+
+**变更**（对应 C5 评审发现，`/code-review` 双轴报告）：
+- 修复时间耦合回归（Spec 关键项）：`make_sample_data()` 由固定日期（2026-07-20~27）
+  改为相对今天生成（offsets 7/6/5/3/2/0），样本日始终落在 `[today-6, today]` 窗口内，
+  `test_ui_initialization` 的 `present > 0` 断言不再于 2026-08-03 后必失败；
+  编辑/删除测试改为从 `logic.data` 动态取日期，不硬编码样本日
+- 公开 seam 收敛：`test_settings_persistence` 改用 `win.close()`（closeEvent 落盘）
+  替代私有 `_save_settings()`；theme 断言由 `!= "light"` 恢复为 `== "dark"`（fixture 确定态）
+- fixtures 去重：`qapp`（3 处）/`settings_guard`（2 处）收敛到 `tests/conftest.py`，
+  `test_table_theme`/`test_input_panel`/`test_ui_smoke` 删除本地副本
+- 文档勘误：节号 `13~15`→`13~14`（verify_all 实际 14 节，本日志 + `test_ui_smoke.py` docstring/节标题）、
+  verify_all 行数 `825`→`831`、README 测试数 103→147、PROJECT_REFERENCE `116 项`→147
+  + 第四/八节 UI 测试描述改写（原「当前无 UI 测试」已过时）
+
+**验证**：pytest 147/147 ✅
+
+---
+
 ### 2026-07-31 | C6 | 全项目 | 浅层残留清扫
 
 **变更**：

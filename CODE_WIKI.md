@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（第二阶段迁移完成 + 第三阶段架构优化完成）  
 > 生成日期：2026-07-29  
-> 测试状态：116 项 pytest 全部通过；verify_all.py 烟测通过（4 项既有失败与改动无关）
+> 测试状态：147 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,8 +17,8 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → 单 .exe |
-| 测试框架 | pytest（103 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1/C2）全部完成 |
+| 测试框架 | pytest（147 项） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）全部完成 |
 
 ---
 
@@ -92,10 +92,12 @@ Profit Calculator/
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 21 个测试（DayRecord + 业务逻辑）
-│   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复）
-│   └── test_formatting.py   ← 31 个测试（格式化/解析/校验）
-├── verify_all.py            ← 全量集成验证脚本（offscreen 模式，14 个模块）
+│   ├── test_calculator.py   ← 48 个测试（DayRecord + 业务逻辑）
+│   ├── test_data_store.py   ← 15 个测试（保存/加载/备份/恢复）
+│   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
+│   ├── test_input_panel.py  ← 10 个测试（C4 seam + C9 静态守卫）
+│   ├── test_table_theme.py  ← 3 个测试（C1 主题色实时解析）
+│   └── test_ui_smoke.py     ← 13 个测试（C5 UI 烟测，offscreen）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}）
 ├── settings.json            ← 窗口几何 + 置顶 + 主题持久化
 ├── requirements.txt         ← PySide6>=6.6.0, pyqtgraph>=0.13.0
@@ -486,32 +488,24 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 21 | DayRecord 属性、冻结、CRUD、日期回溯、7 日滚动、收益率计算、格式化、盈亏标签 |
-| `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持 |
-| `tests/test_formatting.py` | 31 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
+| `tests/test_calculator.py` | 48 | DayRecord 属性、冻结、CRUD、日期回溯、7 日滚动、收益率计算、格式化、盈亏标签、删除、滚动旋转、7 日汇总 |
+| `tests/test_data_store.py` | 15 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持 |
+| `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 
 **运行方式**：在项目根目录执行 `pytest`
 
-### 7.2 全量集成验证（verify_all.py）
+### 7.2 UI 烟测（pytest offscreen）
 
-`verify_all.py` 在 offscreen 模式下运行，覆盖 14 个模块：
+UI 烟测并入 pytest（C5 迁移，2026-08-01 删除影子脚本 `verify_all.py`），
+offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
-1. 业务逻辑层（calculator.py）
-2. 格式化层（formatting.py）
-3. 数据持久化层（data_store.py）
-4. UI 启动 & 基本渲染
-5. 保存今日数据
-6. 编辑模式
-7. 删除数据（确认/取消）
-8. 亮/暗主题切换
-9. 窗口置顶切换
-10. 设置持久化
-11. 窗口几何恢复（兼容旧 Tkinter 格式）
-12. 7 天滚动旋转
-13. 金额输入校验 + 格式化
-14. 键盘快捷键（Enter/Esc）
+| 测试文件 | 用例数 | 覆盖范围 |
+|----------|--------|----------|
+| `tests/test_ui_smoke.py` | 13 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc） |
+| `tests/test_input_panel.py` | 10 | InputPanel getter 语义 / raw getter / refresh_validity / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API |
+| `tests/test_table_theme.py` | 3 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 |
 
-**运行方式**：`QT_QPA_PLATFORM=offscreen python verify_all.py`
+**运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）
 
 ---
 
@@ -540,11 +534,8 @@ python main.py
 ### 8.3 运行测试
 
 ```bash
-# 单元测试
+# 全部测试（含 UI 烟测，Qt 用例自动使用 offscreen 平台）
 pytest
-
-# 全量集成验证（offscreen 模式，无需 GUI）
-QT_QPA_PLATFORM=offscreen python verify_all.py
 ```
 
 ### 8.4 打包为可执行文件

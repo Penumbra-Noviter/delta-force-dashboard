@@ -182,8 +182,7 @@ Profit Calculator/
 
 ### 4.3 验收标准
 
-- [x] `verify_all.py` 全部测试通过（exit code 0）
-- [x] `pytest tests/` 全部通过（103 项）
+- [x] `pytest tests/` 全部通过（147 项，C5 迁移后 verify_all.py 已并入）
 - [x] 启动速度不差于优化前
 - [x] 程序运行无闪退、无 UI 卡顿
 - [x] Tkinter 代码完全移除后已有功能不受影响

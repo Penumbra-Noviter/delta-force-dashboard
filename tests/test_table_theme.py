@@ -26,16 +26,7 @@ from calculator import DayRecord
 __all__ = []
 
 
-# ── fixtures ──────────────────────────────────────────────
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    """进程级 QApplication（offscreen），供表格控件创建。"""
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication.instance() or QApplication([])
-    yield app
+# ── fixtures（qapp 见 tests/conftest.py）──────────────────
 
 
 @pytest.fixture

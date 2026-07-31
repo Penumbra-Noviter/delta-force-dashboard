@@ -26,27 +26,7 @@ from data_store import DataStore
 __all__ = []
 
 
-# ── fixtures ──────────────────────────────────────────────
-
-
-@pytest.fixture(scope="module")
-def qapp():
-    """进程级 QApplication（offscreen），供输入面板/主窗口创建。"""
-    from PySide6.QtWidgets import QApplication
-
-    app = QApplication.instance() or QApplication([])
-    yield app
-
-
-@pytest.fixture
-def settings_guard(tmp_path):
-    """隔离真实 settings.json：测试期间重定向到 tmp，避免 closeEvent 污染用户设置。"""
-    import app.main_window as mw
-
-    orig = mw.SETTINGS_FILE
-    mw.SETTINGS_FILE = tmp_path / "settings.json"
-    yield
-    mw.SETTINGS_FILE = orig
+# ── fixtures（qapp / settings_guard 见 tests/conftest.py）──
 
 
 @pytest.fixture

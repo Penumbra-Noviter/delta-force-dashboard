@@ -12,7 +12,7 @@
 
 **核心场景**：用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动记录最近 7 天数据，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
-**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段 P0-P5 + Phase 4（T-01~T-05）+ C 系列（C1/C2）架构优化已完成，新增单实例保证。116 项测试全部通过。
+**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段 P0-P5 + Phase 4（T-01~T-05）+ C 系列（C1~C5）架构优化已完成，新增单实例保证。147 项测试全部通过。
 
 ---
 
@@ -144,12 +144,15 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 ## 四、测试体系
 
 - **框架**：pytest
-- **覆盖范围**：
-  - `calculator.py`：DayRecord 属性、增删改查、差值计算、7 日滚动查询、集成流程 — 21 用例
-  - `data_store.py`：保存/加载回环、滚动备份编号、损坏恢复、原子写入残留 — 18 用例
-  - `formatting.py`：金额格式化（大/小/零/负/None）、输入解析（符号/后缀/空格/中文）、校验边界 — 31 用例
-- **运行**：项目根目录执行 `pytest`
-- **注意**：当前无 UI 测试（Tkinter + matplotlib 测试困难），PySide6 迁移后可考虑 `pytest-qt`
+- **覆盖范围**（147 项，2026-08-01）：
+  - `calculator.py`：DayRecord 属性、增删改查、差值计算、7 日滚动/旋转、汇总 — 48 用例
+  - `data_store.py`：保存/加载回环、滚动备份编号、损坏恢复、原子写入残留 — 15 用例
+  - `formatting.py`：金额格式化（大/小/零/负/None）、输入解析（符号/后缀/空格/中文）、校验边界 — 58 用例
+  - `test_input_panel.py`：InputPanel getter / 编辑状态归属 / save_today 走公开 API（C4 seam）— 10 用例
+  - `test_table_theme.py`：表格主题色实时解析 + AST 防冻结（C1 回归）— 3 用例
+  - `test_ui_smoke.py`：offscreen UI 烟测（C5，承接原 verify_all）— 13 用例
+- **运行**：项目根目录执行 `pytest`（Qt 用例自动使用 offscreen 平台）
+- **注意**：UI 烟测已并入 pytest（offscreen），`verify_all.py` 影子脚本已于 C5 删除
 
 ---
 
@@ -225,7 +228,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - **第二阶段启动前验证环境**：`pip install PySide6 pyqtgraph`
 - **第二阶段迁移策略**：先搭 QMainWindow 骨架 → 逐步移植子组件 → 每移植一个验证一次
 - **data.json 的现有数据**：有 6 天真实数据（2026-07-20 ~ 2026-07-27），开发过程中注意备份
-- **测试**：`pytest` 在项目根目录运行，测试不依赖 UI
+- **测试**：`pytest` 在项目根目录运行（UI 烟测 offscreen，自动使用临时数据/设置，不触碰真实 data.json / settings.json）
 
 ---
 
