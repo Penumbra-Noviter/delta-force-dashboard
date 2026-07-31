@@ -27,7 +27,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFocusEvent, QKeySequence
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from calculator import ProfitCalculatorLogic
 from config import DATE_FORMAT
@@ -389,3 +389,72 @@ def test_keyboard_shortcuts_enter_and_escape(sample_window):
         a for a in actions if a.shortcut() == QKeySequence(Qt.Key.Key_Escape)
     ]
     assert len(esc_shortcuts) >= 1
+
+
+# ── O-04. CSV 导出 ───────────────────────────────────
+
+
+def test_export_btn_exists(sample_window):
+    """标题栏存在「导出 CSV」按钮。"""
+    win = sample_window
+    assert hasattr(win, "export_btn")
+    assert win.export_btn.text() == "导出 CSV"
+
+
+def test_export_csv_writes_file(sample_window, monkeypatch, tmp_path):
+    """点击导出 → 选择路径 → 写入 utf-8-sig CSV（Excel 可直接打开）。"""
+    win = sample_window
+    out = tmp_path / "export.csv"
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *a, **kw: (str(out), "CSV 文件 (*.csv)")),
+    )
+
+    win.export_btn.click()
+
+    assert out.exists()
+    raw = out.read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf")  # utf-8-sig BOM
+    text = raw.decode("utf-8-sig")
+    assert text.startswith("日期,现金,仓库,较前日,收益率\n")
+
+
+def test_export_csv_cancel_writes_nothing(sample_window, monkeypatch, tmp_path):
+    """取消文件选择 → 不写入文件、无异常。"""
+    win = sample_window
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *a, **kw: ("", "")),
+    )
+
+    win.export_btn.click()
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_export_csv_failure_shows_warning(sample_window, monkeypatch, tmp_path):
+    """写入失败 → 弹出警告且不静默。"""
+    win = sample_window
+    out = tmp_path / "export.csv"
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *a, **kw: (str(out), "CSV 文件 (*.csv)")),
+    )
+    monkeypatch.setattr(
+        "builtins.open",
+        lambda *a, **kw: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    warnings: list = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+
+    win.export_btn.click()
+
+    assert warnings  # 写失败时弹了警告
+    assert not out.exists()

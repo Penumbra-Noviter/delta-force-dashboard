@@ -9,6 +9,7 @@ from __future__ import annotations
 __all__ = ["MainWindow"]
 
 import json
+import logging
 import platform
 from datetime import datetime
 
@@ -16,6 +17,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -28,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from app.chart_widget import ChartWidget
 from config import (
+    APP_DIR,
     DATE_FORMAT,
     SETTINGS_FILE,
     WEEK_DAYS,
@@ -42,6 +45,8 @@ from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+
+_logger = logging.getLogger(__name__)
 
 # DPI scaling on Windows
 if platform.system() == "Windows":
@@ -189,6 +194,12 @@ class MainWindow(QMainWindow):
         self.pin_btn.setObjectName("pinBtn")
         self.pin_btn.clicked.connect(self._toggle_pin)
         title_layout.addWidget(self.pin_btn)
+
+        self.export_btn = QPushButton("导出 CSV")
+        self.export_btn.setObjectName("exportBtn")
+        self.export_btn.setToolTip("将数据导出为 CSV 文件（Excel 可直接打开）")
+        self.export_btn.clicked.connect(self._export_csv)
+        title_layout.addWidget(self.export_btn)
 
         root_layout.addWidget(title_bar)
 
@@ -473,6 +484,35 @@ class MainWindow(QMainWindow):
             self._cancel_edit()
 
         self.refresh_display()
+
+    # ═══════════════════════════════════════════════════════
+    # 导出 CSV
+    # ═══════════════════════════════════════════════════════
+
+    def _export_csv(self) -> None:
+        """导出 CSV：QFileDialog 选路径，utf-8-sig 编码写入（Excel 可直接打开）。
+
+        写入失败时提示用户并记录日志，不静默；取消选择时直接返回。
+        """
+        default_path = str(APP_DIR / f"收益数据_{self.today}.csv")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "导出 CSV", default_path, "CSV 文件 (*.csv)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8-sig", newline="") as f:
+                f.write(self.logic.export_csv())
+        except OSError as e:
+            _logger.error("CSV 导出失败（%s）: %s", path, e)
+            QMessageBox.warning(
+                self,
+                "导出失败",
+                f"无法写入文件：\n{path}\n\n{e}",
+            )
+            return
+        _logger.info("CSV 已导出：%s", path)
+        self.input_panel.set_saved_indicator("✓ CSV 已导出")
 
     # ═══════════════════════════════════════════════════════
     # 刷新展示

@@ -188,3 +188,30 @@ class ProfitCalculatorLogic:
         if len(records) == 1:
             return 1, records[0].warehouse
         return len(records), records[-1].warehouse - records[0].warehouse
+
+    def export_csv(self) -> str:
+        """生成 CSV 导出文本（列：日期/现金/仓库/较前日/收益率）。
+
+        纯函数：只读 self.data，无副作用、不触碰 UI。记录按日期升序排列；
+        「较前日」与「收益率」相对前一有记录日期计算，语义与表格/图表一致
+        （较前日 = 当日仓库值 − 前一日仓库值，总收益 = 仓库价值已含现金）；
+        无前日数据时对应单元格为 "—"。
+        """
+        lines = ["日期,现金,仓库,较前日,收益率"]
+        prev_warehouse: float | None = None
+        for date_str in sorted(self.data):
+            record = self.get_record(date_str)
+            if record is None:
+                continue
+            diff = (
+                "—"
+                if prev_warehouse is None
+                else str(record.warehouse - prev_warehouse)
+            )
+            rate = self.calculate_rate(prev_warehouse, record.warehouse)
+            rate_text, _ = self.format_rate(rate)
+            lines.append(
+                f"{date_str},{record.cash},{record.warehouse},{diff},{rate_text}"
+            )
+            prev_warehouse = record.warehouse
+        return "\n".join(lines) + "\n"
