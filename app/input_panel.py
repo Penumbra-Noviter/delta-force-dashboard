@@ -70,6 +70,13 @@ class MoneyLineEdit(QLineEdit):
             self._set_validity_state("invalid")
         self.validity_changed.emit(valid and text != "")
 
+    def refresh_validity(self) -> None:
+        """立即同步重校验当前文本（外部改动后调用）。
+
+        公开 seam：供 InputPanel 等外部调用，委托私有 _update_validity()。
+        """
+        self._update_validity()
+
     def _set_validity_state(self, state: str) -> None:
         self.setProperty("validity", state)
         self.style().unpolish(self)
@@ -372,8 +379,8 @@ class InputPanel(QWidget):
 
     def refresh_validity(self) -> None:
         """立即重新校验两个输入框的有效性（清空等外部改动后调用）。"""
-        self.cash_entry._update_validity()
-        self.warehouse_entry._update_validity()
+        self.cash_entry.refresh_validity()
+        self.warehouse_entry.refresh_validity()
 
     # ── 主题 ──
 
