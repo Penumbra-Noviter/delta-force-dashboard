@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（第二阶段迁移完成 + 第三阶段架构优化完成）  
 > 生成日期：2026-07-29  
-> 测试状态：147 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 测试状态：165 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,8 +17,8 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → 单 .exe |
-| 测试框架 | pytest（147 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）全部完成 |
+| 测试框架 | pytest（165 项） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-05）全部完成 |
 
 ---
 
@@ -136,16 +136,18 @@ Profit Calculator/
 |------|------|
 | `__init__()` | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
 | `_setup_window()` | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
-| `_build_ui()` | 构建标题栏、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
-| `_connect_signals()` | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求） |
+| `_build_ui()` | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
+| `_connect_signals()` | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
 | `save_today()` | 解析输入 → 验证 → 保存到 logic → 滚动 7 日 → 持久化 → 刷新显示 |
-| `refresh_display()` | 获取 records → 刷新表格 + 图表 |
+| `refresh_display()` | 获取 records → 刷新汇总/今日未录入/表格/图表 |
+| `_export_csv()` | QFileDialog 选路径，utf-8-sig 写入 `logic.export_csv()`（O-04） |
+| `_update_today_status()` | 今日无记录时显示「今日未录入」，有则隐藏（O-05） |
 | `_start_edit(date_str, record)` | 进入编辑模式，回填数据到输入面板 |
 | `_cancel_edit()` | 退出编辑模式，清空输入框 |
 | `_delete_record(date_str)` | 确认对话框 → 删除数据 → 持久化 → 刷新 |
 | `_toggle_theme()` | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
 | `_toggle_pin()` | 切换窗口置顶状态 |
-| `_save_settings()` / `_load_settings()` | 设置持久化（geometry/theme/pinned） |
+| `_save_settings()` / `_load_settings()` | 设置持久化（geometry/theme/pinned），失败记日志（O-01） |
 
 #### 信号连接
 
@@ -171,6 +173,7 @@ Profit Calculator/
 | `__init__()` | 设置占位文本、右对齐、150ms 去抖 QTimer |
 | `_on_text_changed(text)` | 文本变化时重启去抖计时器 |
 | `_update_validity()` | 校验当前输入：空 → normal / 合法 → valid / 非法 → invalid |
+| `refresh_validity()` | 立即同步重校验当前文本（公开 seam，委托 `_update_validity()`，O-02） |
 | `_set_validity_state(state)` | 设置 `validity` 属性，触发 QSS 重绘边框 |
 | `focusInEvent()` | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
 | `focusOutEvent()` | 失焦时格式化：`1234.56` → `¥1,234.56` |
@@ -188,7 +191,7 @@ Profit Calculator/
 | `is_editing()` / `get_editing_date()` | 编辑状态查询（**单方归属 InputPanel**，C4） |
 | `get_cash_value()` / `get_warehouse_value()` | 解析当前输入返回金额；空→`None`，非法→`ValueError`（C4 seam） |
 | `get_cash_raw()` / `get_warehouse_raw()` | 返回输入框原始文本（供解析失败提示） |
-| `refresh_validity()` | 立即重新校验两个输入框的有效性（清空后调用） |
+| `refresh_validity()` | 立即重新校验两个输入框的有效性（经公开 seam，O-02） |
 | `fill_values(cash, warehouse)` | 填入金额并选中现金框（不触发焦点格式化） |
 | `clear_fields()` | 清空输入框，保留已保存指示器 |
 | `set_saved_indicator(text)` | 设置保存成功提示文本 |
@@ -319,11 +322,13 @@ pyqtgraph 双曲线图组件。
 | `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
 | `rotate_weekly` | `days=7` | `None` | 7 日保留策略，超过上限删除最旧记录 |
 | `summary` | `end_date, days=7` | `(int, float \| None)` | 7 日窗口总盈亏（末日−首日） |
+| `export_csv` | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
 
 **关键业务规则**：
 - `total` = `warehouse`（非 `warehouse + cash`）
 - 收益率 = `(今日warehouse - 前日warehouse) / 前日warehouse × 100%`，精度 1 位小数
 - 盈亏标签：盈（绿底）/ 亏（红底）/ —（灰底，无前日数据或持平）
+- CSV「较前日」= 当日仓库值 − 前一有记录日仓库值；无前日数据为 `—`；总收益 = 仓库已含现金
 
 ---
 
@@ -373,13 +378,14 @@ pyqtgraph 双曲线图组件。
 | `save(data)` | 保存数据：滚动备份 → 原子写入 |
 | `_try_load(path)` | 安全读取 JSON 文件，损坏返回 None |
 | `_atomic_write(data, target)` | 原子写入：先写 `.tmp`，再 `os.replace` 覆盖 |
-| `_rotate_backups()` | 滚动备份：bak.2→bak.3, bak.1→bak.2, 当前→bak.1 + bak |
+| `_rotate_backups()` | 滚动备份：bak.2→bak.3, bak.1→bak.2, 当前→bak.1 + bak；复制失败记日志不中断（O-01） |
 
 **关键机制**：
 - **原子写入**：`.tmp` → `os.replace`，保证写入过程中进程崩溃不会损坏原文件
 - **滚动备份**：最多保留 3 份历史备份（`data.json.bak.1` 为最新）
 - **兼容性**：同时保留旧版单文件 `.bak`（与 `.bak.1` 内容相同）
 - **损坏恢复**：主文件 JSON 解析失败时自动从最近可用备份恢复，全部损坏则返回空字典
+- **日志**：备份复制失败仅记 `logger.warning`，不影响主流程保存（O-01）
 
 ---
 
@@ -488,8 +494,8 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 48 | DayRecord 属性、冻结、CRUD、日期回溯、7 日滚动、收益率计算、格式化、盈亏标签、删除、滚动旋转、7 日汇总 |
-| `tests/test_data_store.py` | 15 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持 |
+| `tests/test_calculator.py` | 54 | DayRecord 属性、冻结、CRUD、日期回溯、7 日滚动、收益率计算、格式化、盈亏标签、删除、滚动旋转、7 日汇总、CSV 导出 |
+| `tests/test_data_store.py` | 16 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志 |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 
 **运行方式**：在项目根目录执行 `pytest`
@@ -501,8 +507,8 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | 13 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc） |
-| `tests/test_input_panel.py` | 10 | InputPanel getter 语义 / raw getter / refresh_validity / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API |
+| `tests/test_ui_smoke.py` | 22 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、损坏设置日志、保存失败日志、CSV 导出按钮、今日未录入提醒 |
+| `tests/test_input_panel.py` | 12 | InputPanel getter 语义 / raw getter / refresh_validity 公开 seam / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API |
 | `tests/test_table_theme.py` | 3 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 |
 
 **运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）

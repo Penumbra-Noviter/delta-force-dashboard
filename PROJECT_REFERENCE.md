@@ -12,7 +12,7 @@
 
 **核心场景**：用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动记录最近 7 天数据，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
-**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段 P0-P5 + Phase 4（T-01~T-05）+ C 系列（C1~C5）架构优化已完成，新增单实例保证。147 项测试全部通过。
+**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段 P0-P5 + Phase 4（T-01~T-05）+ C 系列（C1~C5）+ O 系列（O-01~O-05）架构优化已完成，新增单实例保证、CSV 导出、今日未录入提醒、文件日志。165 项测试全部通过。
 
 ---
 
@@ -144,13 +144,13 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 ## 四、测试体系
 
 - **框架**：pytest
-- **覆盖范围**（147 项，2026-08-01）：
-  - `calculator.py`：DayRecord 属性、增删改查、差值计算、7 日滚动/旋转、汇总 — 48 用例
-  - `data_store.py`：保存/加载回环、滚动备份编号、损坏恢复、原子写入残留 — 15 用例
+- **覆盖范围**（165 项，2026-08-01）：
+  - `calculator.py`：DayRecord 属性、增删改查、差值计算、7 日滚动/旋转、汇总、CSV 导出 — 54 用例
+  - `data_store.py`：保存/加载回环、滚动备份编号、损坏恢复、原子写入残留、备份失败日志 — 16 用例
   - `formatting.py`：金额格式化（大/小/零/负/None）、输入解析（符号/后缀/空格/中文）、校验边界 — 58 用例
-  - `test_input_panel.py`：InputPanel getter / 编辑状态归属 / save_today 走公开 API（C4 seam）— 10 用例
+  - `test_input_panel.py`：InputPanel getter / 编辑状态归属 / save_today 走公开 API（C4 seam）/ refresh_validity 公开 seam — 12 用例
   - `test_table_theme.py`：表格主题色实时解析 + AST 防冻结（C1 回归）— 3 用例
-  - `test_ui_smoke.py`：offscreen UI 烟测（C5，承接原 verify_all）— 13 用例
+  - `test_ui_smoke.py`：offscreen UI 烟测（C5，承接原 verify_all；O 系列新增 CSV 导出/今日未录入/损坏设置日志）— 22 用例
 - **运行**：项目根目录执行 `pytest`（Qt 用例自动使用 offscreen 平台）
 - **注意**：UI 烟测已并入 pytest（offscreen），`verify_all.py` 影子脚本已于 C5 删除
 

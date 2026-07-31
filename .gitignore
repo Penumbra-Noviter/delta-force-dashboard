@@ -22,6 +22,9 @@ dist/
 *.bak.*
 *.tmp
 
+# ── Runtime data ────────────────────────────────────
+data.json
+
 # ── IDE / Editor ────────────────────────────────────
 .idea/
 .vscode/

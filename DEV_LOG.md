@@ -6,6 +6,37 @@
 
 ---
 
+### 2026-08-01 | O 系列（并行分发）| 全项目 | O-01~O-05 优化落地
+
+**模式**：O-04/05 论证不依赖 O-01~O-03，分两个 worktree 并行开发（A：O-01~O-03；B：O-04~O-05），合并冲突仅一处（`main_window.py` 模块级 logger 命名 `logger`/`_logger` → 收敛为 `logger`）。
+
+**O-01 | logging 替换静默 except**（`e6d5b64`，重构/可观测性）：
+- `app/main_window.py` `_load_settings` / `_save_settings`、`data_store.py` `_rotate_backups` 三处 `except: pass` → `logger.warning("...: %s", e)`
+- `main.py` 新增 `logging.basicConfig` 写 `APP_DIR/profit_calculator.log`（打包版窗口化 exe 无 stderr，文件日志是唯一可见通道）
+- 保留不动：`_setup_window` 几何恢复/DPI 的 `except Exception: pass`（工单外）；`calculator.py`/`data_store.py` 中 `return None` 的正常语义 except
+- 测试 +3：`test_rotate_backups_logs_warning_on_failure` / `test_load_settings_corrupt_logs_warning` / `test_save_settings_failure_logs_warning`
+
+**O-02 | MoneyLineEdit.refresh_validity 公开 seam**（`486d41f`，重构/seam）：
+- `MoneyLineEdit` 新增公开 `refresh_validity()` 委托私有 `_update_validity()`；`InputPanel.refresh_validity()` 改调公开方法——C4 公开 seam 体系漏网的最后一处跨对象私有访问收敛
+- 测试 +2：公开 seam 行为（valid/invalid/normal）+ AST 守卫（防 InputPanel 直调 `_update_validity` 复发，C9 风格）
+
+**O-03 | format_money docstring 阈值交叉说明**（`ac75c71`，文档）：docstring 补「与 `format_compact` 不同，此处 K 阈值为 1,000,000 而非 1,000」，与 C3 侧形成双向引用。纯注释。
+
+**O-04 | CSV 数据导出**（`8f50592`，功能）：
+- `calculator.py` 新增公开纯函数 `ProfitCalculatorLogic.export_csv()`：列 `日期,现金,仓库,较前日,收益率`，日期升序，较前日/收益率复用 `calculate_rate`/`format_rate` 语义（总收益 = 仓库已含现金），无前日数据为 `—`，异常记录跳过
+- `app/main_window.py` 标题栏新增 `export_btn`「导出 CSV」+ `QFileDialog` 选路径，`utf-8-sig` + `newline=""` 写入（Excel 可直接打开），失败弹 `QMessageBox.warning` + 记日志，成功 `set_saved_indicator("✓ CSV 已导出")`
+- `app/theme.py` `exportBtn` 并入 themeBtn/pinBtn QSS 按钮组
+- 测试 +10：纯函数 6（空/表头/单条/多条/升序/异常跳过）+ UI 4（按钮存在/utf-8-sig BOM/取消不写/失败警告）
+
+**O-05 | 今日未录入提醒**（`749cd59`，功能）：
+- `app/main_window.py` 标题栏新增 `_today_status_label`「今日未录入」，`_update_today_status()` 纯读 `logic.get_record(self.today)` 控制显隐，挂在 `refresh_display()`（启动/保存/删除/主题切换均刷新）
+- `app/theme.py` 新增 `QLabel#todayStatusLabel` QSS（`fg_today` 强调色）
+- 测试 +3：未录入可见 / 保存后隐藏 / 已有记录隐藏
+
+**验证**：pytest 165/165（147 基线 + 18 新增）✅ | 提交 `e6d5b64`/`486d41f`/`ac75c71`/`8f50592`/`749cd59` + merge `c01c2c2`/`fdeca85`
+
+---
+
 ### 2026-08-01 | C5 | tests/ + 全项目 | verify_all 影子测试并入 pytest
 
 **变更**：
