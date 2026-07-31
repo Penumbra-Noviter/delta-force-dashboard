@@ -279,6 +279,38 @@ def test_settings_persistence(sample_window, tmp_path):
     assert "geometry" in saved
 
 
+def test_load_settings_corrupt_logs_warning(tmp_path, monkeypatch, caplog):
+    """损坏的 settings.json：_load_settings 不抛异常，且记录 warning。"""
+    import app.main_window as mw
+
+    bad_file = tmp_path / "settings.json"
+    bad_file.write_text("{ not valid json !!!", encoding="utf-8")
+    monkeypatch.setattr(mw, "SETTINGS_FILE", bad_file)
+
+    with caplog.at_level("WARNING"):
+        result = mw.MainWindow._load_settings()
+
+    assert result == {}
+    assert any("设置文件读取失败" in rec.message for rec in caplog.records)
+
+
+def test_save_settings_failure_logs_warning(qapp, tmp_path, monkeypatch, caplog):
+    """settings.json 写入失败：不抛异常，仅记录 warning。"""
+    import app.main_window as mw
+    from app.main_window import MainWindow
+
+    # 目标目录不存在 → open(..., "w") 抛 OSError
+    bad_file = tmp_path / "missing_dir" / "settings.json"
+    monkeypatch.setattr(mw, "SETTINGS_FILE", bad_file)
+
+    win = MainWindow(store=DataStore(tmp_path / "data.json"))
+    with caplog.at_level("WARNING"):
+        win._save_settings()
+    win.close()
+
+    assert any("设置文件写入失败" in rec.message for rec in caplog.records)
+
+
 # ── 11. 窗口几何恢复 ─────────────────────────────────────
 
 

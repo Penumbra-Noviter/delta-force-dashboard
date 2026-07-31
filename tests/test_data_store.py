@@ -105,6 +105,24 @@ def test_backup_numbering(tmp_dir):
         assert json.load(f) == {"step": 1}
 
 
+# ── Backup failure logging ────────────────────────────
+
+def test_rotate_backups_logs_warning_on_failure(tmp_dir, caplog):
+    """备份复制失败时不抛异常，仅记录 warning（不影响主流程）。"""
+    store = make_store(tmp_dir)
+    store.save({"v": 1})  # 先落盘 data.json
+
+    # 把备份目标指向不存在的目录 → shutil.copy2 抛 OSError
+    store.backup_file = tmp_dir / "missing_dir" / "data.json.bak"
+
+    with caplog.at_level("WARNING"):
+        store.save({"v": 2})
+
+    assert any("备份文件复制失败" in rec.message for rec in caplog.records)
+    # 主数据仍正常写入
+    assert store.load() == {"v": 2}
+
+
 # ── Recovery from backup ─────────────────────────────
 
 def test_recover_from_corrupt_main(tmp_dir):
