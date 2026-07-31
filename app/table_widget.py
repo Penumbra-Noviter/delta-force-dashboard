@@ -27,21 +27,37 @@ from app.theme import get_color
 from formatting import format_money
 from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnL信号
 
-# ── 信号 → 主题颜色映射 ──────────────────────────────
-# 业务层返回语义信号，UI 层在此映射为当前主题的具体颜色值
-_SIGNAL_TO_COLOR = {
-    RateSignal.POSITIVE: get_color("FG_POS"),
-    RateSignal.NEGATIVE: get_color("FG_NEG"),
-    RateSignal.NEUTRAL: get_color("FG_MUTED"),
-    RateSignal.NONE: get_color("FG_MUTED"),
+# ── 信号 → 主题颜色键映射 ──────────────────────────────
+# 业务层返回语义信号；这里只做「信号 → 主题键」的静态映射。
+# 具体色值在渲染时经 get_color() 解析——颜色绝不在 import 期冻结，
+# 主题切换后渲染路径自动取到新主题色。
+_SIGNAL_TO_KEY = {
+    RateSignal.POSITIVE: "FG_POS",
+    RateSignal.NEGATIVE: "FG_NEG",
+    RateSignal.NEUTRAL: "FG_MUTED",
+    RateSignal.NONE: "FG_MUTED",
 }
 
-_PNL_TO_COLOR = {
-    PnL信号.盈: get_color("FG_POS"),
-    PnL信号.亏: get_color("FG_NEG"),
-    PnL信号.平: get_color("FG_MUTED"),
-    PnL信号.无: get_color("FG_MUTED"),
+_PNL_TO_KEY = {
+    PnL信号.盈: "FG_POS",
+    PnL信号.亏: "FG_NEG",
+    PnL信号.平: "FG_MUTED",
+    PnL信号.无: "FG_MUTED",
 }
+
+
+def _signal_color(signal: RateSignal) -> str:
+    """收益率信号 → 当前主题颜色（渲染时解析）。"""
+    return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
+
+
+def _pnl_color(signal: PnL信号) -> str:
+    """盈亏信号 → 当前主题颜色（渲染时解析）。"""
+    return get_color(_PNL_TO_KEY.get(signal, "FG_MUTED"))
+
+
+# 标题基础样式：颜色随主题实时解析，不在此冻结
+_TITLE_STYLE = "font-weight: bold; font-size: 11px; color: {};"
 
 COLUMNS = ["日期", "现金", "仓库（总收益）", "较前日", "收益率", "盈亏", "操作"]
 # 最小列宽（Stretch 模式下的保底宽度，保证内容不被硬截断）
@@ -228,7 +244,7 @@ class _DaySubTable(QTableWidget):
             # 4: 收益率
             rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
             rate_str, rate_signal = ProfitCalculatorLogic.format_rate(rate)
-            rate_color = _SIGNAL_TO_COLOR.get(rate_signal, get_color("FG_MUTED"))
+            rate_color = _signal_color(rate_signal)
             item = QTableWidgetItem(rate_str)
             item.setForeground(QColor(rate_color))
             item.setBackground(row_bg)
@@ -239,7 +255,7 @@ class _DaySubTable(QTableWidget):
             pnl_text, pnl_signal = ProfitCalculatorLogic.get_pnl_label(
                 prev_warehouse, record.warehouse
             )
-            pnl_bg = _PNL_TO_COLOR.get(pnl_signal, get_color("FG_MUTED"))
+            pnl_bg = _pnl_color(pnl_signal)
             if pnl_text == "—":
                 badge_text = "—"
             else:
@@ -325,10 +341,6 @@ class _DaySubTable(QTableWidget):
 
         return widget
 
-    def apply_theme(self) -> None:
-        """下次 draw() 时应用新主题色。"""
-        pass
-
 
 class TableWidget(QWidget):
     """双栏布局表格：左栏前4天 + 右栏后3天数据。"""
@@ -354,9 +366,6 @@ class TableWidget(QWidget):
 
         self._left_title = QLabel()
         self._left_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._left_title.setStyleSheet(
-            f"font-weight: bold; font-size: 11px; color: {get_color('FG_MUTED')};"
-        )
         left_layout.addWidget(self._left_title)
 
         self._left_table = _DaySubTable()
@@ -374,9 +383,6 @@ class TableWidget(QWidget):
 
         self._right_title = QLabel()
         self._right_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._right_title.setStyleSheet(
-            f"font-weight: bold; font-size: 11px; color: {get_color('FG_MUTED')};"
-        )
         right_layout.addWidget(self._right_title)
 
         self._right_table = _DaySubTable()
@@ -398,13 +404,15 @@ class TableWidget(QWidget):
         left_records = records[:mid]
         right_records = records[mid:]
 
-        # 更新标题
+        # 更新标题（配色在渲染时解析，随主题切换即时生效）
+        self._left_title.setStyleSheet(_TITLE_STYLE.format(get_color("FG_MUTED")))
         if left_records:
             left_range = f"{left_records[0][0][-5:]} ~ {left_records[-1][0][-5:]}"
             self._left_title.setText(f"前{len(left_records)}天数据 ({left_range})")
         else:
             self._left_title.setText("暂无数据")
 
+        self._right_title.setStyleSheet(_TITLE_STYLE.format(get_color("FG_MUTED")))
         if right_records:
             right_range = f"{right_records[0][0][-5:]} ~ {right_records[-1][0][-5:]}"
             self._right_title.setText(f"后{len(right_records)}天数据 ({right_range})")
@@ -417,8 +425,3 @@ class TableWidget(QWidget):
         # 绘制右表：传入左表最后一条记录的仓库值作为 prev_warehouse
         prev = left_records[-1][1].warehouse if left_records else None
         self._right_table.draw(right_records, today, prev_warehouse=prev)
-
-    def apply_theme(self) -> None:
-        """主题切换后标记清除；下次 draw() 重建。"""
-        self._left_table.apply_theme()
-        self._right_table.apply_theme()

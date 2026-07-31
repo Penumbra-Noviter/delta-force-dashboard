@@ -6,6 +6,23 @@
 
 ---
 
+### 2026-07-31 | C1 | app/table_widget.py + tests/test_table_theme.py | 修复表格主题色 import 期冻结
+
+**变更**：
+- `app/table_widget.py`: 信号→颜色映射改为「信号→主题键」静态映射 + 渲染时 `get_color()` 解析
+  - 删除模块顶层 `_SIGNAL_TO_COLOR` / `_PNL_TO_COLOR`（import 期调用 `get_color()`，颜色冻结为 light 色板——T-01 复发的同一 bug）
+  - 新增 `_signal_color()` / `_pnl_color()` helper，draw() 内实时解析当前主题色
+  - 左右栏标题 `_left_title` / `_right_title` 内联样式移入 draw()（原在 `__init__` 冻结主题色）
+  - 删除死代码链：`_DaySubTable.apply_theme`（pass）与 `TableWidget.apply_theme`（无人调用；主题路径实为 `refresh_display → draw`）
+- `tests/test_table_theme.py`: 新增 3 项回归测试（首个 Qt offscreen fixture）
+  - 动态：dark 主题下收益率列前景色 == dark FG_POS（修前失败，修后通过）
+  - 动态：light/dark 渲染颜色不同（证明无冻结）
+  - 静态：AST 检查 table_widget 顶层（非函数体）无 `get_color()` 调用——防复发
+
+**验证**：pytest 106/106（103 既有 + 3 新增）✅ | verify_all 通过（同 4 项既有失败，与本次改动无关）
+
+---
+
 ### 2026-07-30 | ✅ T-05 | app/chart_widget.py | ChartWidget 拆分 `_ChartPanel`
 
 **变更**：
