@@ -193,6 +193,11 @@ QLabel#savedIndicator {{
     color: {fg_pos};
     font-size: 10px;
 }}
+QLabel#todayStatusLabel {{
+    color: {fg_today};
+    font-size: 10px;
+    font-weight: bold;
+}}
 
 /* ═══════════════════════════════════════════
    LineEdit

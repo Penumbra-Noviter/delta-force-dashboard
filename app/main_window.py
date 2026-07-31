@@ -183,6 +183,11 @@ class MainWindow(QMainWindow):
         self._title_label.setObjectName("titleLabel")
         title_layout.addWidget(self._title_label)
 
+        # 今日未录入提醒（只读检查，今日有记录时隐藏）
+        self._today_status_label = QLabel("今日未录入")
+        self._today_status_label.setObjectName("todayStatusLabel")
+        title_layout.addWidget(self._today_status_label)
+
         title_layout.addStretch()
 
         self.theme_btn = QPushButton()
@@ -521,8 +526,19 @@ class MainWindow(QMainWindow):
     def refresh_display(self) -> None:
         records = self._get_records()
         self._update_summary()
+        self._update_today_status()
         self.table.draw(records, self.today)
         self.chart.draw(records)
+
+    def _update_today_status(self) -> None:
+        """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。
+
+        纯读操作（logic.get_record），零数据写风险；挂在 refresh_display 上，
+        启动/保存/删除后都会随刷新路径自动更新。
+        """
+        self._today_status_label.setVisible(
+            self.logic.get_record(self.today) is None
+        )
 
     def _update_summary(self) -> None:
         """读取 logic 的 7 日窗口汇总，并格式化为标签展示。"""

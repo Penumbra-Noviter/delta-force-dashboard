@@ -458,3 +458,49 @@ def test_export_csv_failure_shows_warning(sample_window, monkeypatch, tmp_path):
 
     assert warnings  # 写失败时弹了警告
     assert not out.exists()
+
+
+# ── O-05. 今日未录入提醒 ─────────────────────────────
+
+
+@pytest.fixture
+def window_without_today(qapp, settings_guard, tmp_path):
+    """数据不含今日记录的 MainWindow（触发「今日未录入」提醒）。"""
+    from app.main_window import MainWindow
+
+    data = make_sample_data()
+    today_str = datetime.now().strftime(DATE_FORMAT)
+    data.pop(today_str, None)
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json"),
+        logic=ProfitCalculatorLogic(data),
+    )
+    yield win
+    win.close()
+
+
+def test_today_status_shown_when_not_recorded(window_without_today):
+    """今日未录入时提醒标签可见。"""
+    win = window_without_today
+    assert win.logic.get_record(win.today) is None
+    assert win._today_status_label.text() == "今日未录入"
+    assert not win._today_status_label.isHidden()
+
+
+def test_today_status_hidden_after_save(window_without_today):
+    """保存今日数据后提醒标签隐藏。"""
+    win = window_without_today
+    assert not win._today_status_label.isHidden()
+
+    win.input_panel.fill_values(90000000, 470000000)
+    win.save_today()
+
+    assert win.logic.get_record(win.today) is not None
+    assert win._today_status_label.isHidden()
+
+
+def test_today_status_hidden_when_recorded(sample_window):
+    """今日已有记录时提醒标签隐藏。"""
+    win = sample_window
+    assert win.logic.get_record(win.today) is not None
+    assert win._today_status_label.isHidden()
