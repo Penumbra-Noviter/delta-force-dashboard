@@ -44,7 +44,7 @@ from app.theme import (
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 from data_store import DataStore
-from formatting import format_money, format_short_date, parse_money_input
+from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
 
 # DPI scaling on Windows
@@ -68,7 +68,6 @@ class MainWindow(QMainWindow):
         self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.today = datetime.now().strftime(DATE_FORMAT)
         self._pinned = False
-        self._editing_date: str | None = None
         self._settings = self._load_settings()
         self._theme = self._settings.get("theme", "light")
         set_theme(self._theme)
@@ -294,8 +293,7 @@ class MainWindow(QMainWindow):
         widget = QApplication.focusWidget()
         if hasattr(widget, "clear") and hasattr(widget, "text"):
             widget.clear()
-            self.input_panel.cash_entry._update_validity()
-            self.input_panel.warehouse_entry._update_validity()
+            self.input_panel.refresh_validity()
 
     # ═══════════════════════════════════════════════════════
     # QSS 主题
@@ -358,17 +356,17 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def save_today(self) -> None:
-        cash_raw = self.input_panel.cash_entry.text()
-        warehouse_raw = self.input_panel.warehouse_entry.text()
+        cash_raw = self.input_panel.get_cash_raw()
+        warehouse_raw = self.input_panel.get_warehouse_raw()
 
         try:
-            cash = parse_money_input(cash_raw)
+            cash = self.input_panel.get_cash_value()
         except ValueError as e:
             self._show_parse_error("当前现金", cash_raw, str(e))
             return
 
         try:
-            warehouse = parse_money_input(warehouse_raw)
+            warehouse = self.input_panel.get_warehouse_value()
         except ValueError as e:
             self._show_parse_error("仓库价值", warehouse_raw, str(e))
             return
@@ -386,14 +384,12 @@ class MainWindow(QMainWindow):
             )
             return
 
-        save_date = (
-            self._editing_date if self._editing_date else self.today
-        )
+        save_date = self.input_panel.get_editing_date() or self.today
         self.logic.save_record(save_date, cash, warehouse)
         self.logic.rotate_weekly()
         self.store.save(self.logic.data)
 
-        was_editing = self._editing_date is not None
+        was_editing = self.input_panel.is_editing()
         if was_editing:
             self._cancel_edit()
 
@@ -429,12 +425,10 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _start_edit(self, date_str: str, record: DayRecord) -> None:
-        self._editing_date = date_str
         self.input_panel.cancel_reuse()
         self.input_panel.set_edit_mode(date_str, record.cash, record.warehouse)
 
     def _cancel_edit(self) -> None:
-        self._editing_date = None
         self.input_panel.cancel_edit()
 
     def _reuse_last_record(self) -> None:
@@ -479,7 +473,7 @@ class MainWindow(QMainWindow):
         self.logic.delete_record(date_str)
         self.store.save(self.logic.data)
 
-        if self._editing_date == date_str:
+        if self.input_panel.get_editing_date() == date_str:
             self._cancel_edit()
 
         self.refresh_display()

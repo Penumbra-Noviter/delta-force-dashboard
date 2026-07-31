@@ -371,13 +371,13 @@ def test_edit_mode() -> None:
         return
 
     win._start_edit("2026-07-25", rec)
-    check("edit 后 _editing_date 设置", win._editing_date == "2026-07-25")
+    check("edit 后 _editing_date 设置", win.input_panel.get_editing_date() == "2026-07-25")
     check("edit 后按钮文字含更新", "更新数据" in win.input_panel.save_btn.text())
     check("取消编辑按钮可见", not win.input_panel.cancel_edit_btn.isHidden())
 
     # 取消编辑
     win._cancel_edit()
-    check("取消后 _editing_date 清空", win._editing_date is None)
+    check("取消后 _editing_date 清空", win.input_panel.get_editing_date() is None)
     check("取消后按钮恢复", win.input_panel.save_btn.text() == "保存今日数据")
     check("取消编辑按钮隐藏", not win.input_panel.cancel_edit_btn.isVisible())
 

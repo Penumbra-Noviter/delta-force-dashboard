@@ -355,16 +355,25 @@ class InputPanel(QWidget):
     # ── 获取输入值 ──
 
     def get_cash_value(self) -> float | None:
-        try:
-            return parse_money_input(self.cash_entry.text())
-        except ValueError:
-            return None
+        """解析当前现金输入并返回金额；空输入返回 None，非法输入抛出 ValueError。"""
+        return parse_money_input(self.cash_entry.text())
+
+    def get_cash_raw(self) -> str:
+        """当前现金输入框的原始文本（用于解析失败的提示）。"""
+        return self.cash_entry.text()
 
     def get_warehouse_value(self) -> float | None:
-        try:
-            return parse_money_input(self.warehouse_entry.text())
-        except ValueError:
-            return None
+        """解析当前仓库价值输入并返回金额；空输入返回 None，非法输入抛出 ValueError。"""
+        return parse_money_input(self.warehouse_entry.text())
+
+    def get_warehouse_raw(self) -> str:
+        """当前仓库价值输入框的原始文本（用于解析失败的提示）。"""
+        return self.warehouse_entry.text()
+
+    def refresh_validity(self) -> None:
+        """立即重新校验两个输入框的有效性（清空等外部改动后调用）。"""
+        self.cash_entry._update_validity()
+        self.warehouse_entry._update_validity()
 
     # ── 主题 ──
 
