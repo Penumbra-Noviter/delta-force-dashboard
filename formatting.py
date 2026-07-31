@@ -20,6 +20,10 @@ _K = 1_000
 _M = 1_000_000
 _B = 1_000_000_000
 
+# 后缀→因子升序表（K/M/B）：parse_money_input 正向迭代匹配后缀，
+# format_compact 反向迭代（大单位优先）；新增单位只需改这一处
+_UNITS = (("K", _K), ("M", _M), ("B", _B))
+
 
 def format_compact(value: float, *, prefix: str = "") -> str:
     """把数值格式化为紧凑的 K/M/B 财务单位（SI 阈值）。
@@ -33,7 +37,7 @@ def format_compact(value: float, *, prefix: str = "") -> str:
         format_compact(460_900_000)               → "460.9M"
         format_compact(88_541_000, prefix="¥")    → "¥88.5M"
     """
-    for factor, unit in ((_B, "B"), (_M, "M"), (_K, "K")):
+    for unit, factor in reversed(_UNITS):
         if value >= factor:
             return f"{prefix}{value / factor:.1f}{unit}"
     return f"{prefix}{value:.0f}"
@@ -80,7 +84,7 @@ def parse_money_input(text: str) -> float | None:
 
     multiplier = 1
     upper = text.upper()
-    for suffix, factor in [("K", _K), ("M", _M), ("B", _B)]:
+    for suffix, factor in _UNITS:
         if upper.endswith(suffix):
             multiplier = factor
             text = text[:-1].strip()

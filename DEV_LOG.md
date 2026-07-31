@@ -6,6 +6,18 @@
 
 ---
 
+### 2026-07-31 | C3 收尾 | formatting.py + DEV_LOG | 单位↔因子对收敛为 `_UNITS` 共享表
+
+**变更**：
+- `formatting.py`: 新增私有升序表 `_UNITS = (("K", _K), ("M", _M), ("B", _B))`；
+  `format_compact` 改 `reversed(_UNITS)` 反向迭代（大单位优先）、`parse_money_input`
+  改正向迭代——消除两处内联 (后缀, 因子) 对，新增单位只需改一处（行为不变）
+- `DEV_LOG`: C3 记录补记 hover 精度变化为已批准偏离（见 C3 条目说明）
+
+**验证**：pytest 124/124 ✅ | 纯重构，无行为变化
+
+---
+
 ### 2026-07-31 | C3 | formatting.py + app/*.py + tests | 收敛三套 K/M/B 格式化 + 日期短格式去重
 
 **变更**：
@@ -19,8 +31,11 @@
   （`table_widget.py` ×3 / `main_window.py` ×2 / `chart_widget.py` ×1 / `input_panel.py` ×1）
 - `tests/test_formatting.py`: 新增 format_compact ×7 + format_short_date ×1
 
-**说明**：工单提议 API 为 `format_compact(value, *, currency=False)`，实现采用更通用的
-`prefix` 字符串参数（轴无前缀、hover 带 ¥），行为与工单意图一致。
+**说明（含已批准偏离）**：相对工单提议有两处偏离，均已批准——
+1. API 形状：提议 `format_compact(value, *, currency=False)` → 实现为更通用的 `prefix`
+   字符串参数（轴无前缀、hover 带 ¥）
+2. hover 精度：`_ChartPanel._format_value` 原 `.2f`/`.1f` 混用 → 统一 `.1f`
+   （K/M 由 2 位降为 1 位，B 不变）——消除精度漂移并与 Y 轴一致
 
 **验证**：pytest 124/124 ✅ | verify_all 无新增失败（仍为 4 项既有基线失败）| 提交 `e3eff63`
 
