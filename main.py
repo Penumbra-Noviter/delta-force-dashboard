@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 
 from PySide6.QtCore import Qt
@@ -15,6 +16,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 from app.main_window import MainWindow
+from config import APP_DIR
 
 # 单实例锁名称（全局唯一）
 _SERVER_NAME = "profit_calculator_singleton_lock"
@@ -46,6 +48,13 @@ def _is_already_running() -> QLocalServer | None:
 
 
 def main() -> None:
+    # 日志：打包版为窗口化 exe 无 stderr，文件日志是唯一可见通道
+    logging.basicConfig(
+        level=logging.INFO,
+        filename=APP_DIR / "profit_calculator.log",
+        encoding="utf-8",
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     # 高 DPI 支持
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

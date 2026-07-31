@@ -55,6 +55,8 @@ def format_money(value: float | None) -> str:
     - < 1,000,000 → ¥x,xxx.xx
     - ≥ 1,000,000 → ¥x,xxx.xK
     - ≥ 100,000,000 → ¥x,xxx.xM
+
+    与 `format_compact` 不同，此处 K 阈值为 1,000,000 而非 1,000。
     """
     if value is None:
         return "—"

@@ -9,6 +9,7 @@ from __future__ import annotations
 __all__ = ["MainWindow"]
 
 import json
+import logging
 import platform
 from datetime import datetime
 
@@ -42,6 +43,8 @@ from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+
+logger = logging.getLogger(__name__)
 
 # DPI scaling on Windows
 if platform.system() == "Windows":
@@ -135,8 +138,8 @@ class MainWindow(QMainWindow):
             if SETTINGS_FILE.exists():
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("设置文件读取失败（使用默认设置）: %s", e)
         return {}
 
     def _save_settings(self) -> None:
@@ -149,8 +152,8 @@ class MainWindow(QMainWindow):
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning("设置文件写入失败: %s", e)
 
     def closeEvent(self, event) -> None:
         self._save_settings()

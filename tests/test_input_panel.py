@@ -91,6 +91,55 @@ def test_refresh_validity(qapp):
     assert ip.cash_entry.property("validity") == "invalid"
 
 
+def test_money_line_edit_public_refresh_validity(qapp):
+    """MoneyLineEdit.refresh_validity() 公开 seam：委托 _update_validity()。"""
+    from app.input_panel import MoneyLineEdit
+
+    edit = MoneyLineEdit()
+    edit.setText("100")
+    edit.refresh_validity()
+    assert edit.property("validity") == "valid"
+
+    edit.setText("abc")
+    edit.refresh_validity()
+    assert edit.property("validity") == "invalid"
+
+    edit.setText("")
+    edit.refresh_validity()
+    assert edit.property("validity") == "normal"
+
+
+def test_input_panel_does_not_call_private_update_validity(qapp):
+    """InputPanel.refresh_validity 不得直调 MoneyLineEdit._update_validity（C9 静态守卫）。
+
+    行为等价测试即使回归到私有方法调用也会通过；本测试用 AST 扫描源码，
+    拦截 InputPanel 跨类直取 _update_validity 的访问路径（O-02 防复发）。
+    """
+    import ast
+    import inspect
+
+    import app.input_panel as ip_mod
+
+    tree = ast.parse(inspect.getsource(ip_mod))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == "InputPanel":
+            for child in node.body:
+                if (
+                    isinstance(child, ast.FunctionDef)
+                    and child.name == "refresh_validity"
+                ):
+                    for sub in ast.walk(child):
+                        if (
+                            isinstance(sub, ast.Attribute)
+                            and sub.attr == "_update_validity"
+                        ):
+                            violations.append(f"L{sub.lineno}")
+    assert violations == [], (
+        f"InputPanel.refresh_validity 直调 MoneyLineEdit._update_validity（私有方法）：{violations}"
+    )
+
+
 # ── 编辑状态单方归属 InputPanel ──────────────────────────
 
 

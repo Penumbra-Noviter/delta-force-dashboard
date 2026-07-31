@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,8 @@ from config import BACKUP_FILE, DATA_FILE
 __all__ = [
     "DataStore",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class DataStore:
@@ -109,5 +112,5 @@ class DataStore:
         try:
             shutil.copy2(self.data_file, newest)
             shutil.copy2(self.data_file, self.backup_file)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning("备份文件复制失败（不影响主流程）: %s", e)
