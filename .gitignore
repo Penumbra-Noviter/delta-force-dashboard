@@ -47,3 +47,6 @@ Desktop.ini
 # Build outputs
 收益计算器.exe
 收益计算器.spec
+
+# Runtime log (O-01: profit_calculator.log 文件日志)
+profit_calculator.log

@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（第二阶段迁移完成 + 第三阶段架构优化完成）  
 > 生成日期：2026-07-29  
-> 测试状态：165 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 测试状态：166 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,8 +17,8 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → 单 .exe |
-| 测试框架 | pytest（165 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-05）全部完成 |
+| 测试框架 | pytest（166 项） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-06）全部完成 |
 
 ---
 
@@ -255,7 +255,7 @@ pyqtgraph 双曲线图组件。
 
 | 方法 | 说明 |
 |------|------|
-| `draw(records)` | n≥2 时渲染图表，n<2 时显示占位提示文字 |
+| `draw(records)` | n≥2 时渲染图表，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
 | `_create_chart(records)` | 从零创建上下双图 PlotWidget（仓库价值 + 现金） |
 | `_update_chart(records)` | 原地更新曲线数据（不重建 PlotWidget / FillBetweenItem） |
 | `_set_adaptive_ylim(plot_widget, values)` | 自适应 Y 轴范围（底部留 10%，顶部留 8%） |

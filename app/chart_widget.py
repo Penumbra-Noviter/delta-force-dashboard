@@ -15,7 +15,7 @@ from datetime import datetime
 
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QResizeEvent
 from PySide6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -408,9 +408,42 @@ class ChartWidget(QWidget):
             # 委托绘制
             self._top.draw(x, warehouse_vals, dates)
             self._bottom.draw(x, cash_vals, dates)
+
+            # O-06：数据过少时叠加提示，避免误读为图表损坏
+            if 2 <= n <= 3:
+                self._show_sparse_hint()
         else:
             self._clear_all()
             self._show_placeholder(n)
+
+    def _show_sparse_hint(self) -> None:
+        """n=2~3 时在图表区域叠加半透明提示文字（不触碰曲线与交互）。
+
+        与 `_show_placeholder` 共用 `_placeholder_label` / `_clear_placeholder`
+        生命周期；label 不进入 layout，作为顶层子控件覆盖图表，并标记
+        WA_TransparentForMouseEvents 让鼠标事件透传给图表。
+        """
+        self._clear_placeholder()
+        hint = QLabel("数据较少，需更多数据以显示趋势", self)
+        hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 45);"
+            f"color: {get_color('FG_MUTED')};"
+            "font-size: 12px;"
+        )
+        hint.setGeometry(self.rect())
+        hint.raise_()
+        self._placeholder_label = hint
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """overlay 提示不参与 layout，需手动跟随 widget 尺寸。"""
+        super().resizeEvent(event)
+        if (
+            self._placeholder_label is not None
+            and self._layout.indexOf(self._placeholder_label) == -1
+        ):
+            self._placeholder_label.setGeometry(self.rect())
 
     def _show_placeholder(self, n: int) -> None:
         self._clear_placeholder()

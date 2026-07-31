@@ -6,6 +6,21 @@
 
 ---
 
+### 2026-08-01 | O-06/07 | app/chart_widget.py | 图表稀疏提示落地 + O-07 关闭
+
+**O-06 | 图表稀疏数据提示**（功能）：
+- `ChartWidget.draw()` 中 `2 <= n <= 3` 时叠加半透明提示「数据较少，需更多数据以显示趋势」——避免刚开始用 app 的头两三天图表只有 2~3 个点、被误读为图表损坏
+- 新增 `_show_sparse_hint()`：overlay QLabel 不入 layout，作为顶层子控件覆盖图表；`WA_TransparentForMouseEvents` 保证鼠标事件透传给图表（不触碰交互）；与 `_placeholder_label` / `_clear_placeholder` 共用生命周期；`resizeEvent` 同步跟随 widget 尺寸
+- 测试 +1：`test_chart_sparse_data_hint`（n>=4 无提示 / n=3、2 有提示且不拦截鼠标 / n<2 回归占位）
+
+**O-07 | 收益率目标参考线**（关闭，YAGNI）：
+- 目标语义未定义：「收益率」为逐日环比（较前日），图表只画现金/仓库两条金额曲线、无收益率曲线，目标线画在哪条序列上无法解释
+- 实现需输入框 + settings 持久化 + InfiniteLine + 测试，成本高于收益，参照 O-C 系列先例关闭
+
+**验证**：pytest 166/166（165 基线 + 1 新增）✅
+
+---
+
 ### 2026-08-01 | 打包 | dist/收益计算器.exe | 重新打包（含 O-01~O-05）
 
 **产物**：`dist/收益计算器.exe`（83.3 MB，单文件，PyInstaller `--clean` 重建）

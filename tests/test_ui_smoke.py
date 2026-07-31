@@ -536,3 +536,34 @@ def test_today_status_hidden_when_recorded(sample_window):
     win = sample_window
     assert win.logic.get_record(win.today) is not None
     assert win._today_status_label.isHidden()
+
+
+# ── O-06. 图表稀疏数据提示 ───────────────────────────
+
+
+def test_chart_sparse_data_hint(sample_window):
+    """O-06：n=2~3 时叠加「数据较少」半透明提示；n>=4 时无提示；n<2 时回归占位。"""
+    win = sample_window
+    records = win.logic.get_weekly_records(win.today, 7)
+    present = [(d, r) for d, r in records if r is not None]
+    assert len(present) >= 5  # 样本数据充足
+
+    # n >= 4：无稀疏提示
+    win.chart.draw(present)
+    assert win.chart._placeholder_label is None
+
+    # n = 3 / n = 2：叠加半透明提示，且不拦截鼠标（不触碰交互）
+    for subset in (present[-3:], present[-2:]):
+        win.chart.draw(subset)
+        label = win.chart._placeholder_label
+        assert label is not None
+        assert "数据较少" in label.text()
+        assert label.testAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents
+        )
+
+    # n < 2：回归原占位提示（至少需要两天数据）
+    win.chart.draw(present[-1:])
+    label = win.chart._placeholder_label
+    assert label is not None
+    assert "至少需要两天数据" in label.text()
