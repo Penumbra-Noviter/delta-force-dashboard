@@ -121,11 +121,12 @@ Profit Calculator/
 
 ---
 
-## 四、第三阶段任务（架构深度优化 Architecture Deepen — 进行中）
+## 四、第三阶段任务（架构深度优化 Architecture Deepen — ✅ 已完成）
 
 > **启动日期**：2026-07-28  
 > **目标**：在 PySide6 迁移完成的基础上，清理历史遗留问题，优化代码结构，提升运行性能与 UI 质感  
-> **前置条件**：第二阶段（PySide6 迁移）已完成并验证通过
+> **前置条件**：第二阶段（PySide6 迁移）已完成并验证通过  
+> **后续**：2026-07-30~31 新增 Phase 4（T-01~T-05）与架构评审 C1/C2 优化，均已完成；进度见 [`DEV_LOG.md`](DEV_LOG.md) 与 [`TO-TICKETS.md`](TO-TICKETS.md)。
 
 ### 4.1 优化优先级
 
@@ -202,7 +203,7 @@ Profit Calculator/
 
 ---
 
-## 五、后续执行建议
+## 六、后续执行建议
 
 1. 第一阶段直接用当前 Agent 完成，改动的文件少，风险低
 2. 第二阶段建议先 `pip install PySide6 pyqtgraph` 验证环境，再逐步迁移

@@ -12,7 +12,7 @@
 
 **核心场景**：用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动记录最近 7 天数据，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
-**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段架构优化已完成（P0-P4 全部完成），新增单实例保证。103 项测试全部通过。
+**当前状态**：功能完整，架构已优化。PySide6 迁移完成，第三阶段 P0-P5 + Phase 4（T-01~T-05）+ C 系列（C1/C2）架构优化已完成，新增单实例保证。116 项测试全部通过。
 
 ---
 
@@ -199,8 +199,8 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 | **金额显示** | < 1M 显示为 ¥x,xxx.xx；≥ 1M → K 后缀；≥ 100M → M 后缀 |
 | **输入解析** | 兼容 ¥/￥/$、千分位、K/M/B 后缀、负号、首尾空格 |
 | **主题系统** | 两套完整色板（light/dark），约 30 个语义化 token |
-| **图表** | matplotlib TkAgg 后端，延迟加载，双子图共享 X 轴 |
-| **打包** | PyInstaller，需显式指定 hiddenimports（matplotlib 后端） |
+| **图表** | pyqtgraph 原生渲染，双图（仓库价值 + 现金），持久化 PlotCurveItem/FillBetweenItem，增量 setData 更新 |
+| **打包** | PyInstaller 单文件（`dist/收益计算器.exe`），无需 hiddenimports |
 | **未来规划** | ② 整体迁移 PySide6 + pyqtgraph（第一阶段：表格新增收益率 + 盈亏标签 ✅ 已完成） |
 
 ---
@@ -208,11 +208,11 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 ## 七、常碰坑点
 
 1. **主题切换**：模块级常量（`FG_POS` 等）在 `import` 时固定为 light 主题，运行时切换主题必须调用 `get_color(key)` 而非直接引用常量。
-2. **matplotlib 延迟加载**：`ChartManager.deferred_draw()` 在窗口 `after(100)` 才加载 mpl，避免阻塞 Tkinter 初始化。
+2. **单实例保证**：`main.py` 通过 QLocalServer/QLocalSocket 防止多开；崩溃后残留 socket 会自动清理，无需手动删除。
 3. **7 日限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删，确保不超过 7 条。
 4. **day_record.total**：`total` 直接返回 `warehouse`（不是 warehouse + cash）。现金是 warehouse 的组成部分。
 5. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入。
-6. **增量 vs 全量图更新**：`ChartManager._update_chart()` 只更新线条数据和轴范围，不重建 Figure；但 `fill_between` 的 PolyCollection 不支持原地更新，每次通过 `remove()` + 重建实现。
+6. **增量 vs 全量图更新**：`_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅 `setData()` 不重建组件；填充边界曲线也持久化，避免此前 FillBetweenItem 重建开销。
 
 ---
 

@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（第二阶段迁移完成 + 第三阶段架构优化完成）  
 > 生成日期：2026-07-29  
-> 测试状态：103 项 pytest 全部通过，verify_all.py 全部通过
+> 测试状态：116 项 pytest 全部通过；verify_all.py 烟测通过（4 项既有失败与改动无关）
 
 ---
 
@@ -18,7 +18,7 @@
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → 单 .exe |
 | 测试框架 | pytest（103 项） |
-| 开发阶段 | 三阶段全部完成（Tkinter 增强 → PySide6 迁移 → 架构优化） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1/C2）全部完成 |
 
 ---
 
@@ -66,7 +66,7 @@
     → InputPanel (合法性校验 → 启用保存按钮)
     → MainWindow.save_today() (解析 → 验证 → 保存)
     → ProfitCalculatorLogic.save_record() (写入内存 dict)
-    → _rotate_weekly() (保持最多 7 天)
+    → ProfitCalculatorLogic.rotate_weekly() (保持最多 7 天)
     → DataStore.save() (原子写入 JSON + 滚动备份)
     → refresh_display() → TableWidget.draw() + ChartWidget.draw()
 ```
@@ -137,7 +137,6 @@ Profit Calculator/
 | `_build_ui()` | 构建标题栏、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
 | `_connect_signals()` | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求） |
 | `save_today()` | 解析输入 → 验证 → 保存到 logic → 滚动 7 日 → 持久化 → 刷新显示 |
-| `_rotate_weekly()` | 保持最多 7 天数据，排序后从最旧开始删除 |
 | `refresh_display()` | 获取 records → 刷新表格 + 图表 |
 | `_start_edit(date_str, record)` | 进入编辑模式，回填数据到输入面板 |
 | `_cancel_edit()` | 退出编辑模式，清空输入框 |
@@ -310,6 +309,9 @@ pyqtgraph 双曲线图组件。
 | `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
 | `format_rate` | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
 | `get_pnl_label` | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
+| `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
+| `rotate_weekly` | `days=7` | `None` | 7 日保留策略，超过上限删除最旧记录 |
+| `summary` | `end_date, days=7` | `(int, float \| None)` | 7 日窗口总盈亏（末日−首日） |
 
 **关键业务规则**：
 - `total` = `warehouse`（非 `warehouse + cash`）
@@ -575,7 +577,7 @@ pyinstaller --onefile --windowed --name "收益计算器" main.py
 
 1. **主题切换**：运行时必须用 `get_color(key)` 而非模块级常量，因为常量在 `import` 时固定为 light 主题
 2. **DayRecord.total**：`total` = `warehouse`（不是 `warehouse + cash`），现金是仓库的组成部分
-3. **7 日限制**：`_rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删除
+3. **7 日限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删除
 4. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入
 5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，仅 `setData()` 更新，避免重建
 6. **输入框去抖**：`MoneyLineEdit` 使用 150ms 去抖的 QTimer，快速输入时避免每次按键都触发校验
