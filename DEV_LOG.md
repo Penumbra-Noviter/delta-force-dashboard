@@ -6,6 +6,24 @@
 
 ---
 
+### 2026-07-31 | C4 | app/input_panel.py + app/main_window.py + verify_all.py + tests | InputPanel seam 成真
+
+**变更**：
+- `app/input_panel.py`:
+  - `get_cash_value()` / `get_warehouse_value()` 语义明确为「空输入 → None，非法 → 抛 ValueError」（原先吞掉 ValueError 返回 None，区分不了空与非法；二者原无调用者，语义变更无外部影响）
+  - 新增 `get_cash_raw()` / `get_warehouse_raw()` 原始文本 getter（供解析失败提示复用）
+  - 新增 `refresh_validity()`（供 `MainWindow._clear_focused_input` 清空后立即重校验，替代直取两个 `cash_entry._update_validity()`）
+- `app/main_window.py`: 收敛到公开 API，删除私有直取
+  - `save_today` 改走 `get_cash_raw()` / `get_cash_value()` 等公开 getter（不再 `cash_entry.text()` + `parse_money_input`）
+  - 删除 `self._editing_date` 字段——编辑状态单方归属 InputPanel，MainWindow 只查询 `is_editing()` / `get_editing_date()`
+  - `_delete_record` 判断编辑目标改用 `input_panel.get_editing_date()`
+- `verify_all.py`: `win._editing_date` ×2 → `win.input_panel.get_editing_date()`（适配新 API）
+- `tests/test_input_panel.py`: 新增 9 项回归测试（getter 语义 / raw getter / refresh_validity / 编辑状态归属 / `hasattr` 防 `_editing_date` 复发 / save_today 走公开 API 行为等价）
+
+**验证**：pytest 133/133（124 既有 + 9 新增）✅ | verify_all 通过（同 4 项既有基线失败，与本次无关）
+
+---
+
 ### 2026-07-31 | 打包 | dist/收益计算器.exe | 重新打包（含 C3 收尾 `_UNITS` 重构）
 
 **产物**：`dist/收益计算器.exe`（80 MB，单文件）

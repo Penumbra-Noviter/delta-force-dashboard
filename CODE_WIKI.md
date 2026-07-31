@@ -183,7 +183,12 @@ Profit Calculator/
 | `_update_save_btn_state()` | 两个输入框都合法且非空时启用保存按钮 |
 | `set_edit_mode(date_str, cash, warehouse)` | 切换编辑模式，填充数据，改变按钮样式（橙色） |
 | `cancel_edit()` | 退出编辑模式，恢复默认状态 |
-| `is_editing()` / `get_editing_date()` | 状态查询 |
+| `is_editing()` / `get_editing_date()` | 编辑状态查询（**单方归属 InputPanel**，C4） |
+| `get_cash_value()` / `get_warehouse_value()` | 解析当前输入返回金额；空→`None`，非法→`ValueError`（C4 seam） |
+| `get_cash_raw()` / `get_warehouse_raw()` | 返回输入框原始文本（供解析失败提示） |
+| `refresh_validity()` | 立即重新校验两个输入框的有效性（清空后调用） |
+| `fill_values(cash, warehouse)` | 填入金额并选中现金框（不触发焦点格式化） |
+| `clear_fields()` | 清空输入框，保留已保存指示器 |
 | `set_saved_indicator(text)` | 设置保存成功提示文本 |
 | `focus_cash()` | 聚焦现金输入框 |
 | `apply_theme()` | 更新标签颜色 |
