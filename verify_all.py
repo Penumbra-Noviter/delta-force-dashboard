@@ -28,7 +28,6 @@ PROJECT_ROOT = Path("D:/Desktop/Craft/Profit Calculator").resolve()
 os.chdir(str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import SETTINGS_FILE
 from app.theme import THEMES, get_color, get_theme, set_theme
 from data_store import DataStore
 from formatting import (
@@ -421,11 +420,11 @@ def test_delete_record() -> None:
 
     try:
         # 删除 07-20
-        old_len = len(win.data)
+        old_len = len(win.logic.data)
         win._delete_record("2026-07-20")
         rec_20 = win.logic.get_record("2026-07-20")
         check("删除后 07-20 不存在", rec_20 is None)
-        check("删除后数据量-1", len(win.data) == old_len - 1)
+        check("删除后数据量-1", len(win.logic.data) == old_len - 1)
     finally:
         PySide6.QtWidgets.QMessageBox.question = original
 
@@ -447,11 +446,11 @@ def test_delete_cancel() -> None:
     )
 
     try:
-        old_len = len(win.data)
+        old_len = len(win.logic.data)
         win._delete_record("2026-07-21")
         rec_21 = win.logic.get_record("2026-07-21")
         check("取消删除后数据仍在", rec_21 is not None)
-        check("取消删除后数据量不变", len(win.data) == old_len)
+        check("取消删除后数据量不变", len(win.logic.data) == old_len)
     finally:
         PySide6.QtWidgets.QMessageBox.question = original
 
@@ -598,18 +597,18 @@ def test_weekly_rotation() -> None:
     win = MainWindow()
 
     # 初始 6 天，未触发滚动
-    check("初始 ≤7 天", len(win.data) <= 7)
+    check("初始 ≤7 天", len(win.logic.data) <= 7)
 
     # 追加到 8 天
     win.logic.save_record("2026-07-14", 100, 200)  # 最旧
     win.logic.save_record("2026-07-15", 200, 300)
     win.logic.save_record("2026-07-16", 300, 400)
     # 现在有 9 条
-    win._rotate_weekly()
-    check("滚动后最多 7 天", len(win.data) <= 7)
+    win.logic.rotate_weekly()
+    check("滚动后最多 7 天", len(win.logic.data) <= 7)
 
     # 验证正确的 7 条被保留（最近的）
-    dates = sorted(win.data.keys())
+    dates = sorted(win.logic.data.keys())
     check("最旧日期被删除", "2026-07-14" not in dates)
 
     win.close()
@@ -733,6 +732,13 @@ def main() -> int:
     # ── 备份当前 data.json，测试结束后恢复 ──
     saved_data = _backup_data_json()
 
+    # ── 隔离真实 settings.json：测试期间读写临时文件，跑完自动恢复引用 ──
+    #    避免 win.close() → closeEvent → _save_settings() 把测试时的
+    #    theme/pinned 写回真实 settings.json（污染 git 工作区）
+    import app.main_window as mw_mod
+    orig_settings_file = mw_mod.SETTINGS_FILE
+    mw_mod.SETTINGS_FILE = tmp_dir / "settings.json"
+
     try:
 
         # ── 1. 业务逻辑 ──
@@ -796,6 +802,8 @@ def main() -> int:
     finally:
         # 恢复 data.json
         _restore_data_json(saved_data)
+        # 恢复真实 settings.json 引用（隔离期从未写入真实文件）
+        mw_mod.SETTINGS_FILE = orig_settings_file
 
     # ── 汇总 ──
     print("\n" + "=" * 60)

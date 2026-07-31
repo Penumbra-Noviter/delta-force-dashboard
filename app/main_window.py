@@ -65,8 +65,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.store = store or DataStore()
-        self.data = self.store.load()
-        self.logic = logic or ProfitCalculatorLogic(self.data)
+        self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.today = datetime.now().strftime(DATE_FORMAT)
         self._pinned = False
         self._editing_date: str | None = None
@@ -391,8 +390,8 @@ class MainWindow(QMainWindow):
             self._editing_date if self._editing_date else self.today
         )
         self.logic.save_record(save_date, cash, warehouse)
-        self._rotate_weekly()
-        self.store.save(self.data)
+        self.logic.rotate_weekly()
+        self.store.save(self.logic.data)
 
         was_editing = self._editing_date is not None
         if was_editing:
@@ -413,14 +412,6 @@ class MainWindow(QMainWindow):
         if not was_editing:
             self.input_panel.clear_fields()
             self.input_panel.cancel_reuse()
-
-    def _rotate_weekly(self) -> None:
-        """保持最多 7 天数据。"""
-        if len(self.data) <= WEEK_DAYS:
-            return
-        sorted_dates = sorted(self.data.keys())
-        for old_date in sorted_dates[: len(sorted_dates) - WEEK_DAYS]:
-            del self.data[old_date]
 
     @staticmethod
     def _show_parse_error(field: str, raw: str, detail: str) -> None:
@@ -485,9 +476,8 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        if date_str in self.data:
-            del self.data[date_str]
-        self.store.save(self.data)
+        self.logic.delete_record(date_str)
+        self.store.save(self.logic.data)
 
         if self._editing_date == date_str:
             self._cancel_edit()
@@ -500,32 +490,24 @@ class MainWindow(QMainWindow):
 
     def refresh_display(self) -> None:
         records = self._get_records()
-        self._update_summary(records)
+        self._update_summary()
         self.table.draw(records, self.today)
         self.chart.draw(records)
 
-    def _update_summary(self, records: list) -> None:
-        """计算并显示 7 日总盈亏金额。
+    def _update_summary(self) -> None:
+        """读取 logic 的 7 日窗口汇总，并格式化为标签展示。"""
+        count, total = self.logic.summary(self.today, WEEK_DAYS)
 
-        records 为按日期升序排列的 (date_str, DayRecord) 列表。
-        总盈亏 = 末日仓库值 - 首日仓库值。
-        """
-        if len(records) < 2:
-            first_wh = records[0][1].warehouse if len(records) == 1 else None
-            if first_wh is None:
-                self._summary_label.setText("7日总盈亏：数据不足")
-            else:
-                self._summary_label.setText(
-                    f"7日总盈亏：{format_money(first_wh)}（仅 1 条记录）"
-                )
+        # 数据不足或仅一条记录：弱化提示（灰字小号）
+        if total is None or count == 1:
+            text = "7日总盈亏：数据不足" if total is None else (
+                f"7日总盈亏：{format_money(total)}（仅 1 条记录）"
+            )
+            self._summary_label.setText(text)
             self._summary_label.setStyleSheet(
                 f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
             )
             return
-
-        first_wh = records[0][1].warehouse
-        last_wh = records[-1][1].warehouse
-        total = last_wh - first_wh
 
         if total > 0:
             text = f"7日总盈亏：+{format_money(total)}"

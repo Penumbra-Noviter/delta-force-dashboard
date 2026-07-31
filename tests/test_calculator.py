@@ -332,3 +332,107 @@ def test_pnl_label_no_prev():
     label, signal = ProfitCalculatorLogic.get_pnl_label(None, 420.0)
     assert label == "—"
     assert signal == PnL信号.无
+
+
+# ── ProfitCalculatorLogic.delete_record ────────────
+
+def test_delete_record_existing():
+    """删除存在的记录后返回 True，数据被移除。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    assert logic.delete_record("2026-07-20") is True
+    assert logic.get_record("2026-07-20") is None
+
+
+def test_delete_record_missing():
+    """删除不存在的记录返回 False，数据不变。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    assert logic.delete_record("2026-07-19") is False
+    assert logic.get_record("2026-07-20") is not None
+
+
+# ── ProfitCalculatorLogic.rotate_weekly ────────────
+
+def test_rotate_weekly_under_limit():
+    """数据不超过 7 天时不做裁剪。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 17)}
+    logic = ProfitCalculatorLogic(data)
+    logic.rotate_weekly()
+    assert len(logic.data) == 7
+
+
+def test_rotate_weekly_trims_oldest():
+    """超过 7 天时删除最旧记录，保留最近 7 条。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 19)}
+    logic = ProfitCalculatorLogic(data)
+    logic.rotate_weekly()
+    dates = sorted(logic.data.keys())
+    assert len(dates) == 7
+    assert "2026-07-10" not in dates
+    assert "2026-07-11" not in dates
+    assert "2026-07-12" in dates  # 保留下来的最旧一天
+    assert "2026-07-18" in dates
+
+
+# ── ProfitCalculatorLogic.summary ──────────────────
+
+def test_summary_empty():
+    """无记录时返回 (0, None)。"""
+    logic = ProfitCalculatorLogic({})
+    count, total = logic.summary("2026-07-20")
+    assert count == 0
+    assert total is None
+
+
+def test_summary_single_record():
+    """仅一条记录时返回该日仓库值。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 500.0}})
+    count, total = logic.summary("2026-07-20")
+    assert count == 1
+    assert total == 500.0
+
+
+def test_summary_multiple_records():
+    """总盈亏 = 末日仓库值 − 首日仓库值。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
+            "2026-07-18": {"cash": 200.0, "warehouse": 700.0},
+        }
+    )
+    count, total = logic.summary("2026-07-20")
+    assert count == 2
+    assert total == 300.0
+
+
+def test_summary_negative():
+    """下跌窗口总盈亏为负。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 100.0, "warehouse": 700.0},
+            "2026-07-18": {"cash": 200.0, "warehouse": 400.0},
+        }
+    )
+    count, total = logic.summary("2026-07-20")
+    assert count == 2
+    assert total == -300.0
+
+
+def test_summary_zero():
+    """窗口内无变化时总盈亏为 0。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
+            "2026-07-18": {"cash": 200.0, "warehouse": 400.0},
+        }
+    )
+    count, total = logic.summary("2026-07-20")
+    assert count == 2
+    assert total == 0.0
+
+
+def test_summary_invalid_date():
+    """无效截止日期返回 (0, None)。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 500.0}})
+    count, total = logic.summary("bad-date")
+    assert count == 0
+    assert total is None

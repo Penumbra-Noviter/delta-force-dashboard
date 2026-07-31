@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
-from config import DATE_FORMAT
+from config import DATE_FORMAT, WEEK_DAYS
 from formatting import format_money
 
 __all__ = [
@@ -155,3 +155,37 @@ class ProfitCalculatorLogic:
         if current_warehouse < prev_warehouse:
             return "亏", PnL信号.亏
         return "—", PnL信号.平
+
+    def delete_record(self, date_str: str) -> bool:
+        """删除某日记录；不存在时返回 False。"""
+        if date_str in self.data:
+            del self.data[date_str]
+            return True
+        return False
+
+    def rotate_weekly(self, days: int = WEEK_DAYS) -> None:
+        """7 日保留策略：数据超过 days 天时删除最旧记录，保持最多 days 条。"""
+        if len(self.data) <= days:
+            return
+        sorted_dates = sorted(self.data.keys())
+        for old_date in sorted_dates[: len(sorted_dates) - days]:
+            del self.data[old_date]
+
+    def summary(
+        self, end_date: str, days: int = WEEK_DAYS
+    ) -> tuple[int, float | None]:
+        """计算截至 end_date 的最近 days 天窗口总盈亏。
+
+        返回 (记录数, 总盈亏金额)：
+        - 记录数 >= 2：总盈亏 = 末日仓库值 − 首日仓库值；
+        - 记录数 == 1：总盈亏为该日仓库值（无对比对象，供视图提示「仅 1 条记录」）；
+        - 记录数 == 0：总盈亏为 None。
+        """
+        records = [
+            r for _, r in self.get_weekly_records(end_date, days) if r is not None
+        ]
+        if not records:
+            return 0, None
+        if len(records) == 1:
+            return 1, records[0].warehouse
+        return len(records), records[-1].warehouse - records[0].warehouse
