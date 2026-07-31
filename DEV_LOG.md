@@ -6,6 +6,26 @@
 
 ---
 
+### 2026-07-31 | C3 | formatting.py + app/*.py + tests | 收敛三套 K/M/B 格式化 + 日期短格式去重
+
+**变更**：
+- `formatting.py`: 新增共享单位常量 `_K/_M/_B` 与公开 `format_compact(value, *, prefix="")`
+  （SI 阈值 K≥1e3 / M≥1e6 / B≥1e9，`.1f`，<1e3 整数）；`format_money` 与 `parse_money_input`
+  改用同一常量（输出不变）
+- `app/chart_widget.py`: `KMBAxisItem.tickStrings`（Y 轴，无前缀）与 `_ChartPanel._format_value`
+  （hover/端点，`prefix="¥"`）委托给 `format_compact`——消除两处阈值/精度各自漂移
+  （hover 原 `.2f`/`.1f` 混用 → 统一 `.1f`，符合「与 Y 轴一致」的原始意图）
+- 日期截取 `date_str[-5:]` 在 4 文件 6 处重复 → 新增 `format_short_date()` 统一替换
+  （`table_widget.py` ×3 / `main_window.py` ×2 / `chart_widget.py` ×1 / `input_panel.py` ×1）
+- `tests/test_formatting.py`: 新增 format_compact ×7 + format_short_date ×1
+
+**说明**：工单提议 API 为 `format_compact(value, *, currency=False)`，实现采用更通用的
+`prefix` 字符串参数（轴无前缀、hover 带 ¥），行为与工单意图一致。
+
+**验证**：pytest 124/124 ✅ | verify_all 无新增失败（仍为 4 项既有基线失败）| 提交 `e3eff63`
+
+---
+
 ### 2026-07-31 | fix | verify_all.py | settings.json 污染修复：测试期间隔离真实设置文件
 
 **症状**：跑完 `verify_all.py` 后 `settings.json` 被改写（theme/pinned/geometry 残留测试态），需手动 `git restore settings.json`

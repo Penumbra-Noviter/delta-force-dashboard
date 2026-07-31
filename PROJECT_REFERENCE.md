@@ -128,9 +128,11 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - 滚动机制：`max_backups=3`，每次保存前备份当前文件为 `.bak.1`，旧备份后移
 - 兼容旧版单文件 `.bak`（与 `.bak.1` 内容相同）
 
-#### `formatting.py`（~106 行）
+#### `formatting.py`（~145 行）
 金额处理工具：
 - `format_money(value)`：`¥1,234.56` / `¥5,378.1K` / `¥419.9M` / None → `—`
+- `format_compact(value, *, prefix="")`：图表紧凑 K/M/B（SI 阈值；Y 轴刻度无前缀、hover/端点标注带 ¥）
+- `format_short_date(date_str)`：`YYYY-MM-DD` → `MM-DD`（表格/图表标题短日期）
 - `parse_money_input(text)`：支持 `¥/$/￥`、千分位逗号、`K/M/B` 后缀、空格、负号
 - `is_valid_money_input(text)`：空字符串合法（占位），`"abc"` 非法
 - `format_input_value(value)` / `unformat_input_value(text)`：焦点进出的格式转换
