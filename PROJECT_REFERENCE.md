@@ -205,7 +205,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 | **输入解析** | 兼容 ¥/￥/$、千分位、K/M/B 后缀、负号、首尾空格 |
 | **主题系统** | 两套完整色板（light/dark），约 30 个语义化 token |
 | **图表** | pyqtgraph 原生渲染，双图（仓库价值 + 现金），持久化 PlotCurveItem/FillBetweenItem，增量 setData 更新 |
-| **打包** | PyInstaller 单文件（`dist/收益计算器.exe`），无需 hiddenimports |
+| **打包** | PyInstaller 单文件（`dist/收益计算器.exe`），无需 hiddenimports；`app_icon.ico` 设 exe 图标 + 运行窗口图标 |
 | **未来规划** | ② 整体迁移 PySide6 + pyqtgraph（第一阶段：表格新增收益率 + 盈亏标签 ✅ 已完成） |
 
 ---

@@ -127,7 +127,7 @@ python -m pytest tests/ -q
 python -m PyInstaller 收益计算器.spec --noconfirm
 ```
 
-打包产物位于 `dist/收益计算器.exe`。
+打包产物位于 `dist/收益计算器.exe`。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
 
 ---
 

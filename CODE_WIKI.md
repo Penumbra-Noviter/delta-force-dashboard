@@ -77,28 +77,29 @@
 
 ```
 Profit Calculator/
-├── main.py                  ← [主入口] PySide6 QApplication + 单实例保证
+├── main.py                  ← [主入口] PySide6 QApplication + 单实例保证 + 应用图标
 ├── app/
 │   ├── __init__.py          ← app 包标记，重导出 get_color/get_theme/set_theme
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏 7 日数据表格（7 列）
-│   ├── chart_widget.py      ← pyqtgraph 双曲线图 + PNG 导出
-│   ├── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
-│   └── config.py            ← 空文件（路径常量已迁移至根 config.py）
+│   ├── chart_widget.py      ← pyqtgraph 双曲线图 + PNG 导出 + 稀疏数据提示
+│   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
 ├── config.py                ← [基础配置] 路径、日期格式、字体、THEMES 色板
 ├── data_store.py            ← [持久化] DataStore — JSON 原子写入 + 滚动备份
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 48 个测试（DayRecord + 业务逻辑）
-│   ├── test_data_store.py   ← 15 个测试（保存/加载/备份/恢复）
+│   ├── test_calculator.py   ← 54 个测试（DayRecord + 业务逻辑 + CSV 导出）
+│   ├── test_data_store.py   ← 16 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
-│   ├── test_input_panel.py  ← 10 个测试（C4 seam + C9 静态守卫）
+│   ├── test_input_panel.py  ← 12 个测试（C4 seam + C9 静态守卫 + O-02 seam）
 │   ├── test_table_theme.py  ← 3 个测试（C1 主题色实时解析）
-│   └── test_ui_smoke.py     ← 13 个测试（C5 UI 烟测，offscreen）
-├── data.json                ← 运行态数据（日期 → {cash, warehouse}）
+│   └── test_ui_smoke.py     ← 23 个测试（C5 UI 烟测 + O-04/05/06，offscreen）
+├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
+├── 收益计算器.spec           ← PyInstaller 打包配置（单文件 + 图标）
+├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
 ├── settings.json            ← 窗口几何 + 置顶 + 主题持久化
 ├── requirements.txt         ← PySide6>=6.6.0, pyqtgraph>=0.13.0
 ├── .gitignore
@@ -110,9 +111,9 @@ Profit Calculator/
 
 ## 四、核心模块详细说明
 
-### 4.1 `main.py` — 程序入口（~74 行）
+### 4.1 `main.py` — 程序入口（~92 行）
 
-**职责**：启动 PySide6 应用，单实例保证，事件循环管理。
+**职责**：启动 PySide6 应用，单实例保证，应用图标，事件循环管理。
 
 | 元素 | 说明 |
 |------|------|
@@ -548,8 +549,10 @@ pytest
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --windowed --name "收益计算器" main.py
+python -m PyInstaller 收益计算器.spec --noconfirm
 ```
+
+**图标**：`收益计算器.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随单文件解压，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
 
 ---
 

@@ -6,6 +6,17 @@
 
 ---
 
+### 2026-08-01 | 打包 | dist/收益计算器.exe + app_icon.ico | 应用图标落地（exe 文件 + 运行窗口）
+
+**变更**：
+- `收益计算器.spec`：`EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 内嵌图标（单文件版解压后供运行时读取）
+- `main.py`：新增 `_icon_path()`（打包版从 `sys._MEIPASS`、源码版从项目根目录解析）+ `app.setWindowIcon()` 设置窗口/任务栏图标
+- `app_icon.ico`：项目根目录新增图标（16~256px 多尺寸，来源 `D:\steam\...\8acb6477....ico`，用户指定）
+
+**验证**：pytest 166/166 ✅ | exe 启动烟测通过（双进程常驻 + 单实例锁）| 从 exe 提取图标与源文件一致 ✅
+
+---
+
 ### 2026-08-01 | O-06/07 | app/chart_widget.py | 图表稀疏提示落地 + O-07 关闭
 
 **O-06 | 图表稀疏数据提示**（功能）：

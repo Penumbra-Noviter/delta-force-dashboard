@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
@@ -21,6 +23,19 @@ from config import APP_DIR
 # 单实例锁名称（全局唯一）
 _SERVER_NAME = "profit_calculator_singleton_lock"
 
+
+
+def _icon_path() -> str:
+    """定位应用图标路径。
+
+    - 打包版（PyInstaller 单文件）：从 `sys._MEIPASS` 解压目录读取
+    - 源码版：从项目根目录读取
+    """
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS)
+    else:
+        base = Path(__file__).resolve().parent
+    return str(base / "app_icon.ico")
 
 def _is_already_running() -> QLocalServer | None:
     """
@@ -61,6 +76,7 @@ def main() -> None:
     )
     app = QApplication(sys.argv)
     app.setApplicationName("收益计算器")
+    app.setWindowIcon(QIcon(_icon_path()))
 
     # ── 单实例检查 ──
     server = _is_already_running()
