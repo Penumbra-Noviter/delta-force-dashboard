@@ -67,6 +67,11 @@ def _is_already_running() -> QLocalServer | None:
 
 
 def main() -> None:
+    # 统一数据目录（O-22）必须先行创建：日志 handler、迁移、数据/设置写入
+    # 都落在 DATA_DIR 下，目录不存在时 RotatingFileHandler 打开日志文件即抛
+    # FileNotFoundError。空启动（无旧数据、无用户目录）也需保证目录存在。
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
     # 日志：打包版为窗口化 exe 无 stderr，文件日志是唯一可见通道。
     # O-15：RotatingFileHandler 轮转（单文件 1MB、保留 3 份备份），防单文件无限增长。
     root_logger = logging.getLogger()

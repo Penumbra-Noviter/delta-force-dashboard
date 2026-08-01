@@ -1,12 +1,17 @@
 """
 Tests for migrate_legacy_data — 旧数据一次性迁移到统一目录（O-22）。
+
+另含 main() 启动顺序回归（DATA_DIR 先建再开日志）——同一 O-22 数据目录主题。
 """
 
 from __future__ import annotations
 
+import ast
+import inspect
 import json
 from pathlib import Path
 
+import main as main_mod
 from data_store import migrate_legacy_data
 
 
@@ -96,4 +101,46 @@ def test_migrate_logs_message(tmp_path, caplog):
     assert any(
         "已从" in rec.message and "迁移数据到" in rec.message
         for rec in caplog.records
+    )
+
+
+# ── main() 启动顺序回归 ───────────────────────────────────
+#
+# O-22 把日志路径改挂 DATA_DIR 后，曾出现「空启动即崩」：
+# main() 先构造 RotatingFileHandler（打开 LOG_FILE），再执行迁移——
+# 而目录创建仅发生在迁移逻辑内，空启动（无旧数据、无 ~/收益计算器）
+# 时迁移提前返回、目录从未创建 → FileNotFoundError。
+# 修复：main() 第一行显式 DATA_DIR.mkdir(parents=True, exist_ok=True)。
+# 本组用 AST 静态断言「mkdir 必须先于 RotatingFileHandler」，防复发。
+
+
+def _main_ast() -> ast.FunctionDef:
+    source = inspect.getsource(main_mod)
+    tree = ast.parse(source)
+    funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main"]
+    assert len(funcs) == 1, f"main.py 应恰有一个 main()，实际 {len(funcs)}"
+    return funcs[0]
+
+
+def _call_lineno(node: ast.FunctionDef, name: str) -> int:
+    """返回函数体内第一个 `.name(...)`（Attribute）或 `name(...)`（Name）调用行号。"""
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Call):
+            continue
+        func = child.func
+        if isinstance(func, ast.Attribute) and func.attr == name:
+            return child.lineno
+        if isinstance(func, ast.Name) and func.id == name:
+            return child.lineno
+    raise AssertionError(f"main() 中未找到 {name}(...) 调用")
+
+
+def test_main_creates_data_dir_before_log_handler():
+    """DATA_DIR.mkdir 必须在 RotatingFileHandler 之前执行。"""
+    main_fn = _main_ast()
+    mkdir_lineno = _call_lineno(main_fn, "mkdir")
+    handler_lineno = _call_lineno(main_fn, "RotatingFileHandler")
+    assert mkdir_lineno < handler_lineno, (
+        f"DATA_DIR.mkdir（L{mkdir_lineno}）必须先于 RotatingFileHandler（L{handler_lineno}）"
+        "——否则空启动时日志目录不存在，RotatingFileHandler 打开 LOG_FILE 抛 FileNotFoundError"
     )

@@ -6,6 +6,20 @@
 
 ---
 
+### 2026-08-01 | 修复 | main.py + tests/test_migration.py | O-22 空启动日志目录未建 → FileNotFoundError 崩溃
+
+**症状**：exe 在空环境（无旧数据、无 `~/收益计算器`）下首启即崩，日志 `FileNotFoundError: ... 'C:\Users\<user>\收益计算器\profit_calculator.log'`。
+
+**根因**：O-22 把日志路径改挂 `DATA_DIR` 后，`main()` 先构造 `RotatingFileHandler`（打开 `LOG_FILE`）再执行迁移；而目录创建只在 `migrate_legacy_data` 的迁移分支内发生——空启动时迁移提前返回、目录从未创建，日志文件无处打开。
+
+**修复**：`main()` 第一行显式 `DATA_DIR.mkdir(parents=True, exist_ok=True)`，先于日志 handler / 迁移 / 数据写入，保证空启动也有目录。
+
+**回归测试**：`tests/test_migration.py` 新增 AST 静态断言——`main()` 内 `DATA_DIR.mkdir` 行号必须先于 `RotatingFileHandler`（防顺序回退复发）。
+
+**结果**：pytest 187/187 ✅（186 + 1 新增）。重建 exe 后空启动正常出窗口。
+
+---
+
 ### 2026-08-01 | 重构+运维 | config.py + data_store.py + main.py + app/main_window.py + tests/test_migration.py | O-22 运行态数据统一到用户目录
 
 **背景**：旧 `APP_DIR` 语义下，打包版数据（`data.json`/`settings.json`/日志）生成在 exe 同目录 `dist/收益计算器/`。`dist/` 是构建产物，每次 PyInstaller 重建整体覆盖即丢用户数据（O-20/O-21 已发生两次）；exe 移动位置同样丢数据；开发版与 exe 两套数据各自演进。
