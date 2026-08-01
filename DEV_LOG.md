@@ -6,6 +6,20 @@
 
 ---
 
+### 2026-08-01 | 文档整理 | TO-TICKETS/README/CODE_WIKI/PROJECT_REFERENCE | 核心文档冗余清理与失同步修正
+
+**TO-TICKETS.md**：删除「工单详情」整节（C3/C5/O-01~O-19 长文——均已归档，细节 git 可追溯，活跃表已空）；删除从未使用的「🔜 待排期」状态说明。文件从 401 行缩至 109 行（头部规则 + 活跃表 + 归档表 + 状态说明）。
+
+**README.md**：修正图表颜色标注（仓库=琥珀金/现金=青色，原写反）；「近 7 天 / 7 日总盈亏」→「最近 7 条」；备份份数 5→4（3 份滚动 + 1 份兼容旧版，实测 `data_store._rotate_backups`）；文件树补 `app/__init__.py`、`requirements-dev.txt`、`收益计算器.spec`、`app_icon.ico`，`config.py` 注释去「字体/主题色板」。
+
+**CODE_WIKI.md**：版本行 + §一 开发阶段补 O-07~O-19（含 O-07 YAGNI 关闭）；§4.6 theme.py 改「内联定义 THEMES（T-02 迁入，不再从 config.py 导入）」+ 行数 243→371；§4.8 config.py 删除已迁走的主题色板/函数表（~127→~20 行，补指向 §4.6）；§2.1 架构图、§5.2/§5.3 依赖表同步（theme.py 无外部依赖、main.py 导入清单补全）；§三 `__init__.py` 注释去「重导出主题函数」。
+
+**PROJECT_REFERENCE.md**：精简为项目介绍（概述/数据模型/关键决策/常碰坑点），删除与 CODE_WIKI 重复且易漂移的技术细节（文件布局/模块行数/测试计数/UI ASCII 图/「与 Agent 合作建议」整节），技术细节统一指向 CODE_WIKI——根治双文档漂移（O-19 同因）。
+
+**验证**：纯文档改动，未触碰代码，pytest 180/180 不受影响。
+
+---
+
 ### 2026-08-01 | 运维 | .gitignore + settings.json | O-18 settings.json 运行态入库清理（出索引 + gitignore）
 
 **O-18**（P2，运维）：`settings.json` 内容为运行时态（窗口几何 + theme 随切换翻转），仍在 git 跟踪导致每次改主题/拖窗口都污染提交 diff（`082ce62` 已附带提交一次翻转）。拍板选 **A**：

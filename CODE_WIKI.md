@@ -1,6 +1,6 @@
 # 收益计算器 (Profit Calculator) — Code Wiki
 
-> 版本：PySide6 版（第二阶段迁移完成 + 第三阶段架构优化完成）  
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列全部完成）  
 > 生成日期：2026-07-29  
 > 测试状态：180 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
@@ -18,7 +18,7 @@
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → 单 .exe |
 | 测试框架 | pytest（180 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-06）全部完成 |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-19，O-07 YAGNI 关闭）全部完成 |
 
 ---
 
@@ -52,9 +52,9 @@
 ├─────────────────────────────────────────────────────────┤
 │                    配置 / 主题层                          │
 │  ┌──────────────┐  ┌───────────────────────────────────┐ │
-│  │  config.py   │  │ app/theme.py — QSS 样式表生成     │ │
-│  │  路径/字体/  │  │ 复用 config.py 的 THEMES 色板     │ │
-│  │  THEMES 色板 │  │                                    │ │
+│  │  config.py   │  │ app/theme.py — 主题色板 + QSS    │ │
+│  │  路径/日期/  │  │ THEMES/get_color 定义于此（T-02） │ │
+│  │  保留条数    │  │                                    │ │
 │  └──────────────┘  └───────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -79,7 +79,7 @@
 Profit Calculator/
 ├── main.py                  ← [主入口] PySide6 QApplication + 单实例保证 + 应用图标
 ├── app/
-│   ├── __init__.py          ← app 包标记，重导出 get_color/get_theme/set_theme
+│   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏最近 7 条数据表格（7 列）
@@ -286,9 +286,9 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（~243 行）
+### 4.6 `app/theme.py` — 主题系统（~371 行）
 
-从根目录 `config.py` 导入 `THEMES` 色板字典和主题切换函数，专供 `app/` 内的 PySide6 组件使用。
+主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用。
 
 | 函数 | 说明 |
 |------|------|
@@ -334,7 +334,7 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.8 `config.py` — 基础配置（~127 行）
+### 4.8 `config.py` — 基础配置（~20 行）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
@@ -345,27 +345,7 @@ pyqtgraph 双曲线图组件。
 | `DATE_FORMAT` | `"%Y-%m-%d"` | 日期格式 |
 | `WEEK_DAYS` | `7` | 保留最近记录条数（录入条数语义，非日历天数） |
 
-**主题 color token 说明**：
-
-| Token | 用途 |
-|-------|------|
-| `BG` | 全局背景 |
-| `FG_LABEL` / `FG_MUTED` / `FG_TODAY` | 标签/灰显/今日文字颜色 |
-| `FG_POS` / `FG_NEG` | 涨/跌颜色 |
-| `BTN_BG` / `BTN_BG_HOVER` / `BTN_FG` | 按钮颜色 |
-| `BORDER_DEFAULT` / `BORDER_VALID` / `BORDER_INVALID` | 输入框边框颜色 |
-| `CHART_CASH` / `CHART_WAREHOUSE` / `CHART_TOTAL` / `CHART_GRID` / `CHART_BG` / `CHART_AXIS` / `CHART_TEXT` | 图表颜色 |
-| `TABLE_TEXT` / `TABLE_TEXT_BOLD` / `TABLE_ROW_EVEN_BG` / `TABLE_ROW_ODD_BG` / `TABLE_ROW_HOVER_BG` / `TABLE_HEADER_BG` / `TABLE_HEADER_FG` | 表格颜色 |
-| `CARD_BG` / `CARD_BORDER` / `INPUT_BG` / `INPUT_FG` | 卡片/输入框颜色 |
-| `MUTED_BG` / `SEPARATOR` / `PLACEHOLDER` | 辅助颜色 |
-
-**函数**：
-
-| 函数 | 说明 |
-|------|------|
-| `get_theme()` | 返回当前主题配色字典 |
-| `set_theme(name)` | 切换主题（`"light"` \| `"dark"`） |
-| `get_color(key)` | 获取当前主题下指定颜色值（运行时安全） |
+> 主题色板（`THEMES` / `get_theme` / `set_theme` / `get_color`）已于 T-02 迁至 `app/theme.py`（见 §4.6），config.py 不再包含主题数据。
 
 ---
 
@@ -429,7 +409,7 @@ main.py
         ├── app/input_panel.py ──┐
         ├── app/table_widget.py  ├── formatting.py
         ├── app/chart_widget.py  │
-        ├── app/theme.py ────────┼── config.py
+        ├── app/theme.py          （无外部依赖）
         ├── data_store.py ───────┼── config.py
         ├── calculator.py ───────┼── config.py, formatting.py
         └── config.py
@@ -439,12 +419,12 @@ main.py
 
 | 模块 | 导入来源 |
 |------|----------|
-| `main.py` | `app.main_window`, `PySide6` |
+| `main.py` | `app.main_window`, `config`, `PySide6`（QtCore/QtGui/QtNetwork/QtWidgets） |
 | `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `formatting`, `calculator`, `PySide6` |
 | `app/input_panel.py` | `app.theme`, `formatting`, `PySide6` |
 | `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `PySide6` |
 | `app/chart_widget.py` | `app.theme`, `numpy`, `pyqtgraph`, `PySide6` |
-| `app/theme.py` | `config`（根目录） |
+| `app/theme.py` | 无外部依赖（仅标准库） |
 | `calculator.py` | `config`, `formatting` |
 | `data_store.py` | `config` |
 | `formatting.py` | 无外部依赖（仅标准库） |
@@ -467,7 +447,7 @@ main.py
 - 日期为 key（`YYYY-MM-DD` 格式）
 - `cash` 为当前现金（float）
 - `warehouse` 为仓库价值（float，已包含现金）
-- 最多保留 7 天数据
+- 最多保留最近 7 条记录（超出删除最旧，按记录数而非日历天数）
 
 ### 6.2 `settings.json` 格式
 
