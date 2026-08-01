@@ -19,7 +19,8 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 from app.main_window import MainWindow
-from config import APP_DIR
+from config import APP_DIR, DATA_DIR, LOG_FILE
+from data_store import migrate_legacy_data
 
 # 单实例锁名称（全局唯一）
 _SERVER_NAME = "profit_calculator_singleton_lock"
@@ -71,7 +72,7 @@ def main() -> None:
     root_logger = logging.getLogger()
     if not root_logger.handlers:  # 已有配置时不重复添加（与 basicConfig 幂等语义一致）
         handler = RotatingFileHandler(
-            APP_DIR / "profit_calculator.log",
+            LOG_FILE,
             maxBytes=1_000_000,
             backupCount=3,
             encoding="utf-8",
@@ -94,6 +95,10 @@ def main() -> None:
     if server is None:
         # 已有实例在运行，静默退出
         sys.exit(0)
+
+    # ── 旧数据一次性迁移（O-22）：运行态数据统一到 ~/收益计算器 ──
+    # 目标目录已有数据则跳过；旧数据保留原位置（复制非移动）。
+    migrate_legacy_data(APP_DIR, DATA_DIR)
 
     window = MainWindow()
     window.show()

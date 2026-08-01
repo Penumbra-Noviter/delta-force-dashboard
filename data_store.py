@@ -14,9 +14,39 @@ from config import BACKUP_FILE, DATA_FILE
 
 __all__ = [
     "DataStore",
+    "migrate_legacy_data",
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def migrate_legacy_data(legacy_dir: Path, target_dir: Path) -> None:
+    """一次性迁移旧版数据目录到统一数据目录（O-22）。
+
+    - 目标目录已有 ``data.json`` → 视为已迁移，直接返回（新数据权威，绝不覆盖）。
+    - legacy 目录无 ``data.json`` → 无需迁移，直接返回。
+    - 否则创建目标目录，复制 ``data.json`` + 全部滚动备份 + ``settings.json``。
+    - 采用复制而非移动：源文件保留、迁移可逆；失败仅记 warning，不中断启动。
+    """
+    target_data = target_dir / "data.json"
+    if target_data.exists() or not (legacy_dir / "data.json").exists():
+        return
+
+    files: list[tuple[Path, Path]] = [(legacy_dir / "data.json", target_data)]
+    for bak in sorted(legacy_dir.glob("data.json.bak*")):
+        files.append((bak, target_dir / bak.name))
+    settings = legacy_dir / "settings.json"
+    if settings.exists():
+        files.append((settings, target_dir / "settings.json"))
+
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for src, dst in files:
+            shutil.copy2(src, dst)
+    except OSError as e:
+        logger.warning("旧数据迁移失败（数据仍在原位置，不影响启动）: %s", e)
+        return
+    logger.info("已从 %s 迁移数据到 %s", legacy_dir, target_dir)
 
 
 class DataStore:

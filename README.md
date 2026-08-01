@@ -45,7 +45,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（180 项测试，含 offscreen UI 烟测） |
+| 测试框架 | pytest（186 项测试，含 offscreen UI 烟测） |
 
 ---
 
@@ -53,7 +53,7 @@
 
 ### 方式一：直接运行打包版（推荐）
 
-前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（zip），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）生成在 exe 同目录。
+前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（zip），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `C:\Users\<你的用户名>\收益计算器\`（开发版与打包版共用；旧版 exe 目录/项目根内的数据会在首次启动时自动迁移过去）。
 
 ### 方式二：从源码运行
 
@@ -84,10 +84,10 @@ python main.py
 
 ## 数据与隐私
 
-- 所有数据存储于本地 `data.json` 文件，**不联网、不上传、不收集任何信息**
+- 所有数据存储于本地 `data.json` 文件（`C:\Users\<你的用户名>\收益计算器\data.json`），**不联网、不上传、不收集任何信息**
 - 每次保存自动生成滚动备份，最多保留 4 份历史备份（3 份滚动 + 1 份兼容旧版）
 - 数据文件损坏时可自动从最近备份恢复
-- 窗口位置、主题、置顶状态等设置保存于 `settings.json`
+- 窗口位置、主题、置顶状态等设置保存于 `settings.json`（同一目录）
 
 ---
 
@@ -112,8 +112,8 @@ profit-calculator/
 ├── 收益计算器.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）
 ├── requirements-dev.txt     # 开发依赖（pytest）
-├── data.json                # 运行态数据
-└── settings.json            # 应用设置
+├── data.json                # 旧版遗留数据（运行态已移至用户目录，O-22）
+└── settings.json            # 旧版遗留设置（同上）
 ```
 
 ---

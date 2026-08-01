@@ -338,10 +338,12 @@ pyqtgraph 双曲线图组件。
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
-| `APP_DIR` | Path | 应用根目录（打包后为 exe 所在目录） |
-| `DATA_FILE` | `data.json` | 数据文件路径 |
-| `BACKUP_FILE` | `data.json.bak` | 备份文件基础路径 |
-| `SETTINGS_FILE` | `settings.json` | 设置文件路径 |
+| `APP_DIR` | Path | 应用所在目录（打包版为 exe 目录，源码版为项目根）；O-22 起仅作「旧数据源」供一次性迁移 |
+| `DATA_DIR` | `Path.home()/收益计算器` | 统一数据目录（开发版与 exe 共用，O-22） |
+| `DATA_FILE` | `DATA_DIR/data.json` | 数据文件路径 |
+| `BACKUP_FILE` | `DATA_DIR/data.json.bak` | 备份文件基础路径 |
+| `SETTINGS_FILE` | `DATA_DIR/settings.json` | 设置文件路径 |
+| `LOG_FILE` | `DATA_DIR/profit_calculator.log` | 日志文件路径 |
 | `DATE_FORMAT` | `"%Y-%m-%d"` | 日期格式 |
 | `WEEK_DAYS` | `7` | 保留最近记录条数（录入条数语义，非日历天数） |
 
@@ -533,9 +535,9 @@ pip install pyinstaller
 python -m PyInstaller 收益计算器.spec --noconfirm
 ```
 
-**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）生成在 exe 同目录。
+**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `~/收益计算器`（O-22），与 exe 位置/重建解耦——`dist/` 每次构建整体覆盖也不影响用户数据。旧版 exe 目录/项目根内的数据在首次启动时由 `migrate_legacy_data` 自动复制（复制非移动，源保留）。
 
-**为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致，源码零改动。
+**为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致；O-22 后运行态数据不再依赖 `APP_DIR`，改走 `DATA_DIR`（`Path.home()/收益计算器`）。
 
 **体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件。`upx=False`（本机未装 UPX，此前为空转）。
 

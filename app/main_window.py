@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 
 from app.chart_widget import ChartWidget
 from config import (
-    APP_DIR,
+    DATA_DIR,
     DATE_FORMAT,
     SETTINGS_FILE,
     WEEK_DAYS,
@@ -528,7 +528,7 @@ class MainWindow(QMainWindow):
 
         写入失败时提示用户并记录日志，不静默；取消选择时直接返回。
         """
-        default_path = str(APP_DIR / f"收益数据_{self.today}.csv")
+        default_path = str(DATA_DIR / f"收益数据_{self.today}.csv")
         path, _ = QFileDialog.getSaveFileName(
             self, "导出 CSV", default_path, "CSV 文件 (*.csv)"
         )

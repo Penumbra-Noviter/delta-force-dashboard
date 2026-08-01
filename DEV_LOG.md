@@ -6,6 +6,23 @@
 
 ---
 
+### 2026-08-01 | 重构+运维 | config.py + data_store.py + main.py + app/main_window.py + tests/test_migration.py | O-22 运行态数据统一到用户目录
+
+**背景**：旧 `APP_DIR` 语义下，打包版数据（`data.json`/`settings.json`/日志）生成在 exe 同目录 `dist/收益计算器/`。`dist/` 是构建产物，每次 PyInstaller 重建整体覆盖即丢用户数据（O-20/O-21 已发生两次）；exe 移动位置同样丢数据；开发版与 exe 两套数据各自演进。
+
+**改动**：
+- `config.py`：新增 `DATA_DIR = Path.home()/"收益计算器"`；`DATA_FILE`/`BACKUP_FILE`/`SETTINGS_FILE` 全部改挂其下，新增 `LOG_FILE`；`APP_DIR` 保留为「旧数据源」仅供迁移。
+- `data_store.py`：新增模块级幂等函数 `migrate_legacy_data(legacy_dir, target_dir)`——目标已有 `data.json` 跳过（新数据权威，绝不覆盖）、legacy 无数据跳过；否则 `mkdir` + 复制 `data.json` + 全部滚动备份 + `settings.json`；**复制而非移动**（源保留、可逆）；失败仅 warning 不中断启动。
+- `main.py`：日志 handler 路径 `APP_DIR/profit_calculator.log` → `LOG_FILE`；单实例检查通过后、建 MainWindow 前调用 `migrate_legacy_data(APP_DIR, DATA_DIR)`。
+- `app/main_window.py`：CSV 默认导出路径 `APP_DIR/…` → `DATA_DIR/…`。
+- 测试：新增 `tests/test_migration.py` 6 项（空 legacy 无操作 / 目标已有跳过不覆盖 / 迁移 data.json+备份+settings / 非破坏性 / 无 settings 仍迁移 / 成功迁移记日志）。
+
+**结果**：pytest 186/186 ✅（180 + 6 新增）。对真实项目根数据（`data.json` + 4 备份 + `settings.json`）实测迁移复制完整。下次启动（开发版或 exe）自动把旧数据迁到 `C:\Users\<user>\收益计算器\`。
+
+**取舍**：迁移用复制而非移动——旧文件保留原位置（`.gitignore` 已忽略），用户确认后可手动清理；`dist/` 重建整体覆盖不再影响用户数据。
+
+---
+
 ### 2026-08-01 | 运维+打包 | %TEMP% + 收益计算器.spec + dist/收益计算器 | O-21 打包 UPX 压缩瘦身 + O-20 待办闭环（_MEI 残留清理）
 
 **O-20 待办闭环（`%TEMP%` 孤儿 `_MEI*` 清理）**：单文件模式遗留的 5 个 `_MEI*` 解压目录（各 181M，共 905MB，确认无进程占用）已 `rm -rf` 清除，O-20 日志「待办」闭环。
