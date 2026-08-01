@@ -139,99 +139,64 @@ def test_last_record_before_empty_data():
     assert logic.last_record_before("2026-07-20") is None
 
 
-# ── ProfitCalculatorLogic.get_weekly_records ──────────
+# ── ProfitCalculatorLogic.recent_records ──────────
 
-def test_weekly_all_present():
-    """7 天数据全部存在时返回完整列表。"""
-    data = {}
-    from datetime import datetime, timedelta
-    from config import DATE_FORMAT
-
-    today = datetime.now()
-    for i in range(7):
-        d = today - timedelta(days=6 - i)
-        data[d.strftime(DATE_FORMAT)] = {"cash": 100.0 * (i + 1), "warehouse": 50.0 * (i + 1)}
-
+def test_recent_records_under_limit():
+    """记录数不超过上限时全部返回（按日期升序）。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 17)}
     logic = ProfitCalculatorLogic(data)
-    weekly = logic.get_weekly_records(today.strftime(DATE_FORMAT), days=7)
+    records = logic.recent_records()
 
-    assert len(weekly) == 7
-    for date_str, record in weekly:
-        assert record is not None
-        assert record.cash > 0
+    assert [d for d, _ in records] == [f"2026-07-{d:02d}" for d in range(10, 17)]
 
 
-def test_weekly_some_missing():
-    """部分日期无数据时对应位置返回 None。"""
-    data = {
-        (__import__("datetime").datetime.now() - __import__("datetime").timedelta(days=0)).strftime("%Y-%m-%d"): {"cash": 100, "warehouse": 200},
-    }
-    logic = ProfitCalculatorLogic(data)
-    from datetime import datetime
-
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    weekly = logic.get_weekly_records(today_str, days=7)
-
-    assert len(weekly) == 7
-    # 只有今天有数据
-    found = sum(1 for _, r in weekly if r is not None)
-    assert found == 1
-    # 其他应为 None
-    assert weekly[-1][1] is not None  # 今天
-
-
-def test_weekly_empty_data():
-    """无任何数据时全部为 None。"""
-    logic = ProfitCalculatorLogic({})
-    weekly = logic.get_weekly_records("2026-07-20", days=7)
-
-    assert len(weekly) == 7
-    for _, record in weekly:
-        assert record is None
-
-
-def test_weekly_invalid_date():
-    """无效日期输入返回空列表。"""
+def test_recent_records_only_entered():
+    """只返回实际录入的记录：间断录入不产生空位占位。"""
     logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100, "warehouse": 200}})
-    weekly = logic.get_weekly_records("bad-date", days=7)
-    assert weekly == []
+    records = logic.recent_records()
+
+    assert len(records) == 1
+    assert records[0][0] == "2026-07-20"
 
 
-def test_weekly_custom_days():
+def test_recent_records_empty():
+    """无任何数据时返回空列表。"""
+    logic = ProfitCalculatorLogic({})
+    assert logic.recent_records() == []
+
+
+def test_recent_records_caps_to_days():
+    """超过上限时只返回最近 days 条（间断录入的较老记录保留在 data 但不上表）。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(1, 11)}
+    logic = ProfitCalculatorLogic(data)
+    records = logic.recent_records()
+
+    dates = [d for d, _ in records]
+    assert len(records) == 7
+    assert dates == [f"2026-07-{d:02d}" for d in range(4, 11)]
+
+
+def test_recent_records_custom_days():
     """自定义天数参数。"""
-    data = {}
-    from datetime import datetime, timedelta
-    from config import DATE_FORMAT
-
-    today = datetime.now()
-    for i in range(3):
-        d = today - timedelta(days=2 - i)
-        data[d.strftime(DATE_FORMAT)] = {"cash": 100.0, "warehouse": 200.0}
-
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 13)}
     logic = ProfitCalculatorLogic(data)
-    weekly = logic.get_weekly_records(today.strftime(DATE_FORMAT), days=3)
+    records = logic.recent_records(days=3)
 
-    assert len(weekly) == 3
-    for _, record in weekly:
-        assert record is not None
+    assert [d for d, _ in records] == ["2026-07-10", "2026-07-11", "2026-07-12"]
 
 
-def test_weekly_sorted_order():
-    """验证返回列表按日期升序排列。"""
-    data = {}
-    from datetime import datetime, timedelta
-    from config import DATE_FORMAT
+def test_recent_records_skips_malformed():
+    """无效/缺失字段的记录被跳过，且不占条数上限。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+            "2026-07-21": {"cash": "abc", "warehouse": 240.0},  # 无效
+            "2026-07-22": {"cash": 120.0, "warehouse": 250.0},
+        }
+    )
+    records = logic.recent_records()
 
-    today = datetime.now()
-    for i in [0, 2, 5]:  # 非连续
-        d = today - timedelta(days=i)
-        data[d.strftime(DATE_FORMAT)] = {"cash": 100.0, "warehouse": 200.0}
-
-    logic = ProfitCalculatorLogic(data)
-    weekly = logic.get_weekly_records(today.strftime(DATE_FORMAT), days=7)
-
-    dates = [d for d, _ in weekly]
-    assert dates == sorted(dates)
+    assert [d for d, _ in records] == ["2026-07-20", "2026-07-22"]
 
 
 # ── Integration-style ────────────────────────────────
@@ -398,67 +363,70 @@ def test_rotate_weekly_logs_deletion(caplog):
 def test_summary_empty():
     """无记录时返回 (0, None)。"""
     logic = ProfitCalculatorLogic({})
-    count, total = logic.summary("2026-07-20")
+    count, total = logic.summary()
     assert count == 0
     assert total is None
 
 
 def test_summary_single_record():
-    """仅一条记录时返回该日仓库值。"""
+    """仅一条记录时返回该条仓库值。"""
     logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 500.0}})
-    count, total = logic.summary("2026-07-20")
+    count, total = logic.summary()
     assert count == 1
     assert total == 500.0
 
 
 def test_summary_multiple_records():
-    """总盈亏 = 末日仓库值 − 首日仓库值。"""
+    """总盈亏 = 最新记录仓库值 − 最旧记录仓库值。"""
     logic = ProfitCalculatorLogic(
         {
             "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
             "2026-07-18": {"cash": 200.0, "warehouse": 700.0},
         }
     )
-    count, total = logic.summary("2026-07-20")
+    count, total = logic.summary()
     assert count == 2
     assert total == 300.0
 
 
 def test_summary_negative():
-    """下跌窗口总盈亏为负。"""
+    """下跌时总盈亏为负。"""
     logic = ProfitCalculatorLogic(
         {
             "2026-07-14": {"cash": 100.0, "warehouse": 700.0},
             "2026-07-18": {"cash": 200.0, "warehouse": 400.0},
         }
     )
-    count, total = logic.summary("2026-07-20")
+    count, total = logic.summary()
     assert count == 2
     assert total == -300.0
 
 
 def test_summary_zero():
-    """窗口内无变化时总盈亏为 0。"""
+    """最新与最旧仓库值相等时总盈亏为 0。"""
     logic = ProfitCalculatorLogic(
         {
             "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
             "2026-07-18": {"cash": 200.0, "warehouse": 400.0},
         }
     )
-    count, total = logic.summary("2026-07-20")
+    count, total = logic.summary()
     assert count == 2
     assert total == 0.0
 
 
-def test_summary_invalid_date():
-    """无效截止日期返回 (0, None)。"""
-    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 500.0}})
-    count, total = logic.summary("bad-date")
-    assert count == 0
-    assert total is None
+def test_summary_caps_to_recent_days():
+    """超过上限时只统计最近 days 条记录（间断录入的较老记录不参与）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-01": {"cash": 100.0, "warehouse": 100.0},
+            **{f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 18)},
+        }
+    )
+    count, total = logic.summary()
+    assert count == 7
+    assert total == 0.0  # 07-11~07-17 仓库值恒为 200，07-01 不在最近 7 条内
 
-
-# ── ProfitCalculatorLogic.export_csv ────────────────
 
 def test_export_csv_empty():
     """无数据时只有表头行。"""

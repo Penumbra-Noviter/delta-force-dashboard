@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**收益计算器**是一款 Windows 桌面工具，面向个人投资者。用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动记录最近 7 天数据，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
+**收益计算器**是一款 Windows 桌面工具，面向个人投资者。用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动保留最近 7 条实际录入记录（间断录入不丢历史），以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
 | 属性 | 说明 |
 |------|------|
@@ -66,7 +66,7 @@
     → InputPanel (合法性校验 → 启用保存按钮)
     → MainWindow.save_today() (解析 → 验证 → 保存)
     → ProfitCalculatorLogic.save_record() (写入内存 dict)
-    → ProfitCalculatorLogic.rotate_weekly() (保持最多 7 天)
+    → ProfitCalculatorLogic.rotate_weekly() (保留最近 7 条实际录入记录，超出删除最旧)
     → DataStore.save() (原子写入 JSON + 滚动备份)
     → refresh_display() → TableWidget.draw() + ChartWidget.draw()
 ```
@@ -82,7 +82,7 @@ Profit Calculator/
 │   ├── __init__.py          ← app 包标记，重导出 get_color/get_theme/set_theme
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
-│   ├── table_widget.py      ← 双栏 7 日数据表格（7 列）
+│   ├── table_widget.py      ← 双栏最近 7 条数据表格（7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双曲线图 + PNG 导出 + 稀疏数据提示
 │   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
@@ -91,17 +91,18 @@ Profit Calculator/
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 54 个测试（DayRecord + 业务逻辑 + CSV 导出）
-│   ├── test_data_store.py   ← 16 个测试（保存/加载/备份/恢复/日志）
+│   ├── test_calculator.py   ← 57 个测试（DayRecord + 业务逻辑 + CSV 导出）
+│   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
-│   ├── test_input_panel.py  ← 12 个测试（C4 seam + C9 静态守卫 + O-02 seam）
+│   ├── test_input_panel.py  ← 18 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式）
 │   ├── test_table_theme.py  ← 3 个测试（C1 主题色实时解析）
-│   └── test_ui_smoke.py     ← 23 个测试（C5 UI 烟测 + O-04/05/06，offscreen）
+│   └── test_ui_smoke.py     ← 26 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（单文件 + 图标）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
 ├── settings.json            ← 窗口几何 + 置顶 + 主题持久化
-├── requirements.txt         ← PySide6>=6.6.0, pyqtgraph>=0.13.0
+├── requirements.txt         ← PySide6==6.11.1, pyqtgraph==0.14.0（O-12 版本锁定）
+├── requirements-dev.txt     ← -r requirements.txt + pytest==9.1.1
 ├── .gitignore
 ├── CONSENSUS.md             ← 开发共识文档（三阶段任务记录）
 └── PROJECT_REFERENCE.md     ← 项目介绍书（架构说明）
@@ -139,7 +140,7 @@ Profit Calculator/
 | `_setup_window()` | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
 | `_build_ui()` | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
 | `_connect_signals()` | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
-| `save_today()` | 解析输入 → 验证 → 保存到 logic → 滚动 7 日 → 持久化 → 刷新显示 |
+| `save_today()` | 解析输入 → 验证 → 保存到 logic → 轮转保留最近 7 条 → 持久化 → 刷新显示 |
 | `refresh_display()` | 获取 records → 刷新汇总/今日未录入/表格/图表 |
 | `_export_csv()` | QFileDialog 选路径，utf-8-sig 写入 `logic.export_csv()`（O-04） |
 | `_update_today_status()` | 今日无记录时显示「今日未录入」，有则隐藏（O-05） |
@@ -316,13 +317,13 @@ pyqtgraph 双曲线图组件。
 | `get_record` | `date_str: str` | `DayRecord \| None` | 查单日数据，字段缺失/格式异常返回 None |
 | `save_record` | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录 |
 | `last_record_before` | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
-| `get_weekly_records` | `end_date, days=7` | `list[(str, DayRecord\|None)]` | 获取连续 N 天数据，按日期升序 |
+| `recent_records` | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
 | `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
 | `format_rate` | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
 | `get_pnl_label` | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
 | `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
-| `rotate_weekly` | `days=7` | `None` | 7 日保留策略，超过上限删除最旧记录 |
-| `summary` | `end_date, days=7` | `(int, float \| None)` | 7 日窗口总盈亏（末日−首日） |
+| `rotate_weekly` | `days=7` | `list[str]` | 保留最近 days 条实际录入记录，超过上限删除最旧；返回被删除日期列表（升序，O-14） |
+| `summary` | `days=7` | `(int, float \| None)` | 最近 days 条记录总盈亏（最新−最旧，录入条数语义） |
 | `export_csv` | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
 
 **关键业务规则**：
@@ -342,7 +343,7 @@ pyqtgraph 双曲线图组件。
 | `BACKUP_FILE` | `data.json.bak` | 备份文件基础路径 |
 | `SETTINGS_FILE` | `settings.json` | 设置文件路径 |
 | `DATE_FORMAT` | `"%Y-%m-%d"` | 日期格式 |
-| `WEEK_DAYS` | `7` | 数据保留天数 |
+| `WEEK_DAYS` | `7` | 保留最近记录条数（录入条数语义，非日历天数） |
 
 **主题 color token 说明**：
 
@@ -415,10 +416,10 @@ pyqtgraph 双曲线图组件。
 
 | 包 | 版本要求 | 用途 |
 |-----|----------|------|
-| PySide6 | ≥6.6.0 | Qt 官方 Python 绑定，UI 框架 |
-| pyqtgraph | ≥0.13.0 | 高性能 Qt 原生图表渲染 |
+| PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
+| pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | (开发依赖) | 单元测试框架 |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 |
 
 ### 5.2 模块间依赖关系图
 
@@ -495,8 +496,8 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 54 | DayRecord 属性、冻结、CRUD、日期回溯、7 日滚动、收益率计算、格式化、盈亏标签、删除、滚动旋转、7 日汇总、CSV 导出 |
-| `tests/test_data_store.py` | 16 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志 |
+| `tests/test_calculator.py` | 57 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08） |
+| `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 
 **运行方式**：在项目根目录执行 `pytest`
@@ -508,8 +509,8 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | 22 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、损坏设置日志、保存失败日志、CSV 导出按钮、今日未录入提醒 |
-| `tests/test_input_panel.py` | 12 | InputPanel getter 语义 / raw getter / refresh_validity 公开 seam / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API |
+| `tests/test_ui_smoke.py` | 26 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、损坏设置日志、保存失败日志、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）、settings 顶层 dict 校验（O-09） |
+| `tests/test_input_panel.py` | 18 | InputPanel getter 语义 / raw getter / refresh_validity 公开 seam / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | 3 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 |
 
 **运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）
@@ -576,7 +577,7 @@ python -m PyInstaller 收益计算器.spec --noconfirm
 
 1. **主题切换**：运行时必须用 `get_color(key)` 而非模块级常量，因为常量在 `import` 时固定为 light 主题
 2. **DayRecord.total**：`total` = `warehouse`（不是 `warehouse + cash`），现金是仓库的组成部分
-3. **7 日限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删除
+3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，按「录入条数」超过上限时从最旧开始删除；表格/图表/汇总（`recent_records`/`summary`）同以最近 7 条实际录入记录为基准，而非最近 7 个日历天
 4. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入
 5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，仅 `setData()` 更新，避免重建
 6. **输入框去抖**：`MoneyLineEdit` 使用 150ms 去抖的 QTimer，快速输入时避免每次按键都触发校验

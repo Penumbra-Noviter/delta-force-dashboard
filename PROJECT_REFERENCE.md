@@ -98,7 +98,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - 键盘绑定：QAction → Enter 保存 / Esc 清空
 - 主题切换：QSS 样式表一键切换，主题按钮文字联动
 - 置顶切换：`windowFlags() ^ WindowStaysOnTopHint`
-- 数据流：`save_today()` → parse → validate → save → 旋转 7 日 → 持久化 → 刷新表格+图表
+- 数据流：`save_today()` → parse → validate → save → 轮转保留最近 7 条 → 持久化 → 刷新表格+图表
 - 编辑模式：`_start_edit()` → 回填数据到输入面板，修改后 `save_today()` 写回原日期
 - 删除模式：确认对话框 → `logic.delete_record(date)` → 持久化 → 刷新
 
@@ -108,10 +108,10 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 - `ProfitCalculatorLogic.get_record(date)`：查单日数据，异常返回 None
 - `ProfitCalculatorLogic.save_record(date, cash, warehouse)`：写数据
 - `ProfitCalculatorLogic.last_record_before(date)`：向前回溯最近有效记录（跳过空/无效日）
-- `ProfitCalculatorLogic.get_weekly_records(end_date, days=7)`：获取连续 N 天数据（含 None 占位）
+- `ProfitCalculatorLogic.recent_records(days=7)`：最近 days 条实际录入记录（录入条数语义，无空位占位）
 - `ProfitCalculatorLogic.delete_record(date)`：删除单日记录（不存在时返回 False）
-- `ProfitCalculatorLogic.rotate_weekly(days=7)`：7 日保留策略，超过上限删除最旧记录
-- `ProfitCalculatorLogic.summary(end_date, days=7)`：7 日窗口总盈亏（末日−首日仓库值）
+- `ProfitCalculatorLogic.rotate_weekly(days=7)`：保留最近 days 条实际录入记录，超过上限删除最旧记录
+- `ProfitCalculatorLogic.summary(days=7)`：最近 days 条记录总盈亏（最新−最旧仓库值）
 - `ProfitCalculatorLogic.format_diff(diff)`：返回 `(符号, 格式化金额, 颜色)` 三元组
 
 #### `config.py`（~154 行）
@@ -214,7 +214,7 @@ PySide6 入口点。创建 QApplication（高 DPI 缩放），实例化 `MainWin
 
 1. **主题切换**：模块级常量（`FG_POS` 等）在 `import` 时固定为 light 主题，运行时切换主题必须调用 `get_color(key)` 而非直接引用常量。
 2. **单实例保证**：`main.py` 通过 QLocalServer/QLocalSocket 防止多开；崩溃后残留 socket 会自动清理，无需手动删除。
-3. **7 日限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，排序后从最旧开始删，确保不超过 7 条。
+3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，按「录入条数」超过上限时从最旧开始删，确保不超过 7 条；表格/图表/汇总同以最近 7 条实际录入记录为基准（`recent_records`/`summary`），而非最近 7 个日历天。
 4. **day_record.total**：`total` 直接返回 `warehouse`（不是 warehouse + cash）。现金是 warehouse 的组成部分。
 5. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入。
 6. **增量 vs 全量图更新**：`_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅 `setData()` 不重建组件；填充边界曲线也持久化，避免此前 FillBetweenItem 重建开销。

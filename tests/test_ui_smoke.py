@@ -40,11 +40,10 @@ __all__ = []
 
 
 def make_sample_data() -> dict:
-    """创建 6 天连续样本数据（相对今天，保证落在 7 日滚动窗口内）。
+    """创建 6 天样本数据（相对今天生成，含两天间断缺口）。
 
     原 verify_all 用固定日期（2026-07-20~27）；迁移后改为相对今天生成，
-    避免样本日超出 [today-6, today] 窗口导致 test_ui_initialization 断言
-    在 2026-08-03 之后必然失败（时间耦合回归）。
+    避免样本日与墙钟耦合导致断言必然失败（时间耦合回归）。
     """
     today = datetime.now()
     offsets = (7, 6, 5, 3, 2, 0)  # 与原 6 天间隔（含两天缺口）一致
@@ -106,15 +105,14 @@ def test_ui_initialization(sample_window):
     # 表格列数 = 7
     assert win.table.columnCount() == 7
 
-    # 初始有样本数据
-    records = win.logic.get_weekly_records(win.today, 7)
-    present = [d for d, r in records if r is not None]
+    # 初始有样本数据（recent_records 返回全部实际录入记录，无空位占位）
+    records = win.logic.recent_records(7)
+    present = [d for d, _ in records]
     assert len(present) > 0
 
     # 表格 / 图表 draw 无 crash
-    data_records = [(d, r) for d, r in records if r is not None]
-    win.table.draw(data_records, win.today)
-    win.chart.draw(data_records)
+    win.table.draw(records, win.today)
+    win.chart.draw(records)
 
     # 7 列表头名称（双栏同构，使用左表验证）
     headers = [
@@ -234,7 +232,9 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
     win.save_today()
 
     assert len(win.logic.data) == 7  # 最旧 1 条被自动裁剪
-    assert "自动清理" in win.input_panel.saved_indicator.text()
+    indicator = win.input_panel.saved_indicator.text()
+    assert "已保留最近 7 条记录" in indicator
+    assert "自动清理 1 条较早记录" in indicator
     win.close()
 
 
@@ -611,8 +611,7 @@ def test_today_status_hidden_when_recorded(sample_window):
 def test_chart_sparse_data_hint(sample_window):
     """O-06：n=2~3 时叠加「数据较少」半透明提示；n>=4 时无提示；n<2 时回归占位。"""
     win = sample_window
-    records = win.logic.get_weekly_records(win.today, 7)
-    present = [(d, r) for d, r in records if r is not None]
+    present = win.logic.recent_records(7)
     assert len(present) >= 5  # 样本数据充足
 
     # n >= 4：无稀疏提示

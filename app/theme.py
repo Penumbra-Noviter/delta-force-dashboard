@@ -63,48 +63,48 @@ THEMES = {
         "DANGER_HOVER_BG": "#dc2626",
     },
     "dark": {
-        "BG": "#0d1114",             # 极暗冷灰底，接近纯黑但保留冷调（oklch 0.08 0.006 230）
-        "FG_LABEL": "#c8d6e5",       # 冷银白，高对比度
-        "FG_MUTED": "#8395a7",       # 冷灰绿，次级文字
-        "FG_POS": "#5eeea8",         # 荧光薄荷绿涨（高饱和，暗底醒目）
-        "FG_NEG": "#ff6b7f",         # 珊瑚红跌（提亮，暗底可读）
-        "FG_TODAY": "#00ddce",       # 冰青荧光（色相~178，亮而不刺）
-        "BTN_BG": "#00ddce",         # 冰青主按钮
-        "BTN_BG_HOVER": "#00f5e4",   # 悬停提亮
-        "BTN_FG": "#0a0e12",         # 深底文字
-        "BORDER_DEFAULT": "#1e2a33", # 暗蓝灰实色边框（Qt QSS 不支持 #AARRGGBB）
-        "BORDER_VALID": "#5eeea8",
-        "BORDER_INVALID": "#ff6b7f",
-        "BORDER_WARNING": "#e5b04f",
-        "SEPARATOR": "#1a2630",      # 比基底亮两阶分隔线
-        "PLACEHOLDER": "#566677",    # 暗灰占位
-        "MUTED_BG": "#141c23",       # 次级按钮底，比基底亮一阶
-        "PIN_OFF_BG": "#141c23",
-        "PIN_ON_BG": "#00ddce",      # 冰青钉选
-        "CHART_CASH": "#00ddce",     # 冰青荧光虚线（现金）
-        "CHART_WAREHOUSE": "#5eeea8",# 荧光薄荷绿实线（仓库价值）
-        "CHART_TOTAL": "#5eeea8",
-        "CHART_GRID": "#1a2630",     # 极暗网格
-        "CHART_BG": "#0a0f12",       # 图表区比基底更暗
-        "CHART_AXIS": "#8395a7",
-        "CHART_TEXT": "#c8d6e5",
-        "TABLE_TEXT": "#c8d6e5",
-        "TABLE_TEXT_BOLD": "#e8eff5",# 近白强调
-        "TABLE_ROW_EVEN_BG": "#0d1114",
-        "TABLE_ROW_ODD_BG": "#121820",
-        "TABLE_ROW_HOVER_BG": "#1a2630",
-        "TABLE_ROW_TODAY_BG": "#0f2628",  # 今日行暗冰青底
-        "TABLE_HEADER_BG": "#141c23",
-        "TABLE_HEADER_FG": "#8395a7",
-        "CARD_BG": "#121820",        # 卡片比基底亮一阶
-        "CARD_BORDER": "#1e2a33",
-        "INPUT_BG": "#161e27",       # 输入框比卡片微亮
-        "INPUT_FG": "#c8d6e5",
+        "BG": "#0a0a0d",             # 极暗炭灰底（接近纯黑但保留灰调，非死黑）
+        "FG_LABEL": "#c4c4cc",       # 中冷灰，正文
+        "FG_MUTED": "#7a7a84",       # 低对比灰，次级文字（参考图 #A0A0A5）
+        "FG_POS": "#10B981",         # 薄荷绿涨（柔和不刺眼）
+        "FG_NEG": "#EF4444",         # 玫瑰红跌（柔和不刺眼）
+        "FG_TODAY": "#FF8C00",       # 电光琥珀橙（参考图主色）
+        "BTN_BG": "#FF8C00",         # 琥珀橙主按钮
+        "BTN_BG_HOVER": "#FFA940",   # 悬停提亮
+        "BTN_FG": "#0a0a0d",         # 深底文字（橙色上显深字）
+        "BORDER_DEFAULT": "#121217", # 与卡片底同色，肉眼不可见的边框
+        "BORDER_VALID": "#10B981",
+        "BORDER_INVALID": "#EF4444",
+        "BORDER_WARNING": "#FF8C00",
+        "SEPARATOR": "#0d0d11",      # 比基底亮半阶，表格网格线极淡
+        "PLACEHOLDER": "#5a5a64",
+        "MUTED_BG": "#131318",       # 次级按钮底，比基底亮一阶
+        "PIN_OFF_BG": "#131318",
+        "PIN_ON_BG": "#FF8C00",      # 琥珀橙钉选
+        "CHART_CASH": "#FFA940",     # 暖琥珀虚线（现金）
+        "CHART_WAREHOUSE": "#FF8C00",# 电光橙实线（仓库价值）
+        "CHART_TOTAL": "#10B981",
+        "CHART_GRID": "#0d0d11",     # 极暗网格，几乎不可见
+        "CHART_BG": "#0a0a0d",       # 图表区与基底一致
+        "CHART_AXIS": "#7a7a84",
+        "CHART_TEXT": "#c4c4cc",
+        "TABLE_TEXT": "#c4c4cc",
+        "TABLE_TEXT_BOLD": "#e8e8ee",# 近白强调
+        "TABLE_ROW_EVEN_BG": "#0a0a0d",
+        "TABLE_ROW_ODD_BG": "#0f0f14",
+        "TABLE_ROW_HOVER_BG": "#17171e",
+        "TABLE_ROW_TODAY_BG": "#1a1410",  # 今日行暗暖橙底
+        "TABLE_HEADER_BG": "#131318",
+        "TABLE_HEADER_FG": "#7a7a84",
+        "CARD_BG": "#121217",        # 卡片比基底亮一阶，靠色差而非边框区隔
+        "CARD_BORDER": "#121217",    # 与卡片底同色，边框彻底隐形
+        "INPUT_BG": "#14141a",       # 输入框比卡片微亮
+        "INPUT_FG": "#c4c4cc",
         # 操作按钮语义色
-        "DANGER_BG": "#261820",
-        "DANGER_FG": "#ff6b7f",
-        "DANGER_BORDER": "#3d1f28",
-        "DANGER_HOVER_BG": "#e0556a",
+        "DANGER_BG": "#1f1418",
+        "DANGER_FG": "#EF4444",
+        "DANGER_BORDER": "#2d1a20",
+        "DANGER_HOVER_BG": "#dc3838",
     },
 }
 

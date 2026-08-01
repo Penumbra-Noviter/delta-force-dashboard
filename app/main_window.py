@@ -374,9 +374,8 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _get_records(self) -> list:
-        """返回有数据的 (date_str, DayRecord) 列表。"""
-        weekly = self.logic.get_weekly_records(self.today, WEEK_DAYS)
-        return [(d, r) for d, r in weekly if r is not None]
+        """返回最近 WEEK_DAYS 条实际录入的 (date_str, DayRecord) 列表。"""
+        return self.logic.recent_records(WEEK_DAYS)
 
     # ═══════════════════════════════════════════════════════
     # 保存
@@ -442,8 +441,8 @@ class MainWindow(QMainWindow):
                 f"仓库总收益 {format_money(warehouse)}"
             )
         if deleted:
-            # O-14：7 日保留策略触发的自动删除对用户可见
-            indicator += f"（自动清理 {len(deleted)} 条超 {WEEK_DAYS} 天记录）"
+            # O-14/O-17：保留策略按「录入条数」轮转（保留最近 WEEK_DAYS 条），文案如实表述
+            indicator += f"（已保留最近 {WEEK_DAYS} 条记录，自动清理 {len(deleted)} 条较早记录）"
         self.input_panel.set_saved_indicator(indicator)
 
         # 非编辑模式保存后清空输入框并回焦，便于连续录入
@@ -571,13 +570,14 @@ class MainWindow(QMainWindow):
         )
 
     def _update_summary(self) -> None:
-        """读取 logic 的 7 日窗口汇总，并格式化为标签展示。"""
-        count, total = self.logic.summary(self.today, WEEK_DAYS)
+        """读取 logic 的最近记录汇总（按录入条数），并格式化为标签展示。"""
+        count, total = self.logic.summary(WEEK_DAYS)
+        prefix = f"最近{WEEK_DAYS}条总盈亏："
 
         # 数据不足或仅一条记录：弱化提示（灰字小号）
         if total is None or count == 1:
-            text = "7日总盈亏：数据不足" if total is None else (
-                f"7日总盈亏：{format_money(total)}（仅 1 条记录）"
+            text = f"{prefix}数据不足" if total is None else (
+                f"{prefix}{format_money(total)}（仅 1 条记录）"
             )
             self._summary_label.setText(text)
             self._summary_label.setStyleSheet(
@@ -586,13 +586,13 @@ class MainWindow(QMainWindow):
             return
 
         if total > 0:
-            text = f"7日总盈亏：+{format_money(total)}"
+            text = f"{prefix}+{format_money(total)}"
             color = get_color("FG_POS")
         elif total < 0:
-            text = f"7日总盈亏：{format_money(total)}"
+            text = f"{prefix}{format_money(total)}"
             color = get_color("FG_NEG")
         else:
-            text = f"7日总盈亏：{format_money(total)}"
+            text = f"{prefix}{format_money(total)}"
             color = get_color("FG_MUTED")
 
         self._summary_label.setText(text)

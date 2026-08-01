@@ -6,7 +6,43 @@
 
 ---
 
-### 2026-08-01 | 评审 `082ce62` | TO-TICKETS + DEV_LOG | O-11~O-15 代码评审 + O-16~O-19 录入
+### 2026-08-01 | 文档同步 | CODE_WIKI.md | O-19 CODE_WIKI 失同步修正（方法表/依赖版本/测试计数）
+
+**O-19**（P3，文档）：`082ce62` 声称「同步 CODE_WIKI」但留下三处失实引用，本次以源码/实测为准一次性修正：
+- §4.7 方法表：`rotate_weekly` 返回 `None` → `list[str]`（O-14 起返回被删除日期列表）；`get_weekly_records` → `recent_records`、`summary` 去 `end_date`（承接同批 O-17 重构）。
+- §3 / §5.1 依赖：`PySide6>=6.6.0` / `pyqtgraph>=0.13.0` → `==6.11.1` / `==0.14.0`，pytest `==9.1.1`；§3 补 `requirements-dev.txt` 行。
+- §7 测试计数：以 `pytest --collect-only` 实测为准（calculator 54→57、data_store 16→18、input_panel 12→18、ui_smoke 22/23→26 归一），合计 165→180；§7 覆盖范围补 O-08/09/11/13/14 用例描述。
+- §一 / §6.1 / §7 / §十 中「7 日 / 7 天」表述统一为「最近 7 条 / 保留条数限制」，与 README/PROJECT_REFERENCE 同批同步。
+
+**验证**：`pytest --collect-only` 确认逐文件计数与总数 180 一致；pytest 180/180 ✅。
+
+---
+
+### 2026-08-01 | 修复+重构 | calculator.py + main_window.py + tests | O-17 清理文案与轮转语义不符 + 显示基准统一为录入条数
+
+**O-17**（P3，文案准确性）：`rotate_weekly` 按「记录数」轮转（保留最近 7 条），但保存提示写「（自动清理 N 条超 7 天记录）」——间断录入时暗示按日历年龄删除，误导。改「（已保留最近 7 条记录，自动清理 N 条较早记录）」；`rotate_weekly` logger「删除超期记录」改「删除最旧记录（保留最近 %d 条）」。
+
+**显示基准统一为录入条数**（用户拍板，本次核心改动）：
+- 现象：表格/图表/汇总此前走 `get_weekly_records(today, 7)`（最近 7 个日历天窗口），间断录入时保留在 data 的老记录（>6 个日历天前）从界面消失，表现为「按现实时间 7 天清出数据」。
+- 改动：`get_weekly_records` → `recent_records(days)`（最近 days 条实际录入记录，按日期升序、无空位占位、跳过无效记录）；`MainWindow._get_records` / `logic.summary` 改用它；`summary` 去掉 `end_date` 参数，汇总标签「7日总盈亏」→「最近7条总盈亏」。轮转 `rotate_weekly` 维持按条数（本就正确），本次不改。
+- 效果：间断录入时，保留的最近 7 条记录在清理前始终可见；超过 7 条时才删最旧。
+- 测试：`get_weekly_records` 6 项 → `recent_records` 6 项（含 caps_to_days / skips_malformed）；`summary` 去掉 invalid_date、新增 `test_summary_caps_to_recent_days`（间断录入的较老记录不参与汇总）；`test_save_triggers_rotation_hint` 断言新文案。
+
+**验证**：pytest 180/180 ✅。
+
+---
+
+### 2026-08-01 | 决策拍板 | TO-TICKETS + calculator.py | O-16 CSV 大额 K/M 精度（保持现状，文档注明取舍）
+
+**拍板**：O-16（CSV 导出 ≥1e6 金额被 `format_money` 缩写为 K/M、丢失全值精度，Excel 不可求和）选 **A 保持现状**。
+- A/B/C 三选项：A 保持现状（仅文档注明取舍）；B CSV 专用千分位全值（如 `1,234,567.89`，引号包裹，Excel 可求和但 pandas 默认读成字符串）；C 纯数值（如 `1234567.89`，Excel/pandas 开箱即算、实现最简、彻底移除 K/M 分支）。
+- 理由：CSV 主消费场景为 Excel 人工查看，与界面显示一致优先于机器可读全值；B 的千分位逗号引号包裹是 pandas 默认解析的经典坑；C 为最优机器格式，留作后续「机器可读导出」备选。
+- 落地：仅 `export_csv` docstring 补取舍说明，零行为变更；TO-TICKETS O-16 → ✅ 归档（新增「决策拍板」表）。
+- 附：收益率列「转纯数值」仅在 B/C 下成立，随 A 一并搁置。
+
+**验证**：`export_csv` 相关测试 7/7 通过（docstring 变更不触碰行为）。⚠️ 全量 pytest 当前红（16 failed + 27 errors）——并行 session 正重构 `calculator.py`（`get_weekly_records`→`recent_records`、`summary` 签名变更、`rotate_weekly` 语义），测试未同步，与本次 O-16 改动无关。
+
+---
 
 **评审结论**：`/code-review` 双轴评审 `082ce62`（O-11~O-15）。五张工单实现与规格全部对齐（Spec 轴 0 缺失、新测试 4 项全过），无阻断性缺陷。**对个人用户影响整体低-中**，无 P0/P1 级问题；仅有少量值得做的清理，已拆分为 O-16~O-19 录入活跃表。
 

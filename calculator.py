@@ -112,27 +112,19 @@ class ProfitCalculatorLogic:
                 return check_str, record
         return None
 
-    def get_weekly_records(
-        self, end_date: str, days: int = 7
-    ) -> list[tuple[str, "DayRecord | None"]]:
-        """
-        获取以 end_date 为截止日期的最近 N 天记录。
+    def recent_records(self, days: int = WEEK_DAYS) -> list[tuple[str, "DayRecord"]]:
+        """返回最近 days 条实际录入记录（按日期升序）。
 
-        返回按日期升序排列的 (date_str, DayRecord | None) 列表，
-        None 表示该日无数据。
+        与 rotate_weekly 的保留语义一致：以「录入条数」而非日历天数为基准。
+        间断录入（假期/出差）跨越多日时，仍展示最近 days 条录入记录，
+        不因日历窗口丢弃仍保留在 data 中的老记录；无效/缺失字段的记录被跳过。
         """
-        try:
-            end = datetime.strptime(end_date, DATE_FORMAT)
-        except ValueError:
-            return []
-
-        results: list[tuple[str, "DayRecord | None"]] = []
-        for i in range(days - 1, -1, -1):
-            d = end - timedelta(days=i)
-            date_str = d.strftime(DATE_FORMAT)
+        records: list[tuple[str, "DayRecord"]] = []
+        for date_str in sorted(self.data):
             record = self.get_record(date_str)
-            results.append((date_str, record))
-        return results
+            if record is not None:
+                records.append((date_str, record))
+        return records[-days:]
 
     @staticmethod
     def calculate_rate(
@@ -181,7 +173,10 @@ class ProfitCalculatorLogic:
         return False
 
     def rotate_weekly(self, days: int = WEEK_DAYS) -> list[str]:
-        """7 日保留策略：数据超过 days 天时删除最旧记录，保持最多 days 条。
+        """保留最近 days 条实际录入记录：数据条数超过 days 时删除最旧记录。
+
+        以「录入条数」而非日历天数为基准（与 recent_records / summary 一致）：
+        间断录入时，只要记录条数未超上限，较早日期的记录仍会保留。
 
         返回被删除的日期列表（升序）；删除时记录 info 日志，
         供调用方（save_today）在状态栏向用户提示（O-14）。
@@ -192,27 +187,25 @@ class ProfitCalculatorLogic:
         deleted = sorted_dates[: len(sorted_dates) - days]
         for old_date in deleted:
             del self.data[old_date]
-            logger.info("7 日保留策略删除超期记录: %s", old_date)
+            logger.info("保留策略删除最旧记录（保留最近 %d 条）: %s", days, old_date)
         return deleted
 
-    def summary(
-        self, end_date: str, days: int = WEEK_DAYS
-    ) -> tuple[int, float | None]:
-        """计算截至 end_date 的最近 days 天窗口总盈亏。
+    def summary(self, days: int = WEEK_DAYS) -> tuple[int, float | None]:
+        """计算最近 days 条实际录入记录的总盈亏。
+
+        与 recent_records / rotate_weekly 一致，以「录入条数」而非日历天数为基准。
 
         返回 (记录数, 总盈亏金额)：
-        - 记录数 >= 2：总盈亏 = 末日仓库值 − 首日仓库值；
-        - 记录数 == 1：总盈亏为该日仓库值（无对比对象，供视图提示「仅 1 条记录」）；
+        - 记录数 >= 2：总盈亏 = 最新记录仓库值 − 最旧记录仓库值；
+        - 记录数 == 1：总盈亏为该条仓库值（无对比对象，供视图提示「仅 1 条记录」）；
         - 记录数 == 0：总盈亏为 None。
         """
-        records = [
-            r for _, r in self.get_weekly_records(end_date, days) if r is not None
-        ]
+        records = self.recent_records(days)
         if not records:
             return 0, None
         if len(records) == 1:
-            return 1, records[0].warehouse
-        return len(records), records[-1].warehouse - records[0].warehouse
+            return 1, records[0][1].warehouse
+        return len(records), records[-1][1].warehouse - records[0][1].warehouse
 
     def export_csv(self) -> str:
         """生成 CSV 导出文本（列：日期/现金/仓库/较前日/收益率）。
@@ -223,6 +216,8 @@ class ProfitCalculatorLogic:
         无前日数据时对应单元格为 "—"。
         金额列统一走 format_money（含千分位与 K/M 缩写），与界面显示一致（O-11）；
         含逗号的字段经 csv 模块引号包裹，保证 Excel 正确分列。
+        已知取舍（O-16 拍板：保持现状）：≥1e6 金额被缩写为 K/M、丢失全值精度，且金额单元格
+        在 Excel 中为文本不可直接求和；如需机器可读全值应改用 CSV 专用纯数值格式。
         """
         buffer = io.StringIO()
         writer = csv.writer(buffer, lineterminator="\n")
