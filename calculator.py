@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -11,6 +13,7 @@ from enum import Enum
 from typing import Optional
 
 from config import DATE_FORMAT, WEEK_DAYS
+from formatting import format_money
 
 __all__ = [
     "DayRecord",
@@ -177,13 +180,20 @@ class ProfitCalculatorLogic:
             return True
         return False
 
-    def rotate_weekly(self, days: int = WEEK_DAYS) -> None:
-        """7 日保留策略：数据超过 days 天时删除最旧记录，保持最多 days 条。"""
+    def rotate_weekly(self, days: int = WEEK_DAYS) -> list[str]:
+        """7 日保留策略：数据超过 days 天时删除最旧记录，保持最多 days 条。
+
+        返回被删除的日期列表（升序）；删除时记录 info 日志，
+        供调用方（save_today）在状态栏向用户提示（O-14）。
+        """
         if len(self.data) <= days:
-            return
+            return []
         sorted_dates = sorted(self.data.keys())
-        for old_date in sorted_dates[: len(sorted_dates) - days]:
+        deleted = sorted_dates[: len(sorted_dates) - days]
+        for old_date in deleted:
             del self.data[old_date]
+            logger.info("7 日保留策略删除超期记录: %s", old_date)
+        return deleted
 
     def summary(
         self, end_date: str, days: int = WEEK_DAYS
@@ -211,8 +221,12 @@ class ProfitCalculatorLogic:
         「较前日」与「收益率」相对前一有记录日期计算，语义与表格/图表一致
         （较前日 = 当日仓库值 − 前一日仓库值，总收益 = 仓库价值已含现金）；
         无前日数据时对应单元格为 "—"。
+        金额列统一走 format_money（含千分位与 K/M 缩写），与界面显示一致（O-11）；
+        含逗号的字段经 csv 模块引号包裹，保证 Excel 正确分列。
         """
-        lines = ["日期,现金,仓库,较前日,收益率"]
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, lineterminator="\n")
+        writer.writerow(["日期", "现金", "仓库", "较前日", "收益率"])
         prev_warehouse: float | None = None
         for date_str in sorted(self.data):
             record = self.get_record(date_str)
@@ -221,12 +235,18 @@ class ProfitCalculatorLogic:
             diff = (
                 "—"
                 if prev_warehouse is None
-                else str(record.warehouse - prev_warehouse)
+                else format_money(record.warehouse - prev_warehouse)
             )
             rate = self.calculate_rate(prev_warehouse, record.warehouse)
             rate_text, _ = self.format_rate(rate)
-            lines.append(
-                f"{date_str},{record.cash},{record.warehouse},{diff},{rate_text}"
+            writer.writerow(
+                [
+                    date_str,
+                    format_money(record.cash),
+                    format_money(record.warehouse),
+                    diff,
+                    rate_text,
+                ]
             )
             prev_warehouse = record.warehouse
-        return "\n".join(lines) + "\n"
+        return buffer.getvalue()

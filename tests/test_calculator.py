@@ -365,7 +365,7 @@ def test_rotate_weekly_under_limit():
     """数据不超过 7 天时不做裁剪。"""
     data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 17)}
     logic = ProfitCalculatorLogic(data)
-    logic.rotate_weekly()
+    assert logic.rotate_weekly() == []
     assert len(logic.data) == 7
 
 
@@ -373,13 +373,24 @@ def test_rotate_weekly_trims_oldest():
     """超过 7 天时删除最旧记录，保留最近 7 条。"""
     data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 19)}
     logic = ProfitCalculatorLogic(data)
-    logic.rotate_weekly()
+    deleted = logic.rotate_weekly()
     dates = sorted(logic.data.keys())
     assert len(dates) == 7
     assert "2026-07-10" not in dates
     assert "2026-07-11" not in dates
     assert "2026-07-12" in dates  # 保留下来的最旧一天
     assert "2026-07-18" in dates
+    # 返回被删除的日期列表（O-14）
+    assert deleted == ["2026-07-10", "2026-07-11"]
+
+
+def test_rotate_weekly_logs_deletion(caplog):
+    """裁剪时记录 info 日志，供状态栏提示溯源（O-14）。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 19)}
+    logic = ProfitCalculatorLogic(data)
+    with caplog.at_level("INFO", logger="calculator"):
+        logic.rotate_weekly()
+    assert any("2026-07-10" in r.message for r in caplog.records)
 
 
 # ── ProfitCalculatorLogic.summary ──────────────────
@@ -467,7 +478,7 @@ def test_export_csv_single_record():
     logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
     lines = logic.export_csv().splitlines()
     assert len(lines) == 2
-    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+    assert lines[1] == "2026-07-20,¥100.00,¥200.00,—,—"
 
 
 def test_export_csv_multiple_records():
@@ -481,11 +492,11 @@ def test_export_csv_multiple_records():
     )
     lines = logic.export_csv().splitlines()
     assert len(lines) == 4
-    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+    assert lines[1] == "2026-07-20,¥100.00,¥200.00,—,—"
     # 较前日 = 240 - 200 = 40；收益率 = (240-200)/200*100 = 20.0% → "+20.0%"
-    assert lines[2] == "2026-07-21,150.0,240.0,40.0,+20.0%"
+    assert lines[2] == "2026-07-21,¥150.00,¥240.00,¥40.00,+20.0%"
     # 较前日 = 210 - 240 = -30；收益率 = -12.5% → "-12.5%"
-    assert lines[3] == "2026-07-22,120.0,210.0,-30.0,-12.5%"
+    assert lines[3] == "2026-07-22,¥120.00,¥210.00,¥-30.00,-12.5%"
 
 
 def test_export_csv_sorted_order():
@@ -512,6 +523,21 @@ def test_export_csv_skips_malformed_records():
     )
     lines = logic.export_csv().splitlines()
     assert len(lines) == 3  # 表头 + 2 条有效记录
-    assert lines[1] == "2026-07-20,100.0,200.0,—,—"
+    assert lines[1] == "2026-07-20,¥100.00,¥200.00,—,—"
     # 07-22 相对 07-20：较前日 = 250 - 200 = 50；收益率 = 25.0%
-    assert lines[2] == "2026-07-22,120.0,250.0,50.0,+25.0%"
+    assert lines[2] == "2026-07-22,¥120.00,¥250.00,¥50.00,+25.0%"
+
+
+def test_export_csv_format_money_unified():
+    """金额列统一 format_money：千分位引号包裹 + 消除 float 伪影（O-11）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 1000.0, "warehouse": 1234.56},
+            "2026-07-21": {"cash": 1000.0, "warehouse": 1234.86},
+        }
+    )
+    lines = logic.export_csv().splitlines()
+    # 含千分位逗号的字段被 csv 模块引号包裹，Excel 可正确分列
+    assert lines[1] == '2026-07-20,"¥1,000.00","¥1,234.56",—,—'
+    # 差值 0.30 而非 0.30000000000000004 类 float 伪影（无逗号 → 不引号）
+    assert lines[2] == '2026-07-21,"¥1,000.00","¥1,234.86",¥0.30,+0.0%'

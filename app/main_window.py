@@ -161,6 +161,18 @@ class MainWindow(QMainWindow):
             logger.warning("设置文件写入失败: %s", e)
 
     def closeEvent(self, event) -> None:
+        # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
+        if self.input_panel.is_editing() or self.input_panel.is_reusing():
+            reply = QMessageBox.question(
+                self,
+                "确认退出",
+                "当前有未保存的编辑（编辑/复用模式），确定退出？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
         self._save_settings()
         super().closeEvent(event)
 
@@ -413,7 +425,7 @@ class MainWindow(QMainWindow):
 
         save_date = self.input_panel.get_editing_date() or self.today
         self.logic.save_record(save_date, cash, warehouse)
-        self.logic.rotate_weekly()
+        deleted = self.logic.rotate_weekly()
         self.store.save(self.logic.data)
 
         was_editing = self.input_panel.is_editing()
@@ -423,13 +435,16 @@ class MainWindow(QMainWindow):
         self.refresh_display()
 
         if save_date == self.today:
-            self.input_panel.set_saved_indicator(
-                f"✓ 今日已保存 — 仓库总收益 {format_money(warehouse)}"
-            )
+            indicator = f"✓ 今日已保存 — 仓库总收益 {format_money(warehouse)}"
         else:
-            self.input_panel.set_saved_indicator(
-                f"✓ {format_short_date(save_date)} 已更新 — 仓库总收益 {format_money(warehouse)}"
+            indicator = (
+                f"✓ {format_short_date(save_date)} 已更新 — "
+                f"仓库总收益 {format_money(warehouse)}"
             )
+        if deleted:
+            # O-14：7 日保留策略触发的自动删除对用户可见
+            indicator += f"（自动清理 {len(deleted)} 条超 {WEEK_DAYS} 天记录）"
+        self.input_panel.set_saved_indicator(indicator)
 
         # 非编辑模式保存后清空输入框并回焦，便于连续录入
         if not was_editing:

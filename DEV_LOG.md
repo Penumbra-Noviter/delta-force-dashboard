@@ -6,6 +6,33 @@
 
 ---
 
+### 2026-08-01 | O-11~O-15 | calculator.py + main.py + app/main_window.py + requirements* | P2 第三批优化（CSV 统一格式化/依赖锁定/关窗确认/删除可见/日志轮转）
+
+**O-11 | CSV 导出金额统一格式化**（重构）：
+- `export_csv`：现金/仓库/较前日三列统一走 `format_money`（拍板：字符串格式与界面一致；代价是 Excel 中为文本不可直接求和）
+- 改用 stdlib `csv` 模块生成（`lineterminator="\n"`），含千分位逗号的字段（如 `"¥1,234.56"`）自动引号包裹，Excel 正确分列
+- 测试：原断言更新为 format_money 输出；新增 `test_export_csv_format_money_unified`（千分位引号包裹 + 消除 `0.30000000000000004` float 伪影）
+
+**O-12 | dev 依赖清单与版本锁定**（运维）：
+- `requirements.txt` 锁精确版本：`PySide6==6.11.1` / `pyqtgraph==0.14.0`（实测版本，配合 O-10 可复现 exe 构建）
+- 新增 `requirements-dev.txt`：`-r requirements.txt` + `pytest==9.1.1`，新环境可精确复现测试
+
+**O-13 | 编辑态关闭窗口确认**（功能）：
+- `closeEvent`：`input_panel.is_editing() or is_reusing()` 时弹 `QMessageBox.question`「当前有未保存的编辑，确定退出？」，No → `event.ignore()` 拦截
+- 测试 `test_close_while_editing_asks_confirmation`：mock 确认框断言 `close()` 返回值（No→False / Yes→True）；用例结束 `cancel_edit()` 恢复非编辑态，避免 fixture 收尾 close 在 offscreen 下触发真实模态框挂起（踩坑：`isHidden()` 对从未 show 的顶层窗口恒为 True，改用 close() 返回值断言）
+
+**O-14 | 7 日自动删除的可见性**（功能）：
+- 拍板「仅可见性提示」。`rotate_weekly` 改为返回被删除日期列表（升序），每条删除 `logger.info`；`save_today` 把「（自动清理 N 条超 7 天记录）」拼到已保存指示器
+- 测试：`test_rotate_weekly_logs_deletion`（caplog）+ `test_save_triggers_rotation_hint`（8 条数据保存后提示 + 裁剪到 7 条）
+- 「保留天数可配置」未做，如需另立候选工单
+
+**O-15 | 日志文件轮转**（重构）：
+- `main.py`：`logging.basicConfig` → `RotatingFileHandler(maxBytes=1MB, backupCount=3, encoding="utf-8")`；根 logger 已有 handler 时不重复添加（幂等）；日志级别保持 INFO（打包版无 stderr，文件日志是唯一通道）
+
+**验证**：pytest 180/180（176 基线 + 4 新增）✅
+
+---
+
 ### 2026-08-01 | O-08/O-09 | calculator.py + data_store.py + app/* | 现金≤仓库不变式校验 + 加载顶层 dict 校验
 
 **O-08 | 保存前校验 cash ≤ warehouse 不变式**（功能）：

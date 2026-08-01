@@ -12,15 +12,10 @@
 
 ## 活跃工单
 
+> 活跃表已空（2026-08-01）。O-11~O-15（P2 第三批）已完成并归档，见「已完成归档」。
+
 | Ticket | 标题 | 类型 | 优先级 | 状态 | 依赖 | 关联 |
 |--------|------|------|--------|------|------|------|
-| O-11 | CSV 导出金额统一格式化 | 重构（显示一致性） | P2 | 📝 已录入 | — | C3 |
-| O-12 | dev 依赖清单与版本锁定 | 运维 | P2 | 📝 已录入 | — | — |
-| O-13 | 编辑态关闭窗口确认 | 功能（新增） | P2 | 📝 已录入 | — | — |
-| O-14 | 7 日自动删除的可见性 | 功能（新增）/候选 | P2 | 📝 已录入 | — | O-C2 |
-| O-15 | 日志文件轮转 | 重构 | P2 | 📝 已录入 | — | O-01 |
-
-> 2026-08-01 架构评估录入 8 项候选（O-08~O-15）。P1 三项（O-08/O-09/O-10）已完成并归档；剩余 O-11~O-15 为 P2。
 
 ---
 
@@ -188,58 +183,73 @@
 
 **完成说明**：`收益计算器.spec` 已出 `.gitignore` 入库（提交 `20b5170`）、`app_icon.ico` + `main.py` 图标改动入库（提交 `fa16d77`）。
 
-### O-11: CSV 导出金额统一格式化
+### O-11: CSV 导出金额统一格式化 ✅
 
 - **类型**：重构（显示一致性）
 - **优先级**：P2 — 低风险
 - **文件范围**：`calculator.py`（`export_csv`）
 - **关联**：C3（K/M/B 收敛）
+- **完成日期**：2026-08-01
 
 **问题描述**：`export_csv` 中较前日差值直接 `str(record.warehouse - prev_warehouse)`（`calculator.py:209`），float 运算会暴露 `0.30000000000000004` 类伪影，且与表格/图表显示格式（`format_money` 千分位）不一致。
 
 **解决思路**：导出差值统一走 `format_money`（或保留数值但补格式说明）。需平衡 Excel 打开场景——数值型单元格利于后续分析，字符串格式化利于可读性；拍板后补测试。
 
-### O-12: dev 依赖清单与版本锁定
+**实现说明**：拍板走 `format_money` 字符串（与界面一致；代价是 Excel 中为文本不可直接求和）。现金/仓库/较前日三列统一 `format_money`；改用 stdlib `csv` 模块生成（`lineterminator="\n"`），含千分位逗号的字段自动引号包裹，Excel 正确分列。测试更新 + 新增 `test_export_csv_format_money_unified`（千分位引号包裹 + float 伪影消除）。
+
+### O-12: dev 依赖清单与版本锁定 ✅
 
 - **类型**：运维
 - **优先级**：P2 — 低风险
 - **文件范围**：`requirements.txt`、新增 `requirements-dev.txt`
+- **完成日期**：2026-08-01
 
 **问题描述**：`requirements.txt` 仅 2 个运行时依赖且未锁版本（`PySide6>=6.6.0` / `pyqtgraph>=0.13.0`）；pytest 未记录 → 新环境无法直接复现 166 项测试。
 
 **解决思路**：新增 `requirements-dev.txt`（含 `-r requirements.txt` + pytest）；运行时依赖是否锁精确版本（`==`）由维护习惯决定，至少 dev 环境记录 pytest 版本。
 
-### O-13: 编辑态关闭窗口确认
+**实现说明**：拍板锁精确版本。`requirements.txt` → `PySide6==6.11.1` / `pyqtgraph==0.14.0`（实测版本，配合 O-10 可复现 exe 构建）；新增 `requirements-dev.txt`（`-r requirements.txt` + `pytest==9.1.1`），新环境可精确复现测试。
+
+### O-13: 编辑态关闭窗口确认 ✅
 
 - **类型**：功能（新增）
 - **优先级**：P2 — 低风险，纯新增
 - **文件范围**：`app/main_window.py`（`closeEvent`）
+- **完成日期**：2026-08-01
 
 **问题描述**：编辑/复用模式下直接关窗，未保存改动静默丢失（`closeEvent`（`main_window.py:160`）只落 settings 不落数据），用户无感知。
 
 **解决思路**：`closeEvent` 检测 `input_panel.is_editing() or is_reusing()` 时弹确认框（「有未保存的编辑，确定退出？」）。注意 UI 烟测中 `win.close()` 是公开 seam，需确认确认框 mock 策略不破坏现有测试（`test_settings_persistence` 等）。
 
-### O-14: 7 日自动删除的可见性（候选）
+**实现说明**：`closeEvent` 中 `is_editing() or is_reusing()` 时 `QMessageBox.question` 确认，No → `event.ignore()` 拦截（`close()` 返回 False），Yes 继续落 settings 并关闭。测试 `test_close_while_editing_asks_confirmation` mock 确认框断言 close() 返回值；用例结束 `cancel_edit()` 恢复非编辑态，避免 fixture 收尾 close 在 offscreen 下触发真实模态框挂起（实现中踩坑：isHidden() 对从未 show 的顶层窗口恒为 True，改用 close() 返回值断言）。
+
+### O-14: 7 日自动删除的可见性（候选）✅
 
 - **类型**：功能（新增）/候选
 - **优先级**：P2 — Worth exploring
 - **文件范围**：`calculator.py`（`rotate_weekly`）、`app/main_window.py`
 - **关联**：O-C2（7 日限制产品决策）
+- **完成日期**：2026-08-01
 
 **问题描述**：`rotate_weekly()`（`calculator.py:165`）静默删除最旧记录，滚动备份同步覆盖。间断录入（假期/出差）超过 7 个日期键后最早记录被永久删除，用户无感知。
 
 **解决思路**：候选方案——删除前 `logger.info` + 状态栏可见提示；或将 7 日保留策略改为可配置/可关闭（触碰产品决策，需与 O-C2 一并拍板）。`Speculative`：是否引入「归档 / 历史视图」。
 
-### O-15: 日志文件轮转
+**实现说明**：拍板「仅可见性提示」（可配置/归档另立候选，未做）。`rotate_weekly` 改为返回被删除日期列表（升序），每条删除 `logger.info`；`save_today` 把「（自动清理 N 条超 7 天记录）」拼到已保存指示器，对用户可见。测试：`test_rotate_weekly_logs_deletion`（caplog）+ `test_save_triggers_rotation_hint`（8 条数据保存后提示 + 裁剪到 7 条）。
+
+### O-15: 日志文件轮转 ✅
 
 - **类型**：重构
 - **优先级**：P2 — 顺手项
 - **文件范围**：`main.py`（logging 配置）
 - **关联**：O-01（日志通道）
+- **完成日期**：2026-08-01
 
 **问题描述**：`logging.basicConfig`（`main.py:67`）固定写 `profit_calculator.log`，长期运行单文件无限增长，无轮转。
 
 **解决思路**：改 `RotatingFileHandler(maxBytes=1MB, backupCount=3)`（或按时间轮转）。纯配置改动，零逻辑影响；注意打包版无 stderr 场景下文件日志是唯一可见通道，勿降级日志级别。
+
+**实现说明**：`main.py` logging.basicConfig → `RotatingFileHandler(maxBytes=1MB, backupCount=3, encoding="utf-8")`；根 logger 已有 handler 时不重复添加（幂等，与 basicConfig 语义一致）；日志级别保持 INFO。
 
 ---
 
@@ -291,6 +301,16 @@
 | O-10 | 打包配置纳入版本控制 | 运维 | 2026-08-01 | `20b5170` / `fa16d77` |
 
 > 两个并行分支（A：O-01~O-03；B：O-04~O-05）经 merge 合入 main，合并提交 `c01c2c2` / `fdeca85`。合并时 `main_window.py` 模块级 logger 命名冲突（`logger` vs `_logger`）已收敛为 `logger`。
+
+### O 系列（2026-08-01，第三批 P2）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| O-11 | CSV 导出金额统一格式化 | 重构（显示一致性） | 2026-08-01 | （随本提交） |
+| O-12 | dev 依赖清单与版本锁定 | 运维 | 2026-08-01 | （随本提交） |
+| O-13 | 编辑态关闭窗口确认 | 功能（新增） | 2026-08-01 | （随本提交） |
+| O-14 | 7 日自动删除的可见性 | 功能（新增） | 2026-08-01 | （随本提交） |
+| O-15 | 日志文件轮转 | 重构 | 2026-08-01 | （随本提交） |
 
 ### O 系列（2026-08-01，评审关闭）
 

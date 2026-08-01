@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -63,13 +64,21 @@ def _is_already_running() -> QLocalServer | None:
 
 
 def main() -> None:
-    # 日志：打包版为窗口化 exe 无 stderr，文件日志是唯一可见通道
-    logging.basicConfig(
-        level=logging.INFO,
-        filename=APP_DIR / "profit_calculator.log",
-        encoding="utf-8",
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    # 日志：打包版为窗口化 exe 无 stderr，文件日志是唯一可见通道。
+    # O-15：RotatingFileHandler 轮转（单文件 1MB、保留 3 份备份），防单文件无限增长。
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:  # 已有配置时不重复添加（与 basicConfig 幂等语义一致）
+        handler = RotatingFileHandler(
+            APP_DIR / "profit_calculator.log",
+            maxBytes=1_000_000,
+            backupCount=3,
+            encoding="utf-8",
+        )
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        )
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.INFO)
     # 高 DPI 支持
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

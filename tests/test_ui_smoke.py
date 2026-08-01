@@ -185,6 +185,59 @@ def test_edit_mode_buttons_and_save(sample_window):
     assert not win.input_panel.is_editing()
 
 
+def test_close_while_editing_asks_confirmation(sample_window, monkeypatch):
+    """编辑态关窗：弹确认框，No 拦截 / Yes 允许（O-13）。"""
+    win = sample_window
+    dates = sorted(win.logic.data)
+    rec = win.logic.get_record(dates[0])
+    assert rec is not None
+    win.input_panel.set_edit_mode(dates[0], rec.cash, rec.warehouse)
+    assert win.input_panel.is_editing()
+
+    # No → 拦截关窗（close() 返回 False，窗口保持打开）
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(lambda *a, **kw: QMessageBox.StandardButton.No),
+    )
+    assert win.close() is False
+
+    # Yes → 允许关闭
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(lambda *a, **kw: QMessageBox.StandardButton.Yes),
+    )
+    assert win.close() is True
+
+    # 恢复非编辑态，避免 fixture 收尾 close() 再次触发真实确认框（offscreen 下会阻塞挂起）
+    win.input_panel.cancel_edit()
+
+
+def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
+    """保存后触发 7 日裁剪：状态提示展示自动删除（O-14）。"""
+    from app.main_window import MainWindow
+
+    today = datetime.now()
+    data = {}
+    for off in range(7, -1, -1):  # 8 个日期键（含今天），超出 7 日上限 1 条
+        d = (today - timedelta(days=off)).strftime(DATE_FORMAT)
+        data[d] = {"cash": 100.0, "warehouse": 200.0 + off}
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        logic=ProfitCalculatorLogic(data),
+    )
+    assert len(win.logic.data) == 8
+
+    win.input_panel.fill_values(100, 300)
+    win.save_today()
+
+    assert len(win.logic.data) == 7  # 最旧 1 条被自动裁剪
+    assert "自动清理" in win.input_panel.saved_indicator.text()
+    win.close()
+
+
 # ── 7. 删除数据 ──────────────────────────────────────────
 
 

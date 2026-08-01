@@ -272,16 +272,16 @@ class InputPanel(QWidget):
         self.warehouse_entry._formatting = False
 
         self.save_btn.setText(f"更新数据（{format_short_date(date_str)}）")
-        edit_color = get_color("CHART_WAREHOUSE")
+        edit_color = get_color("BTN_BG")
         self.save_btn.setStyleSheet(f"""
             QPushButton#saveBtn {{
                 background-color: {edit_color};
-                color: #ffffff;
+                color: {get_color("BTN_FG")};
                 padding: 8px 28px;
                 font-weight: bold;
             }}
             QPushButton#saveBtn:hover {{
-                background-color: {edit_color}dd;
+                background-color: {get_color("BTN_BG_HOVER")};
             }}
         """)
         self.cancel_edit_btn.show()

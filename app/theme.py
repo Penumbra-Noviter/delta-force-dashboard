@@ -63,48 +63,48 @@ THEMES = {
         "DANGER_HOVER_BG": "#dc2626",
     },
     "dark": {
-        "BG": "#1e1e2e",
-        "FG_LABEL": "#cdd6f4",
-        "FG_MUTED": "#9399b3",       # 提亮：overlay→subtext，对比度更佳
-        "FG_POS": "#a6e3a1",
-        "FG_NEG": "#f38ba8",
-        "FG_TODAY": "#2dd4bf",       # teal-400，暗底下更亮
-        "BTN_BG": "#2dd4bf",         # teal-400
-        "BTN_BG_HOVER": "#14b8a6",   # teal-500
-        "BTN_FG": "#1e1e2e",         # 深底亮字
-        "BORDER_DEFAULT": "#45475a",
-        "BORDER_VALID": "#a6e3a1",
-        "BORDER_INVALID": "#f38ba8",
-        "BORDER_WARNING": "#f9e2af",  # 越界警告边框（amber-200，O-08）
-        "SEPARATOR": "#313244",
-        "PLACEHOLDER": "#7f849c",
-        "MUTED_BG": "#313244",
-        "PIN_OFF_BG": "#313244",
-        "PIN_ON_BG": "#2dd4bf",
-        "CHART_CASH": "#2dd4bf",
-        "CHART_WAREHOUSE": "#f9e2af",
-        "CHART_TOTAL": "#a6e3a1",
-        "CHART_GRID": "#45475a",
-        "CHART_BG": "#181825",
-        "CHART_AXIS": "#a6adc8",
-        "CHART_TEXT": "#cdd6f4",
-        "TABLE_TEXT": "#cdd6f4",
-        "TABLE_TEXT_BOLD": "#ffffff",
-        "TABLE_ROW_EVEN_BG": "#1e1e2e",
-        "TABLE_ROW_ODD_BG": "#252636",
-        "TABLE_ROW_HOVER_BG": "#313244",
-        "TABLE_ROW_TODAY_BG": "#1a3a36",  # 今日行深青底
-        "TABLE_HEADER_BG": "#313244",
-        "TABLE_HEADER_FG": "#cdd6f4",
-        "CARD_BG": "#181825",
-        "CARD_BORDER": "#45475a",
-        "INPUT_BG": "#313244",
-        "INPUT_FG": "#cdd6f4",
+        "BG": "#0d1114",             # 极暗冷灰底，接近纯黑但保留冷调（oklch 0.08 0.006 230）
+        "FG_LABEL": "#c8d6e5",       # 冷银白，高对比度
+        "FG_MUTED": "#8395a7",       # 冷灰绿，次级文字
+        "FG_POS": "#5eeea8",         # 荧光薄荷绿涨（高饱和，暗底醒目）
+        "FG_NEG": "#ff6b7f",         # 珊瑚红跌（提亮，暗底可读）
+        "FG_TODAY": "#00ddce",       # 冰青荧光（色相~178，亮而不刺）
+        "BTN_BG": "#00ddce",         # 冰青主按钮
+        "BTN_BG_HOVER": "#00f5e4",   # 悬停提亮
+        "BTN_FG": "#0a0e12",         # 深底文字
+        "BORDER_DEFAULT": "#1e2a33", # 暗蓝灰实色边框（Qt QSS 不支持 #AARRGGBB）
+        "BORDER_VALID": "#5eeea8",
+        "BORDER_INVALID": "#ff6b7f",
+        "BORDER_WARNING": "#e5b04f",
+        "SEPARATOR": "#1a2630",      # 比基底亮两阶分隔线
+        "PLACEHOLDER": "#566677",    # 暗灰占位
+        "MUTED_BG": "#141c23",       # 次级按钮底，比基底亮一阶
+        "PIN_OFF_BG": "#141c23",
+        "PIN_ON_BG": "#00ddce",      # 冰青钉选
+        "CHART_CASH": "#00ddce",     # 冰青荧光虚线（现金）
+        "CHART_WAREHOUSE": "#5eeea8",# 荧光薄荷绿实线（仓库价值）
+        "CHART_TOTAL": "#5eeea8",
+        "CHART_GRID": "#1a2630",     # 极暗网格
+        "CHART_BG": "#0a0f12",       # 图表区比基底更暗
+        "CHART_AXIS": "#8395a7",
+        "CHART_TEXT": "#c8d6e5",
+        "TABLE_TEXT": "#c8d6e5",
+        "TABLE_TEXT_BOLD": "#e8eff5",# 近白强调
+        "TABLE_ROW_EVEN_BG": "#0d1114",
+        "TABLE_ROW_ODD_BG": "#121820",
+        "TABLE_ROW_HOVER_BG": "#1a2630",
+        "TABLE_ROW_TODAY_BG": "#0f2628",  # 今日行暗冰青底
+        "TABLE_HEADER_BG": "#141c23",
+        "TABLE_HEADER_FG": "#8395a7",
+        "CARD_BG": "#121820",        # 卡片比基底亮一阶
+        "CARD_BORDER": "#1e2a33",
+        "INPUT_BG": "#161e27",       # 输入框比卡片微亮
+        "INPUT_FG": "#c8d6e5",
         # 操作按钮语义色
-        "DANGER_BG": "#3a2222",
-        "DANGER_FG": "#f38ba8",
-        "DANGER_BORDER": "#5a2a2a",
-        "DANGER_HOVER_BG": "#f38ba8",
+        "DANGER_BG": "#261820",
+        "DANGER_FG": "#ff6b7f",
+        "DANGER_BORDER": "#3d1f28",
+        "DANGER_HOVER_BG": "#e0556a",
     },
 }
 
@@ -286,7 +286,7 @@ QPushButton#themeBtn:hover, QPushButton#pinBtn:hover, QPushButton#exportBtn:hove
 }}
 QPushButton#pinBtn[active="true"] {{
     background-color: {btn_bg};
-    color: #ffffff;
+    color: {btn_fg};
 }}
 
 /* ═══════════════════════════════════════════

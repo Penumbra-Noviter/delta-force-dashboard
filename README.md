@@ -45,7 +45,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（176 项测试，含 offscreen UI 烟测） |
+| 测试框架 | pytest（180 项测试，含 offscreen UI 烟测） |
 
 ---
 
@@ -106,7 +106,7 @@ profit-calculator/
 ├── config.py                # 路径、字体、主题色板
 ├── data_store.py            # JSON 持久化（原子写入 + 备份）
 ├── formatting.py            # 金额格式化与输入解析
-├── tests/                   # 测试（176 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（180 项，含 offscreen UI 烟测）
 ├── data.json                # 运行态数据
 └── settings.json            # 应用设置
 ```
