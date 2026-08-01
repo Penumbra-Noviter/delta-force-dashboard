@@ -6,6 +6,47 @@
 
 ---
 
+### 2026-08-01 | O-08/O-09 | calculator.py + data_store.py + app/* | 现金≤仓库不变式校验 + 加载顶层 dict 校验
+
+**O-08 | 保存前校验 cash ≤ warehouse 不变式**（功能）：
+- `save_today()`：解析出 `cash > warehouse` 时 `QMessageBox.warning`「数据不合逻辑」并中断保存（UI 层硬拦截）
+- `InputPanel`：新增 `_update_invariant_state()`，跨字段检查挂在 `_update_save_btn_state`（每次字段校验后）；`MoneyLineEdit` 新增公开 seam `set_invariant_warning()`，越界时两输入框置 `validity="warning"` 态
+- `app/theme.py`：新增 `BORDER_WARNING` 色（light amber-600 / dark amber-200）+ `QLineEdit[validity="warning"]` QSS
+- `calculator.py`：业务层 `save_record` 仅 `logger.warning` 不拦截（允许保留已录入的异常数据并继续展示——拦截由 UI 层负责）
+- 测试 +6：越界警告边框 / 恢复自然态 / 边界相等不触发 / 空字段不触发 / 越界保存被拦截 / 边界相等允许
+
+**O-09 | 加载时顶层 dict schema 校验**（健壮性）：
+- `data_store._try_load`：`isinstance(data, dict)` 校验，合法 JSON 但顶层非 dict（如 `[]`）视为损坏 → 走备份恢复链（此前会 AttributeError 崩溃且备份链不触发）
+- `main_window._load_settings`：顶层非 dict 返回默认 `{}` + warning 日志
+- 测试 +3：data 顶层 list 触发备份恢复 / 全 list 返回空 / settings 顶层 list 返回默认
+
+**连带修复（测试夹具 bug）**：`tests/` 中 `DataStore(tmp_path/data.json)` 未传 `backup_file` → 默认指向真实 `data.json.bak*`；`load()` 的备份恢复链读取真实备份并 `_atomic_write` 到 tmp_path、`save()` 把测试数据写回真实备份（静默污染用户备份）。修复：显式传 `backup_file=tmp_path/data.json.bak`（test_input_panel + test_ui_smoke 共 6 处）。⚠️ 此前测试运行已把测试态数据写入真实 `data.json.bak*`（含虚假今日记录），待用户确认后从 `data.json` 恢复。
+
+**验证**：pytest 176/176（166 基线 + 10 新增）✅ | `data.json.bak*` mtime 不再变化（夹具隔离生效）
+
+---
+
+### 2026-08-01 | 评审录入 | TO-TICKETS | 架构评估 O-08~O-15 候选落库
+
+**变更**：多维度架构评估（架构/数据可靠性/测试/打包/流程）8 项发现整理为活跃工单 O-08~O-15 录入 TO-TICKETS（仅录入，不实施）：
+
+| Ticket | 问题 | 优先级 |
+|--------|------|--------|
+| O-08 | 保存不校验 cash ≤ warehouse 不变式 | P1 |
+| O-09 | 加载不校验顶层 dict，坏结构启动崩溃 | P1 |
+| O-10 | 打包配置（spec + ico）未纳入版本控制 | P1 |
+| O-11 | CSV 导出差值裸写 float，显示不一致 | P2 |
+| O-12 | dev 依赖（pytest）未记录、依赖未锁版本 | P2 |
+| O-13 | 编辑态直接关窗数据静默丢失 | P2 |
+| O-14 | 7 日自动删除不可见（候选，关联 O-C2） | P2 |
+| O-15 | 日志文件无轮转 | P2 |
+
+**建议顺序**：O-08/O-09 优先（P1，数据完整性 + 启动健壮性）；O-10 打包配置入库与图标改动（`main.py` + `app_icon.ico` + 文档，见下条）未提交的变更一并处理。
+
+**验证**：pytest 166/166 ✅（评估后基线）
+
+---
+
 ### 2026-08-01 | 打包 | dist/收益计算器.exe + app_icon.ico | 应用图标落地（exe 文件 + 运行窗口）
 
 **变更**：

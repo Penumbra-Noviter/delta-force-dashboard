@@ -163,6 +163,30 @@ def test_recover_when_all_corrupt(tmp_dir):
     tmp_dir.joinpath("data.json").write_text("bad", encoding="utf-8")
     assert store.load() == {}
 
+def test_top_level_list_treated_as_corrupt(tmp_dir):
+    """顶层合法 JSON 但非 dict（如 []）视为损坏，应从备份恢复（O-09）。"""
+    store = make_store(tmp_dir, max_backups=2)
+    store.save({"ok": True})
+    store.save({"v": 2})
+
+    # 主文件写成合法 JSON 但顶层是 list
+    tmp_dir.joinpath("data.json").write_text("[]", encoding="utf-8")
+
+    data = store.load()
+    # 从滚动备份 .bak.1 恢复（最近一次保存前的状态）
+    assert data is not None and data == {"ok": True}
+
+
+def test_top_level_list_all_corrupt_returns_empty(tmp_dir):
+    """主文件与备份顶层都是 list 时返回空字典（O-09）。"""
+    store = make_store(tmp_dir)
+    store.save({"ok": True})
+
+    tmp_dir.joinpath("data.json").write_text("[]", encoding="utf-8")
+    tmp_dir.joinpath("data.json.bak").write_text("[]", encoding="utf-8")
+
+    assert store.load() == {}
+
 
 # ── No data file ─────────────────────────────────────
 

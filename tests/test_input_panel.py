@@ -19,6 +19,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
+from PySide6.QtWidgets import QMessageBox
+
 from app.input_panel import InputPanel
 from calculator import DayRecord
 from data_store import DataStore
@@ -34,7 +36,7 @@ def main_window(qapp, settings_guard, tmp_path):
     """带临时数据文件的 MainWindow（不触碰真实 data.json）。"""
     from app.main_window import MainWindow
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json"))
+    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
     yield win
     win.close()
 
@@ -89,6 +91,47 @@ def test_refresh_validity(qapp):
     ip.cash_entry.setText("abc")
     ip.refresh_validity()
     assert ip.cash_entry.property("validity") == "invalid"
+
+def test_invariant_warning_border_on_cash_over_warehouse(qapp):
+    """现金 > 仓库 → 两个输入框进入 warning 态（越界红边，O-08）。"""
+    ip = InputPanel()
+    ip.cash_entry.setText("200")
+    ip.warehouse_entry.setText("100")
+    ip.refresh_validity()
+    assert ip.cash_entry.property("validity") == "warning"
+    assert ip.warehouse_entry.property("validity") == "warning"
+
+
+def test_invariant_warning_cleared_when_balanced(qapp):
+    """现金降到 ≤ 仓库后恢复各自自然校验态。"""
+    ip = InputPanel()
+    ip.cash_entry.setText("200")
+    ip.warehouse_entry.setText("100")
+    ip.refresh_validity()
+    assert ip.cash_entry.property("validity") == "warning"
+
+    ip.warehouse_entry.setText("200")
+    ip.refresh_validity()
+    assert ip.cash_entry.property("validity") == "valid"
+    assert ip.warehouse_entry.property("validity") == "valid"
+
+
+def test_invariant_warning_boundary_equal_not_triggered(qapp):
+    """现金 == 仓库（边界）不触发警告。"""
+    ip = InputPanel()
+    ip.cash_entry.setText("100")
+    ip.warehouse_entry.setText("100")
+    ip.refresh_validity()
+    assert ip.cash_entry.property("validity") == "valid"
+    assert ip.warehouse_entry.property("validity") == "valid"
+
+
+def test_invariant_warning_not_triggered_with_empty_field(qapp):
+    """仓库为空时现金值不触发警告（无可比较对象）。"""
+    ip = InputPanel()
+    ip.cash_entry.setText("200")
+    ip.refresh_validity()
+    assert ip.cash_entry.property("validity") == "valid"
 
 
 def test_money_line_edit_public_refresh_validity(qapp):
@@ -243,3 +286,30 @@ def test_save_today_edit_existing_record(main_window):
     # 保存后自动退出编辑模式
     assert not win.input_panel.is_editing()
     assert win.input_panel.get_editing_date() is None
+
+def test_save_today_blocks_cash_over_warehouse(main_window, monkeypatch):
+    """现金 > 仓库：保存被拦截（弹警告 + 不落盘，O-08）。"""
+    win = main_window
+    warned: list[str] = []
+
+    def fake_warning(parent, title, text):
+        warned.append(text)
+
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(fake_warning))
+
+    win.input_panel.fill_values(200, 100)
+    win.save_today()
+
+    assert win.logic.get_record(win.today) is None
+    assert len(warned) == 1 and "现金不能大于仓库" in warned[0]
+
+
+def test_save_today_allows_boundary_equal(main_window):
+    """现金 == 仓库（边界相等）：允许保存。"""
+    win = main_window
+    win.input_panel.fill_values(100, 100)
+    win.save_today()
+    rec = win.logic.get_record(win.today)
+    assert rec is not None
+    assert rec.cash == 100.0
+    assert rec.warehouse == 100.0

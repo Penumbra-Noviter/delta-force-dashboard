@@ -74,7 +74,7 @@ def sample_window(qapp, settings_guard, tmp_path):
     from app.main_window import MainWindow
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json"),
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(make_sample_data()),
     )
     yield win
@@ -293,6 +293,20 @@ def test_load_settings_corrupt_logs_warning(tmp_path, monkeypatch, caplog):
     assert result == {}
     assert any("设置文件读取失败" in rec.message for rec in caplog.records)
 
+def test_load_settings_top_level_list_returns_default(tmp_path, monkeypatch, caplog):
+    """settings.json 顶层是 list：_load_settings 返回默认 {} 并记 warning（O-09）。"""
+    import app.main_window as mw
+
+    bad_file = tmp_path / "settings.json"
+    bad_file.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(mw, "SETTINGS_FILE", bad_file)
+
+    with caplog.at_level("WARNING"):
+        result = mw.MainWindow._load_settings()
+
+    assert result == {}
+    assert any("顶层非 dict" in rec.message for rec in caplog.records)
+
 
 def test_save_settings_failure_logs_warning(qapp, tmp_path, monkeypatch, caplog):
     """settings.json 写入失败：不抛异常，仅记录 warning。"""
@@ -303,7 +317,7 @@ def test_save_settings_failure_logs_warning(qapp, tmp_path, monkeypatch, caplog)
     bad_file = tmp_path / "missing_dir" / "settings.json"
     monkeypatch.setattr(mw, "SETTINGS_FILE", bad_file)
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json"))
+    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
     with caplog.at_level("WARNING"):
         win._save_settings()
     win.close()
@@ -326,7 +340,7 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json"))
+    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
     win.close()
 
 
@@ -342,7 +356,7 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json"))
+    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
     win.close()
 
 
@@ -504,7 +518,7 @@ def window_without_today(qapp, settings_guard, tmp_path):
     today_str = datetime.now().strftime(DATE_FORMAT)
     data.pop(today_str, None)
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json"),
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
     )
     yield win

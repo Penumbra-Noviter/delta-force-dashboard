@@ -77,6 +77,19 @@ class MoneyLineEdit(QLineEdit):
         """
         self._update_validity()
 
+    def set_invariant_warning(self, active: bool) -> None:
+        """设置/清除「现金 ⊆ 仓库」不变式的越界警告边框。
+
+        公开 seam：供 InputPanel 跨字段校验后调用（O-08）。
+        active=True 时强制显示 warning 态；active=False 时若当前处于
+        warning 态则重校验，恢复该字段自身的自然校验状态。
+        """
+        if active:
+            self._set_validity_state("warning")
+            return
+        if self.property("validity") == "warning":
+            self._update_validity()
+
     def _set_validity_state(self, state: str) -> None:
         self.setProperty("validity", state)
         self.style().unpolish(self)
@@ -223,6 +236,24 @@ class InputPanel(QWidget):
             and self.warehouse_entry.text().strip() != ""
         )
         self.save_btn.setEnabled(cash_ok and warehouse_ok)
+        self._update_invariant_state()
+
+    def _update_invariant_state(self) -> None:
+        """现金 > 仓库时两输入框置越界警告态，否则恢复自然校验态。
+
+        不变式：现金 ⊆ 仓库（仓库价值已含现金）。跨字段检查挂在每次
+        字段校验之后（validity_changed → _update_save_btn_state），
+        任一字段文本变化都会重算警告边框（O-08）。
+        """
+        try:
+            cash = self.get_cash_value()
+            warehouse = self.get_warehouse_value()
+        except ValueError:
+            cash = None
+            warehouse = None
+        violated = cash is not None and warehouse is not None and cash > warehouse
+        self.cash_entry.set_invariant_warning(violated)
+        self.warehouse_entry.set_invariant_warning(violated)
 
     # ── 编辑模式 ──
 

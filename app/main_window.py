@@ -139,7 +139,10 @@ class MainWindow(QMainWindow):
         try:
             if SETTINGS_FILE.exists():
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+                logger.warning("设置文件顶层非 dict（使用默认设置）")
         except (json.JSONDecodeError, OSError) as e:
             logger.warning("设置文件读取失败（使用默认设置）: %s", e)
         return {}
@@ -393,6 +396,18 @@ class MainWindow(QMainWindow):
                 self,
                 "提示",
                 f"请填写完整数据\n{', '.join(missing)} 无法识别为有效金额",
+            )
+            return
+
+        # 不变式：现金 ⊆ 仓库（仓库价值已含现金）。违反时拦截保存（O-08）。
+        if cash > warehouse:
+            QMessageBox.warning(
+                self,
+                "数据不合逻辑",
+                "当前现金不能大于仓库价值。\n\n"
+                f"现金: {format_money(cash)}\n"
+                f"仓库: {format_money(warehouse)}\n\n"
+                "仓库价值已包含现金，请检查输入。",
             )
             return
 

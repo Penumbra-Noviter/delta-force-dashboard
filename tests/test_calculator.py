@@ -88,6 +88,15 @@ def test_save_overwrite():
     logic.save_record("2026-07-20", 999.0, 111.0)
     assert logic.data["2026-07-20"]["cash"] == 999.0
 
+def test_save_record_logs_warning_when_cash_exceeds_warehouse(caplog):
+    """业务层不拦截异常记录（允许保留展示），仅记录 warning（O-08）。"""
+    logic = ProfitCalculatorLogic({})
+    with caplog.at_level("WARNING"):
+        logic.save_record("2026-07-20", 200.0, 100.0)
+    assert logic.data["2026-07-20"]["cash"] == 200.0
+    assert logic.data["2026-07-20"]["warehouse"] == 100.0
+    assert any("违反不变式" in rec.message for rec in caplog.records)
+
 
 # ── ProfitCalculatorLogic.last_record_before ─────────
 

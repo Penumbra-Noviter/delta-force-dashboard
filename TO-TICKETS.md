@@ -14,8 +14,13 @@
 
 | Ticket | 标题 | 类型 | 优先级 | 状态 | 依赖 | 关联 |
 |--------|------|------|--------|------|------|------|
+| O-11 | CSV 导出金额统一格式化 | 重构（显示一致性） | P2 | 📝 已录入 | — | C3 |
+| O-12 | dev 依赖清单与版本锁定 | 运维 | P2 | 📝 已录入 | — | — |
+| O-13 | 编辑态关闭窗口确认 | 功能（新增） | P2 | 📝 已录入 | — | — |
+| O-14 | 7 日自动删除的可见性 | 功能（新增）/候选 | P2 | 📝 已录入 | — | O-C2 |
+| O-15 | 日志文件轮转 | 重构 | P2 | 📝 已录入 | — | O-01 |
 
-> 活跃表为空：O 系列已全部处理完毕（O-06 ✅ / O-07 ❌ 见归档）。
+> 2026-08-01 架构评估录入 8 项候选（O-08~O-15）。P1 三项（O-08/O-09/O-10）已完成并归档；剩余 O-11~O-15 为 P2。
 
 ---
 
@@ -140,6 +145,104 @@
 
 ---
 
+### O-08: 保存前校验 cash ≤ warehouse 不变式 ✅
+
+- **类型**：功能（新增校验）
+- **优先级**：P1 — 低风险，纯新增
+- **文件范围**：`app/input_panel.py`、`app/main_window.py`、`calculator.py`（可选）
+- **关联**：O-C2（数据模型约束同源：7 日限制产品决策）
+- **完成日期**：2026-08-01
+
+**问题描述**：代码与文档均声明「现金 ⊆ 仓库」（`calculator.py` DayRecord docstring、README 业务规则），但 `save_today()` / `save_record()` 无任何 cash ≤ warehouse 校验——用户可保存现金 > 仓库的违反核心业务规则数据，无提示、无红边、无拦截。
+
+**解决思路**：`save_today()` 保存前校验 `cash > warehouse` 时弹警告并中断；输入框联动加越界警示边框提示（复用 `validity` 属性或新增状态，琥珀色以区分「结构性非法」的红色）。是否在业务层 `save_record` 强制不变式需拍板——强制会破坏「允许记录异常但保留展示」的语义，建议 UI 层拦截 + 业务层仅告警。补回归测试（越界保存被拦截 / 边界相等允许）。
+
+**实现说明**：UI 层拦截 + 业务层仅告警。`save_today()` 校验 `cash > warehouse` 时 `QMessageBox.warning` 并 return；`InputPanel._update_invariant_state()` 跨字段检查挂在 `_update_save_btn_state`，`MoneyLineEdit.set_invariant_warning()` 公开 seam 置 `validity="warning"` 态（`theme.py` 新增 `BORDER_WARNING` 琥珀色 QSS）；`save_record` 业务层仅 `logger.warning` 不拦截。测试 +6（越界警告边框 / 恢复 / 边界相等 / 空字段 / 保存拦截 / 边界保存）。
+
+### O-09: 加载时顶层 dict schema 校验 ✅
+
+- **类型**：重构（健壮性）
+- **优先级**：P1 — 低风险，纯新增
+- **文件范围**：`data_store.py`（`_try_load`）、`app/main_window.py`（`_load_settings`）
+- **关联**：O-01（同类静默容错加固）
+- **完成日期**：2026-08-01
+
+**问题描述**：`_try_load` 只检查 JSON 可解析，不检查顶层结构。若 `data.json` 被外部改写为合法 JSON 但顶层非 dict（如 `[]`），`ProfitCalculatorLogic` 收下错误类型，启动 `summary → get_record → self.data.get()`（`calculator.py:63`）直接 AttributeError 崩溃，且备份恢复链未触发（文件"没坏"）。`settings.json` 同理（顶层数组 → `_settings.get`（`main_window.py:73`）崩溃）。
+
+**解决思路**：`_try_load` 增加 `isinstance(data, dict)` 校验，非 dict 视为损坏 → 走备份恢复链。`_load_settings` 同样要求顶层 dict（非 dict 返回默认 `{}`）。补测试：顶层 list 触发备份恢复 / settings 顶层 list 返回默认。
+
+**实现说明**：`data_store._try_load` 非 dict 返回 None（走备份恢复链）；`main_window._load_settings` 非 dict 返回默认 `{}` + warning 日志。测试 +3（data 顶层 list 触发备份恢复 / 全 list 返回空 / settings 顶层 list 返回默认）。
+
+**连带修复（测试夹具）**：测试 fixtures 的 `DataStore(tmp_path/data.json)` 未传 `backup_file` → 默认指向真实 `data.json.bak*`，`load()` 备份恢复链会读取并把真实备份写入 tmp_path、`save()` 把测试数据写回真实备份（静默污染用户备份）。已改为显式传 `backup_file=tmp_path/data.json.bak`（test_input_panel + test_ui_smoke 共 6 处）。
+
+### O-10: 打包配置纳入版本控制 ✅
+
+- **类型**：运维
+- **优先级**：P1 — 低风险，纯版本控制调整
+- **文件范围**：`.gitignore`、`收益计算器.spec`、`app_icon.ico`
+- **完成日期**：2026-08-01
+
+**问题描述**：`收益计算器.spec` 被 `.gitignore`（第 49 行）忽略、`app_icon.ico` 未跟踪（`git status` 显示 `??`）。打包配置不入库 → 打包产物不可复现、不可追溯，与 README「`python -m PyInstaller 收益计算器.spec`」的打包流程说明矛盾。
+
+**解决思路**：从 `.gitignore` 移除 `收益计算器.spec` 行；`git add 收益计算器.spec app_icon.ico` 入库（工作区未提交的 `main.py` 图标改动建议一并提交）。此后重打包时 spec 的变更可 diff 追溯。
+
+**完成说明**：`收益计算器.spec` 已出 `.gitignore` 入库（提交 `20b5170`）、`app_icon.ico` + `main.py` 图标改动入库（提交 `fa16d77`）。
+
+### O-11: CSV 导出金额统一格式化
+
+- **类型**：重构（显示一致性）
+- **优先级**：P2 — 低风险
+- **文件范围**：`calculator.py`（`export_csv`）
+- **关联**：C3（K/M/B 收敛）
+
+**问题描述**：`export_csv` 中较前日差值直接 `str(record.warehouse - prev_warehouse)`（`calculator.py:209`），float 运算会暴露 `0.30000000000000004` 类伪影，且与表格/图表显示格式（`format_money` 千分位）不一致。
+
+**解决思路**：导出差值统一走 `format_money`（或保留数值但补格式说明）。需平衡 Excel 打开场景——数值型单元格利于后续分析，字符串格式化利于可读性；拍板后补测试。
+
+### O-12: dev 依赖清单与版本锁定
+
+- **类型**：运维
+- **优先级**：P2 — 低风险
+- **文件范围**：`requirements.txt`、新增 `requirements-dev.txt`
+
+**问题描述**：`requirements.txt` 仅 2 个运行时依赖且未锁版本（`PySide6>=6.6.0` / `pyqtgraph>=0.13.0`）；pytest 未记录 → 新环境无法直接复现 166 项测试。
+
+**解决思路**：新增 `requirements-dev.txt`（含 `-r requirements.txt` + pytest）；运行时依赖是否锁精确版本（`==`）由维护习惯决定，至少 dev 环境记录 pytest 版本。
+
+### O-13: 编辑态关闭窗口确认
+
+- **类型**：功能（新增）
+- **优先级**：P2 — 低风险，纯新增
+- **文件范围**：`app/main_window.py`（`closeEvent`）
+
+**问题描述**：编辑/复用模式下直接关窗，未保存改动静默丢失（`closeEvent`（`main_window.py:160`）只落 settings 不落数据），用户无感知。
+
+**解决思路**：`closeEvent` 检测 `input_panel.is_editing() or is_reusing()` 时弹确认框（「有未保存的编辑，确定退出？」）。注意 UI 烟测中 `win.close()` 是公开 seam，需确认确认框 mock 策略不破坏现有测试（`test_settings_persistence` 等）。
+
+### O-14: 7 日自动删除的可见性（候选）
+
+- **类型**：功能（新增）/候选
+- **优先级**：P2 — Worth exploring
+- **文件范围**：`calculator.py`（`rotate_weekly`）、`app/main_window.py`
+- **关联**：O-C2（7 日限制产品决策）
+
+**问题描述**：`rotate_weekly()`（`calculator.py:165`）静默删除最旧记录，滚动备份同步覆盖。间断录入（假期/出差）超过 7 个日期键后最早记录被永久删除，用户无感知。
+
+**解决思路**：候选方案——删除前 `logger.info` + 状态栏可见提示；或将 7 日保留策略改为可配置/可关闭（触碰产品决策，需与 O-C2 一并拍板）。`Speculative`：是否引入「归档 / 历史视图」。
+
+### O-15: 日志文件轮转
+
+- **类型**：重构
+- **优先级**：P2 — 顺手项
+- **文件范围**：`main.py`（logging 配置）
+- **关联**：O-01（日志通道）
+
+**问题描述**：`logging.basicConfig`（`main.py:67`）固定写 `profit_calculator.log`，长期运行单文件无限增长，无轮转。
+
+**解决思路**：改 `RotatingFileHandler(maxBytes=1MB, backupCount=3)`（或按时间轮转）。纯配置改动，零逻辑影响；注意打包版无 stderr 场景下文件日志是唯一可见通道，勿降级日志级别。
+
+---
+
 ## 已完成归档
 
 ### C 系列（2026-07-31）
@@ -178,6 +281,14 @@
 | O-04 | CSV 数据导出 | 功能（新增） | 2026-08-01 | `8f50592` |
 | O-05 | 今日未录入提醒 | 功能（新增） | 2026-08-01 | `749cd59` |
 | O-06 | 图表稀疏数据提示 | 功能（新增） | 2026-08-01 | （随本提交） |
+
+### O 系列（2026-08-01，第二批 P1）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| O-08 | 保存前校验 cash ≤ warehouse 不变式 | 功能（新增校验） | 2026-08-01 | （随本提交） |
+| O-09 | 加载时顶层 dict schema 校验 | 重构（健壮性） | 2026-08-01 | （随本提交） |
+| O-10 | 打包配置纳入版本控制 | 运维 | 2026-08-01 | `20b5170` / `fa16d77` |
 
 > 两个并行分支（A：O-01~O-03；B：O-04~O-05）经 merge 合入 main，合并提交 `c01c2c2` / `fdeca85`。合并时 `main_window.py` 模块级 logger 命名冲突（`logger` vs `_logger`）已收敛为 `logger`。
 

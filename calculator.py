@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -17,6 +18,9 @@ __all__ = [
     "RateSignal",
     "PnLSignal",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class RateSignal(Enum):
@@ -73,7 +77,18 @@ class ProfitCalculatorLogic:
             return None
 
     def save_record(self, date_str: str, cash: float, warehouse: float) -> DayRecord:
-        """保存某日记录并返回对应模型。"""
+        """保存某日记录并返回对应模型。
+
+        业务层不强制「现金 ⊆ 仓库」不变式（允许保留已录入的异常数据并继续展示），
+        仅对违反不变式的写入记录 warning——拦截由 UI 层 save_today 负责（O-08）。
+        """
+        if cash > warehouse:
+            logger.warning(
+                "记录违反不变式（现金 %.2f > 仓库 %.2f，date=%s）",
+                cash,
+                warehouse,
+                date_str,
+            )
         self.data[date_str] = {"cash": cash, "warehouse": warehouse}
         return DayRecord(cash=cash, warehouse=warehouse, date=date_str)
 

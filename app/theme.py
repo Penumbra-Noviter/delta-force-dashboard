@@ -31,6 +31,7 @@ THEMES = {
         "BORDER_DEFAULT": "#d6d3cc",  # 暖灰边框
         "BORDER_VALID": "#16a34a",
         "BORDER_INVALID": "#dc2626",
+        "BORDER_WARNING": "#d97706",  # 越界警告边框（amber-600，O-08）
         "SEPARATOR": "#e7e5e0",      # 暖浅灰分隔线
         "PLACEHOLDER": "#9ca3af",   # gray-400，占位文字豁免 AA
         "MUTED_BG": "#f4f2ed",      # 暖静音底
@@ -74,6 +75,7 @@ THEMES = {
         "BORDER_DEFAULT": "#45475a",
         "BORDER_VALID": "#a6e3a1",
         "BORDER_INVALID": "#f38ba8",
+        "BORDER_WARNING": "#f9e2af",  # 越界警告边框（amber-200，O-08）
         "SEPARATOR": "#313244",
         "PLACEHOLDER": "#7f849c",
         "MUTED_BG": "#313244",
@@ -143,6 +145,7 @@ def generate_qss(theme_name: str) -> str:
     border_def = t["BORDER_DEFAULT"]
     border_valid = t["BORDER_VALID"]
     border_invalid = t["BORDER_INVALID"]
+    border_warning = t["BORDER_WARNING"]
     placeholder = t["PLACEHOLDER"]
     muted_bg = t["MUTED_BG"]
     card_bg = t["CARD_BG"]
@@ -220,6 +223,9 @@ QLineEdit[validity="valid"] {{
 }}
 QLineEdit[validity="invalid"] {{
     border-color: {border_invalid};
+}}
+QLineEdit[validity="warning"] {{
+    border-color: {border_warning};
 }}
 QLineEdit::placeholder {{
     color: {placeholder};

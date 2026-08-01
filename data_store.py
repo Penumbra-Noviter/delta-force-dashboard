@@ -76,9 +76,14 @@ class DataStore:
             return None
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, OSError):
             return None
+        # 顶层必须为 dict（形如 {"2026-08-01": {...}}）；合法 JSON 但结构
+        # 错误视为损坏，走备份恢复链，避免上层收下错误类型（O-09）
+        if not isinstance(data, dict):
+            return None
+        return data
 
     def _atomic_write(self, data: dict[str, Any], target: Path) -> None:
         tmp = target.with_suffix(target.suffix + ".tmp")
