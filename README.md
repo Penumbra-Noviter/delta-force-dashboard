@@ -53,7 +53,7 @@
 
 ### 方式一：直接运行打包版（推荐）
 
-前往 [Releases](../../releases) 下载 `收益计算器.exe`，双击即可运行，无需安装 Python 环境。
+前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（zip），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）生成在 exe 同目录。
 
 ### 方式二：从源码运行
 
@@ -132,7 +132,7 @@ python -m pytest tests/ -q
 python -m PyInstaller 收益计算器.spec --noconfirm
 ```
 
-打包产物位于 `dist/收益计算器.exe`。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
+打包产物位于 `dist/收益计算器/`（onedir：`收益计算器.exe` + `_internal/`，整目录分发或 zip 压缩）。O-20 起由单文件改为 onedir——免去每次启动把 80MB 包解压成 181MB 的开销，启动从 ~2-4s 降至 ~1.5s；体积经 excludes（matplotlib/PIL）+ Qt 模块白名单 + 翻译文件剔除瘦身。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
 
 ---
 

@@ -16,9 +16,9 @@
 | UI 框架 | PySide6（Qt 官方绑定，LGPL 协议） |
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
-| 打包方式 | PyInstaller → 单 .exe |
+| 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
 | 测试框架 | pytest（180 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-19，O-07 YAGNI 关闭）全部完成 |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-20，O-07 YAGNI 关闭）全部完成 |
 
 ---
 
@@ -98,7 +98,7 @@ Profit Calculator/
 │   ├── test_table_theme.py  ← 3 个测试（C1 主题色实时解析）
 │   └── test_ui_smoke.py     ← 26 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
-├── 收益计算器.spec           ← PyInstaller 打包配置（单文件 + 图标）
+├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
 ├── settings.json            ← 窗口几何 + 置顶 + 主题持久化
 ├── requirements.txt         ← PySide6==6.11.1, pyqtgraph==0.14.0（O-12 版本锁定）
@@ -533,7 +533,13 @@ pip install pyinstaller
 python -m PyInstaller 收益计算器.spec --noconfirm
 ```
 
-**图标**：`收益计算器.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随单文件解压，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
+**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）生成在 exe 同目录。
+
+**为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致，源码零改动。
+
+**体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件。`upx=False`（本机未装 UPX，此前为空转）。
+
+**图标**：`收益计算器.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随包内嵌，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
 
 ---
 

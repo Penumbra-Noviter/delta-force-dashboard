@@ -49,7 +49,9 @@ def _is_already_running() -> QLocalServer | None:
     socket.connectToServer(_SERVER_NAME)
 
     # 如果连接成功，说明已有实例在运行
-    if socket.waitForConnected(500):
+    # O-20：500ms → 100ms。本地 socket 探测毫秒级完成，100ms 足够判定；
+    # 无已有实例时免去 500ms 启动白等。
+    if socket.waitForConnected(100):
         socket.disconnectFromServer()
         return None
 

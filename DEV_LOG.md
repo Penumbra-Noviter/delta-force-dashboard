@@ -6,6 +6,24 @@
 
 ---
 
+### 2026-08-01 | 打包 | 收益计算器.spec + main.py | O-20 打包 onedir 化 + 体积瘦身（exe 过大 + 启动慢）
+
+**背景**：单文件 exe 80MB，每次启动把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；且 `%TEMP%` 残留 5 个孤儿 `_MEI` 目录（共 905MB，待用户确认后清理）。
+
+**改动**（A+B+D，全部打包/性能层，零源码框架改动）：
+- **A 单文件→onedir**：spec 重写为 `EXE(exclude_binaries=True) + COLLECT`。启动免解压。交付形态 `dist/收益计算器/`（exe 6.3MB + `_internal/`）。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为不变，源码零改动。
+- **B 体积瘦身**：① `excludes` 剔 matplotlib/PIL 及纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载——importtime 实测）；② Qt 二进制白名单过滤——bindepend 实测保留 DLL/.pyd 的 link-time 依赖闭包后，仅留 Core/Gui/Widgets/Network（应用）+ OpenGL/OpenGLWidgets/Svg/Test（pyqtgraph import 时实际加载），剔掉 Qml/Quick/Pdf/VirtualKeyboard 等整族；③ 剔全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；④ 剔 opengl32sw.dll 软件渲染器（从不建 GL 上下文）与 tls/networkinformation 插件；⑤ `upx=True`→`False`（本机未装 UPX，此前空转）。
+- **D 单实例等待**：`waitForConnected(500)`→`100`（main.py:52）。本地 socket 探测毫秒级，100ms 足够判定，免无实例时的 500ms 白等。
+
+**结果**：
+- 体积：80MB 单文件 → 117MB 目录（onedir 免压缩，可 zip 分发；旧单文件是 zlib 压缩态不可直接对比）。Qt 模块从整包 59 pyd / 全量 DLL 缩到 8 pyd / 8 DLL + shiboken6。
+- 启动：烟测 1560ms 冷启动出窗口（vs 单文件解压 181MB + 启动，用户体感 2~4s+）；二次实例 667ms 内被单实例锁拦截（exit 0），第一实例正常存活。
+- 验证：exe 启动窗口标题「收益计算器」正常，`profit_calculator.log` 0 字节（无启动告警）；pytest 180/180 ✅。
+
+**待办**：`%TEMP%` 孤儿 `_MEI*` 目录 905MB 待用户确认后删除（不删用户数据，仅一次性临时解压残留）。
+
+---
+
 ### 2026-08-01 | 打包 | dist/收益计算器.exe | 重新打包（含 O-06~O-19 全部优化）
 
 **产物**：`dist/收益计算器.exe`（83.7 MB，单文件，PyInstaller `--clean` 重建；O-10 起 spec 入库，本构建可复现）
