@@ -24,6 +24,8 @@ dist/
 
 # ── Runtime data ────────────────────────────────────
 data.json
+# 运行态设置（窗口几何/主题/置顶），O-18 起与 data.json 一致不入库
+settings.json
 
 # ── IDE / Editor ────────────────────────────────────
 .idea/

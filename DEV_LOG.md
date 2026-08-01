@@ -6,6 +6,17 @@
 
 ---
 
+### 2026-08-01 | 运维 | .gitignore + settings.json | O-18 settings.json 运行态入库清理（出索引 + gitignore）
+
+**O-18**（P2，运维）：`settings.json` 内容为运行时态（窗口几何 + theme 随切换翻转），仍在 git 跟踪导致每次改主题/拖窗口都污染提交 diff（`082ce62` 已附带提交一次翻转）。拍板选 **A**：
+- `.gitignore` Runtime data 节 `data.json` 旁追加 `settings.json`；`git rm --cached settings.json` 出索引（磁盘文件保留，本次提交表现为 `deleted: settings.json`）。
+- 运行态零变化：`_load_settings` 读磁盘，缺失/损坏返回默认 `{}`（O-09 保证），无需代码改动。
+- 与 data.json 隔离惯例一致（`95b7eef`）；此后主题/几何改动不再进入提交。
+
+**验证**：`git status` 确认 settings.json 已出索引且被 ignore；纯版本控制调整，未触碰代码，pytest 无影响。
+
+---
+
 ### 2026-08-01 | 文档同步 | CODE_WIKI.md | O-19 CODE_WIKI 失同步修正（方法表/依赖版本/测试计数）
 
 **O-19**（P3，文档）：`082ce62` 声称「同步 CODE_WIKI」但留下三处失实引用，本次以源码/实测为准一次性修正：
