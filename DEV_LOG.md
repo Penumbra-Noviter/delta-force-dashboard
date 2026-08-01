@@ -1,615 +1,164 @@
 # DEV_LOG — 收益计算器开发日志
 
-> **格式**：`YYYY-MM-DD` | `<操作>` | `<范围>` | `<描述>`
+> **格式**：`YYYY-MM-DD` | `<操作>` | `<描述>`（倒序，最新在前）
 >
-> 按时间倒序排列，最新条目在最前。
+> 工单标题/完成日期/提交哈希以 `TO-TICKETS.md` 归档表为准；本日志只记「已做」与决策/避坑。
 
 ---
 
-### 2026-08-01 | 修复 | main.py + tests/test_migration.py | O-22 空启动日志目录未建 → FileNotFoundError 崩溃
+## 滚动摘要（2026-08-01）
 
-**症状**：exe 在空环境（无旧数据、无 `~/收益计算器`）下首启即崩，日志 `FileNotFoundError: ... 'C:\Users\<user>\收益计算器\profit_calculator.log'`。
-
-**根因**：O-22 把日志路径改挂 `DATA_DIR` 后，`main()` 先构造 `RotatingFileHandler`（打开 `LOG_FILE`）再执行迁移；而目录创建只在 `migrate_legacy_data` 的迁移分支内发生——空启动时迁移提前返回、目录从未创建，日志文件无处打开。
-
-**修复**：`main()` 第一行显式 `DATA_DIR.mkdir(parents=True, exist_ok=True)`，先于日志 handler / 迁移 / 数据写入，保证空启动也有目录。
-
-**回归测试**：`tests/test_migration.py` 新增 AST 静态断言——`main()` 内 `DATA_DIR.mkdir` 行号必须先于 `RotatingFileHandler`（防顺序回退复发）。
-
-**结果**：pytest 187/187 ✅（186 + 1 新增）。重建 exe 后空启动正常出窗口。
+- **测试**：pytest **187/187** ✅（O-22 修复后）；基线演进 103→187，各阶段计数见下方条目
+- **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
+- **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
+- **活跃工单**：空（全部归档 TO-TICKETS.md）
+- **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
-### 2026-08-01 | 重构+运维 | config.py + data_store.py + main.py + app/main_window.py + tests/test_migration.py | O-22 运行态数据统一到用户目录
+## 日志正文
 
-**背景**：旧 `APP_DIR` 语义下，打包版数据（`data.json`/`settings.json`/日志）生成在 exe 同目录 `dist/收益计算器/`。`dist/` 是构建产物，每次 PyInstaller 重建整体覆盖即丢用户数据（O-20/O-21 已发生两次）；exe 移动位置同样丢数据；开发版与 exe 两套数据各自演进。
+### 2026-08-01 | 文档 | DEV_LOG 精简（滚动摘要 + 单行条目）+ 进度审计修复
+- 背景：DEV_LOG 615 行/46.6KB，每次会话读取耗 ~14K tokens；核心内容（决策/避坑/哈希/计数）与 TO-TICKETS 归档表大量重复
+- 精简：615→158 行（-61%，~14K→~5.5K tokens）；新增「滚动摘要」顶部块（当前状态 + 4 条持久避坑），正文每工单 1 条仅保留决策/避坑/哈希/计数；4 条「重新打包」烟测条目删除（被 O-20/O-21 覆盖，烟测模式已在 O-20/O-21 保留）；评审录入表压缩（完整行在 TO-TICKETS 归档）
+- 审计同步修复：TO-TICKETS O-22 行回填 `c2e34f9`（空启动崩溃修复，`9835387` 之后）；PROJECT_REFERENCE 打包形态「单文件」→「onedir」（O-20 后失同步，CODE_WIKI/README 已同步）
+- 纯文档改动，pytest 187/187 不受影响
 
-**改动**：
-- `config.py`：新增 `DATA_DIR = Path.home()/"收益计算器"`；`DATA_FILE`/`BACKUP_FILE`/`SETTINGS_FILE` 全部改挂其下，新增 `LOG_FILE`；`APP_DIR` 保留为「旧数据源」仅供迁移。
-- `data_store.py`：新增模块级幂等函数 `migrate_legacy_data(legacy_dir, target_dir)`——目标已有 `data.json` 跳过（新数据权威，绝不覆盖）、legacy 无数据跳过；否则 `mkdir` + 复制 `data.json` + 全部滚动备份 + `settings.json`；**复制而非移动**（源保留、可逆）；失败仅 warning 不中断启动。
-- `main.py`：日志 handler 路径 `APP_DIR/profit_calculator.log` → `LOG_FILE`；单实例检查通过后、建 MainWindow 前调用 `migrate_legacy_data(APP_DIR, DATA_DIR)`。
-- `app/main_window.py`：CSV 默认导出路径 `APP_DIR/…` → `DATA_DIR/…`。
-- 测试：新增 `tests/test_migration.py` 6 项（空 legacy 无操作 / 目标已有跳过不覆盖 / 迁移 data.json+备份+settings / 非破坏性 / 无 settings 仍迁移 / 成功迁移记日志）。
+### 2026-08-01 | 修复 | O-22 空启动日志目录未建崩溃（`c2e34f9`）
+- 症状：exe 空环境首启即崩 `FileNotFoundError: ~/收益计算器/profit_calculator.log`
+- 根因：`main()` 先构造 `RotatingFileHandler`（打开 LOG_FILE）再执行迁移；目录创建仅在迁移分支内，空启动提前返回时目录未建
+- 修复：`main()` 第一行 `DATA_DIR.mkdir(parents=True, exist_ok=True)`，先于日志 handler/迁移/写入
+- 回归测试：AST 静态断言 mkdir 行号先于 RotatingFileHandler（防顺序回退复发）
+- 结果：pytest 187/187 ✅（186+1）；重建 exe 空启动正常出窗口
 
-**结果**：pytest 186/186 ✅（180 + 6 新增）。对真实项目根数据（`data.json` + 4 备份 + `settings.json`）实测迁移复制完整。下次启动（开发版或 exe）自动把旧数据迁到 `C:\Users\<user>\收益计算器\`。
+### 2026-08-01 | 重构+运维 | O-22 运行态数据统一到用户目录（`9835387`）
+- 动机：`dist/` 重建整体覆盖丢数据（O-20/O-21 已踩两次）；exe 移动丢数据；开发版与 exe 两套数据割裂
+- 改动：`DATA_DIR = Path.home()/"收益计算器"`，`DATA_FILE`/`BACKUP_FILE`/`SETTINGS_FILE`/`LOG_FILE` 全挂其下；`APP_DIR` 保留为旧数据源；`migrate_legacy_data` 幂等（目标已有 data.json 跳过 / legacy 无数据跳过 / **复制非移动** / 失败仅 warning）；CSV 默认导出路径同改；`main.py` 单实例检查后、建 MainWindow 前迁移
+- 测试：`tests/test_migration.py` +6；pytest 186/186 ✅（180+6）
+- 取舍：复制非移动——源保留（`.gitignore` 已忽略）可逆，用户确认后手动清理
 
-**取舍**：迁移用复制而非移动——旧文件保留原位置（`.gitignore` 已忽略），用户确认后可手动清理；`dist/` 重建整体覆盖不再影响用户数据。
+### 2026-08-01 | 运维+打包 | O-21 UPX 压缩瘦身（`6978182`）+ O-20 待办闭环
+- O-20 `_MEI*` 孤儿清理闭环：5 个目录 905MB `rm -rf`（确认无进程占用）
+- UPX 5.2.0（winget）装至 `D:\Desktop\tools\UPX\`；spec `upx=True`（EXE + COLLECT 两处）
+- ⚠️ PyInstaller 不读 `UPX_DIR` 环境变量（仅 `--upx-dir` CLI / PATH 搜索），构建须显式传参
+- 结果：dist 117M→64M（-45%）。未达理论值：Qt6*.dll 与 MSVCP*/VCRUNTIME 为 **CFG（Control Flow Guard）构建，PyInstaller 自动跳过 UPX**（`Disabling UPX ... due to CFG`，防损坏）；实际压缩 8 个 Qt *.pyd（`--lzma`）
+- 验证：exe 烟测通过（常驻 ~180MB、二次实例被单实例锁拦截、taskkill 干净）；pytest 180/180 ✅；`upx -t` 确认 QtCore.pyd packed / Qt6Core.dll 未 packed（符合预期）
 
----
+### 2026-08-01 | 打包 | O-20 onedir 化 + 体积瘦身（`5913a22`）
+- 背景：单文件 80MB 每次启动解压 181MB 到 `%TEMP%\_MEI*`（启动慢 ~2-4s 根因），残留 5 个孤儿目录 905MB（O-21 已清）
+- 改动：① spec 重写 `EXE(exclude_binaries=True) + COLLECT`（onedir 免解压，交付 `dist/收益计算器/`，exe 6.3MB + `_internal/`）；② 瘦身：excludes 剔 matplotlib/PIL（pyqtgraph 导出器运行时从不加载）、Qt 二进制白名单（仅留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test，8 pyd/8 DLL）、剔 translations/opengl32sw/tls 插件；③ 单实例等待 `waitForConnected(500→100)`（main.py:52）
+- 结果：80MB 单文件→117MB 目录（onedir 免压缩，可 zip 分发）；冷启动烟测 1560ms（vs 解压 2~4s+）；二次实例 667ms 被拦截
+- `config.APP_DIR`/`_icon_path`（`sys._MEIPASS`）在 onedir 下行为不变，源码零改动；pytest 180/180 ✅
 
-### 2026-08-01 | 运维+打包 | %TEMP% + 收益计算器.spec + dist/收益计算器 | O-21 打包 UPX 压缩瘦身 + O-20 待办闭环（_MEI 残留清理）
+### 2026-08-01 | 文档整理 | TO-TICKETS/README/CODE_WIKI/PROJECT_REFERENCE
+- TO-TICKETS 删「工单详情」长文（401→109 行，只留规则+活跃表+归档表）；README 修正图表颜色标注、备份份数 5→4、文件树补全；CODE_WIKI §4.6 theme.py 内联 THEMES（T-02 迁入）、§4.8 删已迁走主题色板；PROJECT_REFERENCE 精简为项目介绍，技术细节统一指向 CODE_WIKI（根治双文档漂移，O-19 同因）
+- 纯文档改动，pytest 180/180 不受影响
 
-**O-20 待办闭环（`%TEMP%` 孤儿 `_MEI*` 清理）**：单文件模式遗留的 5 个 `_MEI*` 解压目录（各 181M，共 905MB，确认无进程占用）已 `rm -rf` 清除，O-20 日志「待办」闭环。
+### 2026-08-01 | 运维 | O-18 settings.json 出索引 + gitignore（`dd47efa`）
+- 运行态（几何+主题翻转）入库污染 diff（`082ce62` 曾附带提交一次翻转）；拍板 A：`.gitignore` Runtime data 节追加 + `git rm --cached settings.json`（磁盘保留，本次提交表现为 deleted）；运行态零变化（`_load_settings` 缺失/损坏返回默认 `{}`，O-09 保证）；与 data.json 惯例一致（`95b7eef`）
 
-**UPX 安装**：winget 装 UPX 5.2.0（`UPX.UPX`，官方 releases 直连验证可下载），`upx.exe`（615K）复制到用户指定工具目录 `D:\Desktop\tools\UPX\`。
+### 2026-08-01 | 文档同步 | O-19 CODE_WIKI 失同步修正（`9df5ee4`）
+- `rotate_weekly` 返回 `list[str]`、`get_weekly_records`→`recent_records`、`summary` 去 `end_date`；依赖锁 `PySide6==6.11.1`/`pyqtgraph==0.14.0`/`pytest==9.1.1`；测试计数以 `--collect-only` 实测为准 165→180（含 O-08/09/11/13/14 用例）；「7 日」表述统一为「最近 7 条」
 
-**spec 压缩开启**：`upx=False`→`upx=True`（EXE + COLLECT 两处 + 头部注释）。⚠️ PyInstaller 不读 `UPX_DIR` 环境变量（仅 `--upx-dir` CLI / PATH 搜索），构建命令须显式 `pyinstaller --upx-dir D:/Desktop/tools/UPX`。
+### 2026-08-01 | 修复+重构 | O-17 清理文案 + 显示基准统一为录入条数（`9df5ee4`）
+- 文案：`rotate_weekly` 按记录数轮转，保存提示改「已保留最近 7 条记录，自动清理 N 条较早记录」；logger「删除超期记录」→「删除最旧记录（保留最近 %d 条）」
+- **核心决策（用户拍板）**：显示基准从「最近 7 个日历天」改为「最近 7 条实际录入」——`get_weekly_records(today,7)`→`recent_records(days)`（日期升序、无空位占位、跳无效记录）；`summary` 去 `end_date`；标签「7日总盈亏」→「最近7条总盈亏」；间断录入的老记录清理前始终可见
+- 轮转 `rotate_weekly` 维持按条数（本就正确）；测试 6 项同步 + 新文案断言；pytest 180/180 ✅
 
-**结果**：dist `收益计算器/` 117M → 64M（-45%）。未达 ~45MB 理论值：Qt6*.dll 与 MSVCP*/VCRUNTIME 为 CFG（Control Flow Guard）构建，PyInstaller 自动跳过 UPX（`Disabling UPX ... due to CFG`）防损坏；实际压缩的是 8 个 Qt *.pyd 与 Python 扩展（UPX `--lzma`）。CFG 检测是 PyInstaller 6.x 的安全行为，不强压（强压会损坏 DLL）。
+### 2026-08-01 | 决策拍板 | O-16 CSV 大额 K/M 精度（保持现状）
+- ≥1e6 金额被 `format_money` 缩写成 K/M，丢失全值精度、Excel 不可求和。三选项：**A** 保持现状仅 docstring 注明取舍 / **B** CSV 专用千分位全值（引号包裹，pandas 默认读成字符串的经典坑）/ **C** 纯数值（Excel/pandas 开箱即算，最优机器格式）
+- 拍板 **A**：主消费场景为 Excel 人工查看，与界面显示一致优先于机器可读全值；C 留作「机器可读导出」备选；零行为变更，TO-TICKETS 归档
+- 注：当时全量 pytest 红（16 failed+27 errors）系并行重构 `recent_records`/summary/rotate_weekly 未同步，与 O-16 无关
 
-**验证**：exe 启动烟测通过（进程常驻 ~180MB 无崩溃，二次实例被单实例锁拦截，taskkill 干净退出）；pytest 180/180 ✅（源码零改动，spec 不影响测试）；`upx -t` 确认 QtCore.pyd packed / Qt6Core.dll 未 packed（CFG 跳过符合预期）。
+### 2026-08-01 | 评审 | /code-review `082ce62`（O-11~O-15）
+- Spec 轴 0 缺失、新测试 4 项全过、无阻断缺陷（影响低-中）；拆 O-16~O-19 录入活跃表；判定不值得做：theme 调色板重写（已合并的个人偏好，回退属返工）、rotate_weekly 返回列表仅用 len()（Speculative，无害）、closeEvent 缺 `QCloseEvent` 注解、O-15 无测试（纯配置，可接受）
 
----
+### 2026-08-01 | 实现 | O-11~O-15（`082ce62`，180/180 = 176+4）
+- **O-11** CSV 金额统一格式化：现金/仓库/较前日走 `format_money`（拍板：字符串与界面一致，代价 Excel 为文本不可求和）；stdlib csv + `lineterminator="\n"`，千分位自动引号包裹；消除 float 伪影
+- **O-12** dev 依赖锁定：`PySide6==6.11.1`/`pyqtgraph==0.14.0`；新增 `requirements-dev.txt`（+pytest==9.1.1）
+- **O-13** 编辑态关窗确认：`QMessageBox.question`，No→`event.ignore()`；踩坑 `isHidden()` 对未 show 顶层窗口恒 True，改用 `close()` 返回值断言，用例尾 `cancel_edit()` 恢复
+- **O-14** 7 日删除可见性：`rotate_weekly` 返回被删日期列表（升序）+ 逐条 logger.info；`save_today` 拼清理提示到已保存指示器；「保留天数可配置」未做（如需另立候选）
+- **O-15** 日志轮转：`RotatingFileHandler(1MB×3, utf-8)`，根 logger 幂等；级别保持 INFO（打包版无 stderr）
 
-### 2026-08-01 | 打包 | 收益计算器.spec + main.py | O-20 打包 onedir 化 + 体积瘦身（exe 过大 + 启动慢）
+### 2026-08-01 | 实现 | O-08/O-09（`d0af4d6`，176/176 = 166+10）
+- **O-08** 保存前 cash ≤ warehouse 校验：UI 层硬拦截（`QMessageBox.warning`）+ `MoneyLineEdit.set_invariant_warning()` seam + `BORDER_WARNING` 色；业务层 `save_record` 仅 logger.warning 不拦截（允许保留已录入异常数据并继续展示）
+- **O-09** 加载顶层 dict 校验：`_try_load` 非 dict（如 `[]`）视为损坏走备份恢复链（此前 AttributeError 崩溃且链不触发）；settings 非 dict 返回默认 `{}` + warning
+- ⚠️ **连带修复（测试夹具污染 bug）**：tests 中 `DataStore(tmp_path/data.json)` 未传 backup_file → 默认指向真实 `data.json.bak*`，load 读真实备份、save 写回（静默污染用户备份）。修复：显式传 `backup_file=tmp_path/data.json.bak`（test_input_panel + test_ui_smoke 共 6 处）。此前测试态数据已写入真实备份，待用户确认后从 data.json 恢复
 
-**背景**：单文件 exe 80MB，每次启动把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；且 `%TEMP%` 残留 5 个孤儿 `_MEI` 目录（共 905MB，待用户确认后清理）。
+### 2026-08-01 | 评审录入 | O-08~O-15 候选落库
+- 架构评估 8 项录入活跃表（O-08 cash≤warehouse P1 / O-09 顶层 dict 校验 P1 / O-10 打包配置入库 P1 / O-11~O-15 P2），详情见 TO-TICKETS 归档；pytest 166/166 基线
 
-**改动**（A+B+D，全部打包/性能层，零源码框架改动）：
-- **A 单文件→onedir**：spec 重写为 `EXE(exclude_binaries=True) + COLLECT`。启动免解压。交付形态 `dist/收益计算器/`（exe 6.3MB + `_internal/`）。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为不变，源码零改动。
-- **B 体积瘦身**：① `excludes` 剔 matplotlib/PIL 及纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载——importtime 实测）；② Qt 二进制白名单过滤——bindepend 实测保留 DLL/.pyd 的 link-time 依赖闭包后，仅留 Core/Gui/Widgets/Network（应用）+ OpenGL/OpenGLWidgets/Svg/Test（pyqtgraph import 时实际加载），剔掉 Qml/Quick/Pdf/VirtualKeyboard 等整族；③ 剔全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；④ 剔 opengl32sw.dll 软件渲染器（从不建 GL 上下文）与 tls/networkinformation 插件；⑤ `upx=True`→`False`（本机未装 UPX，此前空转）。
-- **D 单实例等待**：`waitForConnected(500)`→`100`（main.py:52）。本地 socket 探测毫秒级，100ms 足够判定，免无实例时的 500ms 白等。
+### 2026-08-01 | 打包 | O-10 应用图标落地（`20b5170`/`fa16d77`）
+- spec `icon='app_icon.ico'` + `datas` 内嵌（单文件版解压后运行时读取）；`main.py` 新增 `_icon_path()`（`sys._MEIPASS`/项目根解析）+ `setWindowIcon()`；ico 16~256px 多尺寸；pytest 166/166 ✅
 
-**结果**：
-- 体积：80MB 单文件 → 117MB 目录（onedir 免压缩，可 zip 分发；旧单文件是 zlib 压缩态不可直接对比）。Qt 模块从整包 59 pyd / 全量 DLL 缩到 8 pyd / 8 DLL + shiboken6。
-- 启动：烟测 1560ms 冷启动出窗口（vs 单文件解压 181MB + 启动，用户体感 2~4s+）；二次实例 667ms 内被单实例锁拦截（exit 0），第一实例正常存活。
-- 验证：exe 启动窗口标题「收益计算器」正常，`profit_calculator.log` 0 字节（无启动告警）；pytest 180/180 ✅。
+### 2026-08-01 | 实现 | O-06/O-07（`0f16e1c`，166/166 = 165+1）
+- **O-06** 图表稀疏提示：2≤n≤3 叠加半透明「数据较少，需更多数据以显示趋势」overlay（`WA_TransparentForMouseEvents` 不拦鼠标，resizeEvent 跟随）；防新用户误读为图表损坏
+- **O-07** 收益率目标参考线：**关闭（YAGNI）**——目标语义未定义（逐日环比 vs 累计），画在哪条序列上无法解释；成本（输入框+settings 持久化+InfiniteLine+测试）>收益
 
-**待办**：`%TEMP%` 孤儿 `_MEI*` 目录 905MB 待用户确认后删除（不删用户数据，仅一次性临时解压残留）。
+### 2026-08-01 | 实现 | O-01~O-05（165/165 = 147+18）
+- **O-01** logging 替换静默 except（`e6d5b64`）：`_load_settings`/`_save_settings`/`_rotate_backups` 三处 `except: pass`→logger.warning；main 加 `logging.basicConfig` 写 APP_DIR/profit_calculator.log（打包版无 stderr）；保留 `_setup_window` 几何/DPI 与 return None 正常语义
+- **O-02** `refresh_validity` 公开 seam（`486d41f`）：C4 最后一处跨对象私有访问收敛；AST 守卫防复发
+- **O-03** format_money docstring 阈值交叉说明（`ac75c71`）：K 阈值 1,000,000 非 1,000，与 C3 双向引用
+- **O-04** CSV 数据导出（`8f50592`）：`export_csv()` 纯函数（日期升序、较前日/收益率复用 format_rate 语义、无前日为—、异常跳过）+ 标题栏「导出 CSV」按钮，utf-8-sig + newline="" 写入
+- **O-05** 今日未录入提醒（`749cd59`）：`_today_status_label` 纯读 `get_record(today)` 控制显隐，挂在 refresh_display()
+- 并行 worktree（A：O-01~03；B：O-04~05）合并冲突一处（模块级 logger/_logger→logger）；merge `c01c2c2`/`fdeca85`
 
----
+### 2026-08-01 | 实现 | C5 verify_all 影子测试并入 pytest（`0c6b8e3`，147/147 = 134+13）
+- 删除 `verify_all.py`（831 行）；第 1~3 节叶子测试已被覆盖直接删，第 4~11/13~14 节 UI 烟测迁至 `tests/test_ui_smoke.py`（offscreen，13 项）；深度私有访问收敛公开 seam（`fill_values`/`set_edit_mode`/`delete_requested.emit`/`theme_btn.click`）；去抖 QTimer 用 `refresh_validity()` 同步断言；settings/data.json 隔离移交 fixture，删手动 backup/restore
 
-### 2026-08-01 | 打包 | dist/收益计算器.exe | 重新打包（含 O-06~O-19 全部优化）
+### 2026-08-01 | 修复 | C5 评审后续（时间耦合回归，147/147）
+- `make_sample_data()` 固定日期 2026-07-20~27 与墙钟窗口 [today-6,today] 耦合，2026-08-03 起 `test_ui_initialization` 必失败 → 改相对今天（offsets 7/6/5/3/2/0）；编辑/删除测试动态取日期
+- `test_settings_persistence` 用 `win.close()`（closeEvent 落盘）替代私有 `_save_settings()`；`qapp`/`settings_guard` 收敛 `tests/conftest.py`；文档勘误（verify_all 14 节、行数 831、README/PROJECT_REFERENCE 147）
 
-**产物**：`dist/收益计算器.exe`（83.7 MB，单文件，PyInstaller `--clean` 重建；O-10 起 spec 入库，本构建可复现）
+### 2026-07-31 | 实现 | C6 浅层残留清扫（`923f544`，134/134）
+- 删 app/config.py 空壳、config.py 7 个无消费者 `FONT_*`；`PnL信号`→`PnLSignal`（rename 全仓同步）；formatting 死分支；6 文件死 import 清理；CODE_WIKI 同步
 
-**验证**：
-- pytest 180/180 通过 ✅
-- exe 启动烟测通过：双进程常驻（PyInstaller 单文件父子结构）→ 二次启动被单实例锁拦截（进程数保持 2）→ 强制结束干净退出（进程数归 0）✅
-- `warn-收益计算器.txt` 仍仅剩 Windows 无关的 POSIX 模块与可选 scipy 缺失，无实质风险（与历次构建一致）
-- `dist/` 残留 0 字节 `profit_calculator.log`（上次烟测遗留）已清理
+### 2026-07-31 | 实现 | C7~C9（`923f544`，134/134）
+- C7 getter docstring 契约修正（空→None / 结构性非法→ValueError）；C8 verify_all 检查标签改名；C9 AST 静态守卫（防 main_window 直取 cash_entry/parse_money_input 复发）
 
----
+### 2026-07-31 | 实现 | C4 InputPanel seam 成真（`bbe59bf`，133/133 = 124+9）
+- getter 语义明确（空→None/非法→抛，原先吞 ValueError 区分不了）；新增 `get_cash_raw`/`get_warehouse_raw`/`refresh_validity`；MainWindow 收敛公开 API、删 `_editing_date` 字段（编辑状态单方归属 InputPanel）；verify_all 适配
 
-### 2026-08-01 | 文档整理 | TO-TICKETS/README/CODE_WIKI/PROJECT_REFERENCE | 核心文档冗余清理与失同步修正
+### 2026-07-31 | 实现 | C3 收尾 _UNITS 共享表（`e3eff63`，124/124）
+- 私有升序表 `_UNITS = (("K", _K), ("M", _M), ("B", _B))`：format_compact 反向迭代、parse_money_input 正向迭代，消除两处内联 (后缀, 因子) 对；纯重构无行为变化
 
-**TO-TICKETS.md**：删除「工单详情」整节（C3/C5/O-01~O-19 长文——均已归档，细节 git 可追溯，活跃表已空）；删除从未使用的「🔜 待排期」状态说明。文件从 401 行缩至 109 行（头部规则 + 活跃表 + 归档表 + 状态说明）。
+### 2026-07-31 | 实现 | C3 收敛三套 K/M/B 格式化（`e3eff63`，124/124）
+- `format_compact(value, *, prefix="")`（SI 阈值 K≥1e3/M≥1e6/B≥1e9，.1f，<1e3 整数）；KMBAxisItem（Y 轴）与 `_ChartPanel._format_value`（hover/端点，prefix="¥"）委托；`format_short_date()` 统一 4 文件 6 处 `date_str[-5:]`
+- **两处已批准偏离**：① API 提议 `currency=False`→实现为更通用 `prefix` 字符串；② hover 精度 `.2f`/`.1f` 混用→统一 `.1f`（K/M 降 1 位，B 不变，与 Y 轴一致）
 
-**README.md**：修正图表颜色标注（仓库=琥珀金/现金=青色，原写反）；「近 7 天 / 7 日总盈亏」→「最近 7 条」；备份份数 5→4（3 份滚动 + 1 份兼容旧版，实测 `data_store._rotate_backups`）；文件树补 `app/__init__.py`、`requirements-dev.txt`、`收益计算器.spec`、`app_icon.ico`，`config.py` 注释去「字体/主题色板」。
+### 2026-07-31 | 修复 | settings.json 测试污染（116/116）
+- 症状：跑 verify_all 后 settings.json 被测试态改写（theme/pinned/geometry 残留），需手动 `git restore`
+- 根因：每 UI 测试 `win.close()`→closeEvent→`_save_settings()` 写真实 SETTINGS_FILE
+- 修复：main() 启动把 SETTINGS_FILE 重定向 tmp_dir，finally 恢复——真实文件全程零读写（强杀也无污染窗口）；附带收益：测试从「读用户真实设置」变确定性默认态；删死 import
 
-**CODE_WIKI.md**：版本行 + §一 开发阶段补 O-07~O-19（含 O-07 YAGNI 关闭）；§4.6 theme.py 改「内联定义 THEMES（T-02 迁入，不再从 config.py 导入）」+ 行数 243→371；§4.8 config.py 删除已迁走的主题色板/函数表（~127→~20 行，补指向 §4.6）；§2.1 架构图、§5.2/§5.3 依赖表同步（theme.py 无外部依赖、main.py 导入清单补全）；§三 `__init__.py` 注释去「重导出主题函数」。
+### 2026-07-31 | 实现 | C2 DayRecord 生命周期收敛到 logic 层（`240d72b`，116/116）
+- logic 新增 `delete_record`/`rotate_weekly`/`summary`，成工作 dict 唯一所有者；MainWindow 视图减负（删 self.data/_rotate_weekly，构造时经 `ProfitCalculatorLogic(self.store.load())` 注入）；`_update_summary` 仅格式化展示；verify_all 适配；测试 +10
+- code-review：Spec 8/8 等价（0→数据不足/1→仅1条/≥2→末日−首日）、Standards 合规、无循环 import；3 小项待处理（`_update_summary` 4 行重复块可合并 / PROJECT_REFERENCE:212 残留引用 / TO-TICKETS 清空 T-01~05 待确认）
 
-**PROJECT_REFERENCE.md**：精简为项目介绍（概述/数据模型/关键决策/常碰坑点），删除与 CODE_WIKI 重复且易漂移的技术细节（文件布局/模块行数/测试计数/UI ASCII 图/「与 Agent 合作建议」整节），技术细节统一指向 CODE_WIKI——根治双文档漂移（O-19 同因）。
-
-**验证**：纯文档改动，未触碰代码，pytest 180/180 不受影响。
-
----
-
-### 2026-08-01 | 运维 | .gitignore + settings.json | O-18 settings.json 运行态入库清理（出索引 + gitignore）
-
-**O-18**（P2，运维）：`settings.json` 内容为运行时态（窗口几何 + theme 随切换翻转），仍在 git 跟踪导致每次改主题/拖窗口都污染提交 diff（`082ce62` 已附带提交一次翻转）。拍板选 **A**：
-- `.gitignore` Runtime data 节 `data.json` 旁追加 `settings.json`；`git rm --cached settings.json` 出索引（磁盘文件保留，本次提交表现为 `deleted: settings.json`）。
-- 运行态零变化：`_load_settings` 读磁盘，缺失/损坏返回默认 `{}`（O-09 保证），无需代码改动。
-- 与 data.json 隔离惯例一致（`95b7eef`）；此后主题/几何改动不再进入提交。
-
-**验证**：`git status` 确认 settings.json 已出索引且被 ignore；纯版本控制调整，未触碰代码，pytest 无影响。
-
----
-
-### 2026-08-01 | 文档同步 | CODE_WIKI.md | O-19 CODE_WIKI 失同步修正（方法表/依赖版本/测试计数）
-
-**O-19**（P3，文档）：`082ce62` 声称「同步 CODE_WIKI」但留下三处失实引用，本次以源码/实测为准一次性修正：
-- §4.7 方法表：`rotate_weekly` 返回 `None` → `list[str]`（O-14 起返回被删除日期列表）；`get_weekly_records` → `recent_records`、`summary` 去 `end_date`（承接同批 O-17 重构）。
-- §3 / §5.1 依赖：`PySide6>=6.6.0` / `pyqtgraph>=0.13.0` → `==6.11.1` / `==0.14.0`，pytest `==9.1.1`；§3 补 `requirements-dev.txt` 行。
-- §7 测试计数：以 `pytest --collect-only` 实测为准（calculator 54→57、data_store 16→18、input_panel 12→18、ui_smoke 22/23→26 归一），合计 165→180；§7 覆盖范围补 O-08/09/11/13/14 用例描述。
-- §一 / §6.1 / §7 / §十 中「7 日 / 7 天」表述统一为「最近 7 条 / 保留条数限制」，与 README/PROJECT_REFERENCE 同批同步。
-
-**验证**：`pytest --collect-only` 确认逐文件计数与总数 180 一致；pytest 180/180 ✅。
-
----
-
-### 2026-08-01 | 修复+重构 | calculator.py + main_window.py + tests | O-17 清理文案与轮转语义不符 + 显示基准统一为录入条数
-
-**O-17**（P3，文案准确性）：`rotate_weekly` 按「记录数」轮转（保留最近 7 条），但保存提示写「（自动清理 N 条超 7 天记录）」——间断录入时暗示按日历年龄删除，误导。改「（已保留最近 7 条记录，自动清理 N 条较早记录）」；`rotate_weekly` logger「删除超期记录」改「删除最旧记录（保留最近 %d 条）」。
-
-**显示基准统一为录入条数**（用户拍板，本次核心改动）：
-- 现象：表格/图表/汇总此前走 `get_weekly_records(today, 7)`（最近 7 个日历天窗口），间断录入时保留在 data 的老记录（>6 个日历天前）从界面消失，表现为「按现实时间 7 天清出数据」。
-- 改动：`get_weekly_records` → `recent_records(days)`（最近 days 条实际录入记录，按日期升序、无空位占位、跳过无效记录）；`MainWindow._get_records` / `logic.summary` 改用它；`summary` 去掉 `end_date` 参数，汇总标签「7日总盈亏」→「最近7条总盈亏」。轮转 `rotate_weekly` 维持按条数（本就正确），本次不改。
-- 效果：间断录入时，保留的最近 7 条记录在清理前始终可见；超过 7 条时才删最旧。
-- 测试：`get_weekly_records` 6 项 → `recent_records` 6 项（含 caps_to_days / skips_malformed）；`summary` 去掉 invalid_date、新增 `test_summary_caps_to_recent_days`（间断录入的较老记录不参与汇总）；`test_save_triggers_rotation_hint` 断言新文案。
-
-**验证**：pytest 180/180 ✅。
-
----
-
-### 2026-08-01 | 决策拍板 | TO-TICKETS + calculator.py | O-16 CSV 大额 K/M 精度（保持现状，文档注明取舍）
-
-**拍板**：O-16（CSV 导出 ≥1e6 金额被 `format_money` 缩写为 K/M、丢失全值精度，Excel 不可求和）选 **A 保持现状**。
-- A/B/C 三选项：A 保持现状（仅文档注明取舍）；B CSV 专用千分位全值（如 `1,234,567.89`，引号包裹，Excel 可求和但 pandas 默认读成字符串）；C 纯数值（如 `1234567.89`，Excel/pandas 开箱即算、实现最简、彻底移除 K/M 分支）。
-- 理由：CSV 主消费场景为 Excel 人工查看，与界面显示一致优先于机器可读全值；B 的千分位逗号引号包裹是 pandas 默认解析的经典坑；C 为最优机器格式，留作后续「机器可读导出」备选。
-- 落地：仅 `export_csv` docstring 补取舍说明，零行为变更；TO-TICKETS O-16 → ✅ 归档（新增「决策拍板」表）。
-- 附：收益率列「转纯数值」仅在 B/C 下成立，随 A 一并搁置。
-
-**验证**：`export_csv` 相关测试 7/7 通过（docstring 变更不触碰行为）。⚠️ 全量 pytest 当前红（16 failed + 27 errors）——并行 session 正重构 `calculator.py`（`get_weekly_records`→`recent_records`、`summary` 签名变更、`rotate_weekly` 语义），测试未同步，与本次 O-16 改动无关。
-
----
-
-**评审结论**：`/code-review` 双轴评审 `082ce62`（O-11~O-15）。五张工单实现与规格全部对齐（Spec 轴 0 缺失、新测试 4 项全过），无阻断性缺陷。**对个人用户影响整体低-中**，无 P0/P1 级问题；仅有少量值得做的清理，已拆分为 O-16~O-19 录入活跃表。
-
-**值得做的 4 项**（已录入 TO-TICKETS 活跃表，状态 📝）：
-| Ticket | 问题 | 优先级 |
-|--------|------|--------|
-| O-16 | CSV 导出大额（≥1M）金额被 `format_money` K/M 缩写、精度丢失，Excel 无法求和 | P2（决策） |
-| O-17 | 清理提示「超 7 天」与 `rotate_weekly` 记录数轮转语义不符 | P3 |
-| O-18 | `settings.json` 运行态（几何/主题翻转）入库，污染 diff，与 data.json 惯例不一致 | P2 |
-| O-19 | CODE_WIKI 失同步（`rotate_weekly` 签名 / 依赖版本 / 测试计数 165 vs 180） | P3 |
-
-**归档清理（删除冗余）**：C5「（待提交）」→ `0c6b8e3`；O-06「（随本提交）」→ `0f16e1c`；O-08/O-09「（随本提交）」→ `d0af4d6`，消除归档表占位符冗余。
-
-**评审中判定不值得做（未录入）**：theme.py 84 行调色板重写 + input_panel 按钮色（`082ce62` 越界改动，但为已合并且生效的个人主题偏好，回退属返工）；`rotate_weekly` 返回列表仅用 `len()`（Speculative Generality，列表被测试使用，无害）；`closeEvent` 缺 `QCloseEvent` 注解（微小，随下次 main_window 改动顺手补）；O-15 无测试（纯配置重构，可接受）。
-
-**验证**：pytest 180/180 不受影响（纯文档/工单变更，未触碰代码）。
+### 2026-07-31 | 实现 | C1 表格主题色 import 期冻结修复（`8a7b98a`，106/106 = 103+3）
+- 根因：模块顶层 `_SIGNAL_TO_COLOR`/`_PNL_TO_COLOR` 在 import 期调 `get_color()`，颜色冻结为 light（T-01 复发同一 bug）→ 改「信号→主题键」静态映射 + draw() 内实时 `get_color()` 解析；左右栏标题内联样式移入 draw()；删死代码链（`apply_theme`）
+- ⚠️ **持久避坑：绝不在模块顶层调 `get_color()`**；回归 3 项：dark 下收益率色==FG_POS、light/dark 渲染不同、AST 检查顶层无 get_color 调用
 
 ---
 
-**O-11 | CSV 导出金额统一格式化**（重构）：
-- `export_csv`：现金/仓库/较前日三列统一走 `format_money`（拍板：字符串格式与界面一致；代价是 Excel 中为文本不可直接求和）
-- 改用 stdlib `csv` 模块生成（`lineterminator="\n"`），含千分位逗号的字段（如 `"¥1,234.56"`）自动引号包裹，Excel 正确分列
-- 测试：原断言更新为 format_money 输出；新增 `test_export_csv_format_money_unified`（千分位引号包裹 + 消除 `0.30000000000000004` float 伪影）
+## Phase 4 — 架构深入优化 ✅（2026-07-30，T-01~T-05，`ea68a61`；基线 103/103）
 
-**O-12 | dev 依赖清单与版本锁定**（运维）：
-- `requirements.txt` 锁精确版本：`PySide6==6.11.1` / `pyqtgraph==0.14.0`（实测版本，配合 O-10 可复现 exe 构建）
-- 新增 `requirements-dev.txt`：`-r requirements.txt` + `pytest==9.1.1`，新环境可精确复现测试
+- **T-01** 剥离展示层颜色：`RateSignal`/`PnLSignal` 枚举，`format_rate`/`get_pnl_label` 返回 (str, signal)；calculator 不再 import config
+- **T-02** 主题系统收敛 `app/theme.py`（内联 THEMES，非重新导出）；config.py 仅留路径/日期/字体
+- **T-03** MainWindow 依赖注入（`__init__(store=None, logic=None)`，默认行为不变）
+- **T-04** 4 个 UI 模块定义 `__all__`
+- **T-05** ChartWidget 拆分 `_ChartPanel`（实例变量 22→4，600→327 行，-45%）
+- 来源：Python Architecture Review 2026-07-30（`python-arch-review-20260730T120000.html`），5 候选 T-01~T-05（P0~P4），顶层建议 T-01 先行
 
-**O-13 | 编辑态关闭窗口确认**（功能）：
-- `closeEvent`：`input_panel.is_editing() or is_reusing()` 时弹 `QMessageBox.question`「当前有未保存的编辑，确定退出？」，No → `event.ignore()` 拦截
-- 测试 `test_close_while_editing_asks_confirmation`：mock 确认框断言 `close()` 返回值（No→False / Yes→True）；用例结束 `cancel_edit()` 恢复非编辑态，避免 fixture 收尾 close 在 offscreen 下触发真实模态框挂起（踩坑：`isHidden()` 对从未 show 的顶层窗口恒为 True，改用 close() 返回值断言）
+## Phase 3 — 架构深度优化 P0-P5 ✅（2026-07-28~29）
 
-**O-14 | 7 日自动删除的可见性**（功能）：
-- 拍板「仅可见性提示」。`rotate_weekly` 改为返回被删除日期列表（升序），每条删除 `logger.info`；`save_today` 把「（自动清理 N 条超 7 天记录）」拼到已保存指示器
-- 测试：`test_rotate_weekly_logs_deletion`（caplog）+ `test_save_triggers_rotation_hint`（8 条数据保存后提示 + 裁剪到 7 条）
-- 「保留天数可配置」未做，如需另立候选工单
+- P0 删 Tkinter 迁移残留（5 文件/52KB）；P1 config 穿透合并；P2 删孤立模块级颜色常量（24 导出）；P3 `__all__` 补齐；P4 图表性能（FillBetweenItem 去重建/输入去抖/主题增量更新）；P5 单实例（QLocalServer 防多开）
+- 验证：pytest 103 ✅ + verify_all ✅；详情见 CONSENSUS.md
 
-**O-15 | 日志文件轮转**（重构）：
-- `main.py`：`logging.basicConfig` → `RotatingFileHandler(maxBytes=1MB, backupCount=3, encoding="utf-8")`；根 logger 已有 handler 时不重复添加（幂等）；日志级别保持 INFO（打包版无 stderr，文件日志是唯一通道）
+## Phase 2 — PySide6 迁移 ✅（~2026-07-28）
 
-**验证**：pytest 180/180（176 基线 + 4 新增）✅
+- Tkinter+matplotlib → PySide6（LGPL，Qt 官方绑定）+ pyqtgraph（原生 Qt 渲染）；保留全部功能（双字段输入/金额校验/K-M-B 后缀/JSON 原子写入+滚动备份/7 日滚动/亮暗主题/窗口置顶/PNG 导出）；新增收益率列、盈亏标签列、双栏表格（左 4 右 3）
 
----
+## Phase 1 — Tkinter 内增强 ✅
 
-### 2026-08-01 | O-08/O-09 | calculator.py + data_store.py + app/* | 现金≤仓库不变式校验 + 加载顶层 dict 校验
-
-**O-08 | 保存前校验 cash ≤ warehouse 不变式**（功能）：
-- `save_today()`：解析出 `cash > warehouse` 时 `QMessageBox.warning`「数据不合逻辑」并中断保存（UI 层硬拦截）
-- `InputPanel`：新增 `_update_invariant_state()`，跨字段检查挂在 `_update_save_btn_state`（每次字段校验后）；`MoneyLineEdit` 新增公开 seam `set_invariant_warning()`，越界时两输入框置 `validity="warning"` 态
-- `app/theme.py`：新增 `BORDER_WARNING` 色（light amber-600 / dark amber-200）+ `QLineEdit[validity="warning"]` QSS
-- `calculator.py`：业务层 `save_record` 仅 `logger.warning` 不拦截（允许保留已录入的异常数据并继续展示——拦截由 UI 层负责）
-- 测试 +6：越界警告边框 / 恢复自然态 / 边界相等不触发 / 空字段不触发 / 越界保存被拦截 / 边界相等允许
-
-**O-09 | 加载时顶层 dict schema 校验**（健壮性）：
-- `data_store._try_load`：`isinstance(data, dict)` 校验，合法 JSON 但顶层非 dict（如 `[]`）视为损坏 → 走备份恢复链（此前会 AttributeError 崩溃且备份链不触发）
-- `main_window._load_settings`：顶层非 dict 返回默认 `{}` + warning 日志
-- 测试 +3：data 顶层 list 触发备份恢复 / 全 list 返回空 / settings 顶层 list 返回默认
-
-**连带修复（测试夹具 bug）**：`tests/` 中 `DataStore(tmp_path/data.json)` 未传 `backup_file` → 默认指向真实 `data.json.bak*`；`load()` 的备份恢复链读取真实备份并 `_atomic_write` 到 tmp_path、`save()` 把测试数据写回真实备份（静默污染用户备份）。修复：显式传 `backup_file=tmp_path/data.json.bak`（test_input_panel + test_ui_smoke 共 6 处）。⚠️ 此前测试运行已把测试态数据写入真实 `data.json.bak*`（含虚假今日记录），待用户确认后从 `data.json` 恢复。
-
-**验证**：pytest 176/176（166 基线 + 10 新增）✅ | `data.json.bak*` mtime 不再变化（夹具隔离生效）
-
----
-
-### 2026-08-01 | 评审录入 | TO-TICKETS | 架构评估 O-08~O-15 候选落库
-
-**变更**：多维度架构评估（架构/数据可靠性/测试/打包/流程）8 项发现整理为活跃工单 O-08~O-15 录入 TO-TICKETS（仅录入，不实施）：
-
-| Ticket | 问题 | 优先级 |
-|--------|------|--------|
-| O-08 | 保存不校验 cash ≤ warehouse 不变式 | P1 |
-| O-09 | 加载不校验顶层 dict，坏结构启动崩溃 | P1 |
-| O-10 | 打包配置（spec + ico）未纳入版本控制 | P1 |
-| O-11 | CSV 导出差值裸写 float，显示不一致 | P2 |
-| O-12 | dev 依赖（pytest）未记录、依赖未锁版本 | P2 |
-| O-13 | 编辑态直接关窗数据静默丢失 | P2 |
-| O-14 | 7 日自动删除不可见（候选，关联 O-C2） | P2 |
-| O-15 | 日志文件无轮转 | P2 |
-
-**建议顺序**：O-08/O-09 优先（P1，数据完整性 + 启动健壮性）；O-10 打包配置入库与图标改动（`main.py` + `app_icon.ico` + 文档，见下条）未提交的变更一并处理。
-
-**验证**：pytest 166/166 ✅（评估后基线）
-
----
-
-### 2026-08-01 | 打包 | dist/收益计算器.exe + app_icon.ico | 应用图标落地（exe 文件 + 运行窗口）
-
-**变更**：
-- `收益计算器.spec`：`EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 内嵌图标（单文件版解压后供运行时读取）
-- `main.py`：新增 `_icon_path()`（打包版从 `sys._MEIPASS`、源码版从项目根目录解析）+ `app.setWindowIcon()` 设置窗口/任务栏图标
-- `app_icon.ico`：项目根目录新增图标（16~256px 多尺寸，来源 `D:\steam\...\8acb6477....ico`，用户指定）
-
-**验证**：pytest 166/166 ✅ | exe 启动烟测通过（双进程常驻 + 单实例锁）| 从 exe 提取图标与源文件一致 ✅
-
----
-
-### 2026-08-01 | O-06/07 | app/chart_widget.py | 图表稀疏提示落地 + O-07 关闭
-
-**O-06 | 图表稀疏数据提示**（功能）：
-- `ChartWidget.draw()` 中 `2 <= n <= 3` 时叠加半透明提示「数据较少，需更多数据以显示趋势」——避免刚开始用 app 的头两三天图表只有 2~3 个点、被误读为图表损坏
-- 新增 `_show_sparse_hint()`：overlay QLabel 不入 layout，作为顶层子控件覆盖图表；`WA_TransparentForMouseEvents` 保证鼠标事件透传给图表（不触碰交互）；与 `_placeholder_label` / `_clear_placeholder` 共用生命周期；`resizeEvent` 同步跟随 widget 尺寸
-- 测试 +1：`test_chart_sparse_data_hint`（n>=4 无提示 / n=3、2 有提示且不拦截鼠标 / n<2 回归占位）
-
-**O-07 | 收益率目标参考线**（关闭，YAGNI）：
-- 目标语义未定义：「收益率」为逐日环比（较前日），图表只画现金/仓库两条金额曲线、无收益率曲线，目标线画在哪条序列上无法解释
-- 实现需输入框 + settings 持久化 + InfiniteLine + 测试，成本高于收益，参照 O-C 系列先例关闭
-
-**验证**：pytest 166/166（165 基线 + 1 新增）✅
-
----
-
-### 2026-08-01 | 打包 | dist/收益计算器.exe | 重新打包（含 O-01~O-05）
-
-**产物**：`dist/收益计算器.exe`（83.3 MB，单文件，PyInstaller `--clean` 重建）
-
-**验证**：
-- pytest 165/165 通过 ✅
-- exe 启动烟测通过：双进程常驻（PyInstaller 单文件父子结构）→ 二次启动被单实例锁拦截（进程数保持 2）→ 强制结束干净退出 ✅
-- `profit_calculator.log` 日志通道就绪：O-01 的 `logging.basicConfig` 按 warning 惰性写文件，无异常时不生成文件属预期
-- `dist/` 残留 `settings.json`（上次烟测遗留）已清理
-
----
-
-### 2026-08-01 | O 系列（并行分发）| 全项目 | O-01~O-05 优化落地
-
-**模式**：O-04/05 论证不依赖 O-01~O-03，分两个 worktree 并行开发（A：O-01~O-03；B：O-04~O-05），合并冲突仅一处（`main_window.py` 模块级 logger 命名 `logger`/`_logger` → 收敛为 `logger`）。
-
-**O-01 | logging 替换静默 except**（`e6d5b64`，重构/可观测性）：
-- `app/main_window.py` `_load_settings` / `_save_settings`、`data_store.py` `_rotate_backups` 三处 `except: pass` → `logger.warning("...: %s", e)`
-- `main.py` 新增 `logging.basicConfig` 写 `APP_DIR/profit_calculator.log`（打包版窗口化 exe 无 stderr，文件日志是唯一可见通道）
-- 保留不动：`_setup_window` 几何恢复/DPI 的 `except Exception: pass`（工单外）；`calculator.py`/`data_store.py` 中 `return None` 的正常语义 except
-- 测试 +3：`test_rotate_backups_logs_warning_on_failure` / `test_load_settings_corrupt_logs_warning` / `test_save_settings_failure_logs_warning`
-
-**O-02 | MoneyLineEdit.refresh_validity 公开 seam**（`486d41f`，重构/seam）：
-- `MoneyLineEdit` 新增公开 `refresh_validity()` 委托私有 `_update_validity()`；`InputPanel.refresh_validity()` 改调公开方法——C4 公开 seam 体系漏网的最后一处跨对象私有访问收敛
-- 测试 +2：公开 seam 行为（valid/invalid/normal）+ AST 守卫（防 InputPanel 直调 `_update_validity` 复发，C9 风格）
-
-**O-03 | format_money docstring 阈值交叉说明**（`ac75c71`，文档）：docstring 补「与 `format_compact` 不同，此处 K 阈值为 1,000,000 而非 1,000」，与 C3 侧形成双向引用。纯注释。
-
-**O-04 | CSV 数据导出**（`8f50592`，功能）：
-- `calculator.py` 新增公开纯函数 `ProfitCalculatorLogic.export_csv()`：列 `日期,现金,仓库,较前日,收益率`，日期升序，较前日/收益率复用 `calculate_rate`/`format_rate` 语义（总收益 = 仓库已含现金），无前日数据为 `—`，异常记录跳过
-- `app/main_window.py` 标题栏新增 `export_btn`「导出 CSV」+ `QFileDialog` 选路径，`utf-8-sig` + `newline=""` 写入（Excel 可直接打开），失败弹 `QMessageBox.warning` + 记日志，成功 `set_saved_indicator("✓ CSV 已导出")`
-- `app/theme.py` `exportBtn` 并入 themeBtn/pinBtn QSS 按钮组
-- 测试 +10：纯函数 6（空/表头/单条/多条/升序/异常跳过）+ UI 4（按钮存在/utf-8-sig BOM/取消不写/失败警告）
-
-**O-05 | 今日未录入提醒**（`749cd59`，功能）：
-- `app/main_window.py` 标题栏新增 `_today_status_label`「今日未录入」，`_update_today_status()` 纯读 `logic.get_record(self.today)` 控制显隐，挂在 `refresh_display()`（启动/保存/删除/主题切换均刷新）
-- `app/theme.py` 新增 `QLabel#todayStatusLabel` QSS（`fg_today` 强调色）
-- 测试 +3：未录入可见 / 保存后隐藏 / 已有记录隐藏
-
-**验证**：pytest 165/165（147 基线 + 18 新增）✅ | 提交 `e6d5b64`/`486d41f`/`ac75c71`/`8f50592`/`749cd59` + merge `c01c2c2`/`fdeca85`
-
----
-
-### 2026-08-01 | C5 | tests/ + 全项目 | verify_all 影子测试并入 pytest
-
-**变更**：
-- 盘点 `verify_all.py` 14 节，确定迁移顺序：
-  - 第 1~3 节（calculator/formatting/datastore 叶子测试）→ 已被 `test_calculator.py`/`test_formatting.py`/`test_data_store.py` 覆盖，直接删除
-  - 第 4~11、13~14 节（UI 烟测）→ 迁移至新文件 `tests/test_ui_smoke.py`（offscreen，参照 `test_table_theme.py` 首个 Qt fixture）
-- 迁移改造点（深度私有访问 → 公开 seam，C4 契约）：
-  - 保存：`cash_entry.setText()` → `input_panel.fill_values()`（公开）
-  - 编辑：`win._start_edit()` → `input_panel.set_edit_mode()`（公开）
-  - 删除：`win._delete_record()` → `table.delete_requested.emit()`（公开信号）
-  - 主题/置顶：`win._toggle_theme()`/`_toggle_pin()` → `theme_btn.click()`/`pin_btn.click()`
-  - 输入校验：去抖 QTimer 异步 → 用 C4 seam `refresh_validity()` 同步断言
-  - 失焦格式化：手动模拟 → 派发真实 `focusOutEvent`
-  - 几何恢复：旧格式 `680x900+100+50` 与空 geometry 两种恢复无 crash
-- 删除 `verify_all.py`（831 行影子脚本）；settings.json 隔离、data.json 备份/恢复逻辑随之移除（pytest fixture 天然隔离，不再需要手动 backup/restore）
-- 文档同步：`CODE_WIKI.md`（7.1 用例数更新 + 7.2 改写为 pytest 烟测表 + 文件树 + 顶部测试状态）、`CONSENSUS.md`（4.3 验收标准）
-
-**验证**：pytest 147/147（134 既有 + 13 新增）✅ | `git status` 无 settings.json/data.json 污染
-
----
-
-### 2026-08-01 | C5 评审修复 | tests/ + README + PROJECT_REFERENCE | code-review 后续修复
-
-**变更**（对应 C5 评审发现，`/code-review` 双轴报告）：
-- 修复时间耦合回归（Spec 关键项）：`make_sample_data()` 由固定日期（2026-07-20~27）
-  改为相对今天生成（offsets 7/6/5/3/2/0），样本日始终落在 `[today-6, today]` 窗口内，
-  `test_ui_initialization` 的 `present > 0` 断言不再于 2026-08-03 后必失败；
-  编辑/删除测试改为从 `logic.data` 动态取日期，不硬编码样本日
-- 公开 seam 收敛：`test_settings_persistence` 改用 `win.close()`（closeEvent 落盘）
-  替代私有 `_save_settings()`；theme 断言由 `!= "light"` 恢复为 `== "dark"`（fixture 确定态）
-- fixtures 去重：`qapp`（3 处）/`settings_guard`（2 处）收敛到 `tests/conftest.py`，
-  `test_table_theme`/`test_input_panel`/`test_ui_smoke` 删除本地副本
-- 文档勘误：节号 `13~15`→`13~14`（verify_all 实际 14 节，本日志 + `test_ui_smoke.py` docstring/节标题）、
-  verify_all 行数 `825`→`831`、README 测试数 103→147、PROJECT_REFERENCE `116 项`→147
-  + 第四/八节 UI 测试描述改写（原「当前无 UI 测试」已过时）
-
-**验证**：pytest 147/147 ✅
-
----
-
-### 2026-07-31 | C6 | 全项目 | 浅层残留清扫
-
-**变更**：
-- 删除 `app/config.py` 空壳文件（grep 全仓确认零引用）
-- `config.py`: 删除 7 个无消费者的 `FONT_*` 元组常量，docstring 同步（`WEEK_DAYS` 等保留）
-- `calculator.py`: `PnL信号` → `PnLSignal`（Serena rename_symbol，全仓 3 文件同步）
-- `formatting.py`: `unformat_input_value` 死分支清理（`f"{v:.2f}"` 恒含小数点，三元 `else` 不可达）
-- 死 import 清理 6 文件：`main_window.py`（QTimer/QFont/QSizePolicy/QSpacerItem/APP_DIR/get_theme）、`chart_widget.py`（os/numpy/QFont/QHBoxLayout/QSizePolicy/get_theme）、`input_panel.py`（QSizePolicy/get_theme/format_money + 4 个死 `FONT_*` 本地常量）、`table_widget.py`（QSizePolicy）、`calculator.py`（format_money）、`verify_all.py`（traceback/patch/QTimer/get_color/get_theme/set_theme/DayRecord）
-- `CODE_WIKI.md`: 删除 config.py 常量表 FONT_* 行（含已迁走的 THEMES 行）
-
-**验证**：pytest 134/134 ✅ | verify_all 通过（同 4 项既有基线失败）| AST 扫描无残留死 import
-
----
-
-### 2026-07-31 | C7~C9 | app/input_panel.py + verify_all.py + tests | C4 评审后续三项
-
-**变更**：
-- **C7**（docstring 契约修正）：`get_cash_value()`/`get_warehouse_value()` docstring 改为「结构性非法数字抛 ValueError；清洗后为空的文本（如 `'abc'`）返回 None」——与 `parse_money_input` 实际语义对齐，消除「空输入」与「垃圾输入」的 docstring 误导
-- **C8**（检查标签改名）：`verify_all.py` `test_edit_mode` 两条 check 标签 `_editing_date` → `get_editing_date()`，不再指向已删除的 `MainWindow._editing_date` 实现细节
-- **C9**（seam 静态守卫）：新增 `test_main_window_has_no_direct_entry_access`——AST 扫描 `main_window.py` 源码，断言无 `cash_entry`/`warehouse_entry` 直取、无 `parse_money_input` 调用，即使行为等价测试回归也会被拦截
-
-**验证**：pytest 134/134 ✅（新增 1 项）| verify_all 通过（同 4 项既有基线失败）
-
----
-
-### 2026-07-31 | C4 | app/input_panel.py + app/main_window.py + verify_all.py + tests | InputPanel seam 成真
-
-**变更**：
-- `app/input_panel.py`:
-  - `get_cash_value()` / `get_warehouse_value()` 语义明确为「空输入 → None，非法 → 抛 ValueError」（原先吞掉 ValueError 返回 None，区分不了空与非法；二者原无调用者，语义变更无外部影响）
-  - 新增 `get_cash_raw()` / `get_warehouse_raw()` 原始文本 getter（供解析失败提示复用）
-  - 新增 `refresh_validity()`（供 `MainWindow._clear_focused_input` 清空后立即重校验，替代直取两个 `cash_entry._update_validity()`）
-- `app/main_window.py`: 收敛到公开 API，删除私有直取
-  - `save_today` 改走 `get_cash_raw()` / `get_cash_value()` 等公开 getter（不再 `cash_entry.text()` + `parse_money_input`）
-  - 删除 `self._editing_date` 字段——编辑状态单方归属 InputPanel，MainWindow 只查询 `is_editing()` / `get_editing_date()`
-  - `_delete_record` 判断编辑目标改用 `input_panel.get_editing_date()`
-- `verify_all.py`: `win._editing_date` ×2 → `win.input_panel.get_editing_date()`（适配新 API）
-- `tests/test_input_panel.py`: 新增 9 项回归测试（getter 语义 / raw getter / refresh_validity / 编辑状态归属 / `hasattr` 防 `_editing_date` 复发 / save_today 走公开 API 行为等价）
-
-**验证**：pytest 133/133（124 既有 + 9 新增）✅ | verify_all 通过（同 4 项既有基线失败，与本次无关）
-
----
-
-### 2026-07-31 | 打包 | dist/收益计算器.exe | 重新打包（含 C3 收尾 `_UNITS` 重构）
-
-**产物**：`dist/收益计算器.exe`（80 MB，单文件）
-
-**验证**：
-- pytest 124/124 通过 ✅
-- exe 启动烟测通过（双进程常驻 → 单实例锁生效，强制结束后正常退出）✅
-
----
-
-### 2026-07-31 | C3 收尾 | formatting.py + DEV_LOG | 单位↔因子对收敛为 `_UNITS` 共享表
-
-**变更**：
-- `formatting.py`: 新增私有升序表 `_UNITS = (("K", _K), ("M", _M), ("B", _B))`；
-  `format_compact` 改 `reversed(_UNITS)` 反向迭代（大单位优先）、`parse_money_input`
-  改正向迭代——消除两处内联 (后缀, 因子) 对，新增单位只需改一处（行为不变）
-- `DEV_LOG`: C3 记录补记 hover 精度变化为已批准偏离（见 C3 条目说明）
-
-**验证**：pytest 124/124 ✅ | 纯重构，无行为变化
-
----
-
-### 2026-07-31 | C3 | formatting.py + app/*.py + tests | 收敛三套 K/M/B 格式化 + 日期短格式去重
-
-**变更**：
-- `formatting.py`: 新增共享单位常量 `_K/_M/_B` 与公开 `format_compact(value, *, prefix="")`
-  （SI 阈值 K≥1e3 / M≥1e6 / B≥1e9，`.1f`，<1e3 整数）；`format_money` 与 `parse_money_input`
-  改用同一常量（输出不变）
-- `app/chart_widget.py`: `KMBAxisItem.tickStrings`（Y 轴，无前缀）与 `_ChartPanel._format_value`
-  （hover/端点，`prefix="¥"`）委托给 `format_compact`——消除两处阈值/精度各自漂移
-  （hover 原 `.2f`/`.1f` 混用 → 统一 `.1f`，符合「与 Y 轴一致」的原始意图）
-- 日期截取 `date_str[-5:]` 在 4 文件 6 处重复 → 新增 `format_short_date()` 统一替换
-  （`table_widget.py` ×3 / `main_window.py` ×2 / `chart_widget.py` ×1 / `input_panel.py` ×1）
-- `tests/test_formatting.py`: 新增 format_compact ×7 + format_short_date ×1
-
-**说明（含已批准偏离）**：相对工单提议有两处偏离，均已批准——
-1. API 形状：提议 `format_compact(value, *, currency=False)` → 实现为更通用的 `prefix`
-   字符串参数（轴无前缀、hover 带 ¥）
-2. hover 精度：`_ChartPanel._format_value` 原 `.2f`/`.1f` 混用 → 统一 `.1f`
-   （K/M 由 2 位降为 1 位，B 不变）——消除精度漂移并与 Y 轴一致
-
-**验证**：pytest 124/124 ✅ | verify_all 无新增失败（仍为 4 项既有基线失败）| 提交 `e3eff63`
-
----
-
-### 2026-07-31 | fix | verify_all.py | settings.json 污染修复：测试期间隔离真实设置文件
-
-**症状**：跑完 `verify_all.py` 后 `settings.json` 被改写（theme/pinned/geometry 残留测试态），需手动 `git restore settings.json`
-
-**根因**：每个 UI 测试 `win.close()` → `closeEvent()` → `_save_settings()` 写真实 `SETTINGS_FILE`；`test_theme_toggle` / `test_pin_toggle` 等未做临时替换，测试态主题被持久化（`test_settings_persistence` 虽已替换，但只在单测内局部生效）
-
-**修复**：
-- `main()` 启动时把 `app.main_window.SETTINGS_FILE` 重定向到 `tmp_dir/settings.json`，`finally` 中恢复引用——真实文件全程零读写，即使脚本被强杀也无污染窗口
-- 附带收益：测试从「读用户真实设置」变为「确定性默认态」，`test_pin_toggle` 不再受用户已置顶状态影响
-- 顺带删除 `verify_all.py` 死 import `from config import SETTINGS_FILE`（无引用）
-
-**验证**：pytest 116/116 ✅ | verify_all 跑完 `git status` 无 `settings.json` / `data.json` 改动（同 4 项既有失败，与本次无关）
-
----
-
-### 2026-07-31 | C2 | calculator.py + app/main_window.py + verify_all.py + tests | DayRecord 生命周期收敛到 logic 层
-
-**变更**：
-- `calculator.py`: `ProfitCalculatorLogic` 新增三个公共方法，成为工作 dict 的唯一所有者
-  - `delete_record(date_str)` — 删除记录，返回是否存在
-  - `rotate_weekly(days=WEEK_DAYS)` — 7 日保留策略（原 `MainWindow._rotate_weekly`）
-  - `summary(end_date, days)` — 7 日窗口总盈亏算术（原 `_update_summary` 业务部分），返回 `(记录数, 总盈亏)`
-- `app/main_window.py`: 视图减负，只做协调
-  - 删除 `self.data` 持有与 `_rotate_weekly`；构造时经 `ProfitCalculatorLogic(self.store.load())` 一次注入数据对象
-  - `save_today` / `_delete_record` 走 `logic.save_record` / `logic.rotate_weekly` / `logic.delete_record`，持久化改用 `store.save(logic.data)`
-  - `_update_summary` 不再接收 records、不做算术，改为读取 `logic.summary()` 仅格式化展示
-- `verify_all.py`: `win.data` → `win.logic.data`，`win._rotate_weekly()` → `win.logic.rotate_weekly()`（适配新 API）
-- `tests/test_calculator.py`: 新增 10 项测试（delete_record ×2 / rotate_weekly ×2 / summary ×6）
-
-**验证**：pytest 116/116 ✅ | verify_all 通过（同 4 项既有失败，与本次改动无关，已 A/B 确认基线一致）
-
-**code-review（C2，双轴并行）**：
-- ✅ Spec：8/8 需求全部落地，行为与重构前逐点等价（0→数据不足 / 1→仅1条 / ≥2→末日−首日）；"工作 dict 唯一所有者"成立（`main_window.py` 无残留 `self.data` 突变）；无循环 import
-- ✅ Standards：无文档规范违规；`ProfitCalculatorLogic` 三新方法 type hints + docstring 齐全，UI/业务分离改善
-- ⚠️ 待处理小项（judgement call）：
-  1. `_update_summary` 引入 4 行重复块（`数据不足` 与 `仅1条` 两分支 setStyleSheet 相同）→ 可合并
-  2. `PROJECT_REFERENCE.md:212` 仍引用已删除的 `MainWindow._rotate_weekly()`（同文件已改，漏网）
-  3. `TO-TICKETS.md` 清空 T-01~T-05 工单体非 C2 规格要求（拟意清扫，待确认保留）
-- 📌 工作区改动未提交（C2 + 文档 + TO-TICKETS 清理），待确认后 commit
-
----
-
-### 2026-07-31 | 打包 | dist/收益计算器.exe | 重新打包（含 C1 主题色修复）
-
-**产物**：`dist/收益计算器.exe`（83.3 MB，单文件）
-
-**验证**：
-- pytest 106/106 通过 ✅
-- exe 启动烟测通过（进程正常常驻后强制结束）✅
-- warn-收益计算器.txt 仅剩 Windows 无关的 POSIX 模块与可选 scipy 缺失，无实质风险
-
----
-
-### 2026-07-31 | C1 | app/table_widget.py + tests/test_table_theme.py | 修复表格主题色 import 期冻结
-
-**变更**：
-- `app/table_widget.py`: 信号→颜色映射改为「信号→主题键」静态映射 + 渲染时 `get_color()` 解析
-  - 删除模块顶层 `_SIGNAL_TO_COLOR` / `_PNL_TO_COLOR`（import 期调用 `get_color()`，颜色冻结为 light 色板——T-01 复发的同一 bug）
-  - 新增 `_signal_color()` / `_pnl_color()` helper，draw() 内实时解析当前主题色
-  - 左右栏标题 `_left_title` / `_right_title` 内联样式移入 draw()（原在 `__init__` 冻结主题色）
-  - 删除死代码链：`_DaySubTable.apply_theme`（pass）与 `TableWidget.apply_theme`（无人调用；主题路径实为 `refresh_display → draw`）
-- `tests/test_table_theme.py`: 新增 3 项回归测试（首个 Qt offscreen fixture）
-  - 动态：dark 主题下收益率列前景色 == dark FG_POS（修前失败，修后通过）
-  - 动态：light/dark 渲染颜色不同（证明无冻结）
-  - 静态：AST 检查 table_widget 顶层（非函数体）无 `get_color()` 调用——防复发
-
-**验证**：pytest 106/106（103 既有 + 3 新增）✅ | verify_all 通过（同 4 项既有失败，与本次改动无关）
-
----
-
-### 2026-07-30 | ✅ T-05 | app/chart_widget.py | ChartWidget 拆分 `_ChartPanel`
-
-**变更**：
-- 新增 `_ChartPanel(QWidget)` 内部类，封装单个图表面板（PlotWidget + 曲线 + 填充 + hover + 端点标注）
-- `ChartWidget.__init__` 实例变量从 22 个（top/bottom 对称）降至 4 个（2 个 Panel 引用 + 占位 + 菜单）
-- `_create_chart()` / `_update_chart()` / `_update_theme_colors()` 的 top/bottom 重复逻辑消除
-- `_on_mouse_moved` 迁入 `_ChartPanel`，无需 `which` 参数分派
-- 文件行数从 600 → 327（缩减 45%）
-
-**验证**：pytest 103/103 ✅ | verify_all 通过（同 4 项既有失败）
-
----
-
-## Phase 4 — 架构深入优化 ✅（已完成）
-
-> **目标**：在第三阶段 P0-P5 基础清理之上，进一步推进架构深度——消除业务层与展示层的耦合、收敛路由表面、引入注入点、消除图表面板重复。
-
-### 2026-07-30 | ✅ T-04 | app/*.py | UI 模块定义 `__all__`
-
-**变更**：
-- `app/main_window.py`: 新增 `__all__ = ["MainWindow"]`
-- `app/input_panel.py`: 新增 `__all__ = ["MoneyLineEdit", "InputPanel"]`
-- `app/table_widget.py`: 新增 `__all__ = ["PnLBadge", "TableWidget"]`
-- `app/chart_widget.py`: 新增 `__all__ = ["ChartWidget"]`
-
-**验收**：pytest 103/103 ✅ | verify_all 通过（同 4 项既有失败）
-
----
-
-### 2026-07-30 | ✅ T-03 | app/main_window.py | MainWindow 依赖注入接口
-
-**变更**：
-- `app/main_window.py`: `__init__()` 新增可选参数 `store` 和 `logic`；使用 `store or DataStore()` / `logic or ProfitCalculatorLogic(self.data)` 模式，默认行为不变
-- 原有 `MainWindow()` 无参调用无需任何修改
-
-**验收**：pytest 103/103 ✅ | verify_all 通过（同 4 项既有失败）
-
----
-
-### 2026-07-30 | ✅ T-01 | calculator.py | 从业务逻辑中剥离展示层颜色
-
-**变更**：
-- `calculator.py`: 新增 `RateSignal`、`PnL信号` 枚举；`format_rate()` 返回 `(str, RateSignal)`；`get_pnl_label()` 返回 `(str, PnL信号)`；移除 `from config import get_color`
-- `app/table_widget.py`: 新增 `_SIGNAL_TO_COLOR`、`_PNL_TO_COLOR` 字典；运行时映射信号→颜色
-- `tests/test_calculator.py`: 断言改为检查枚举值
-- `verify_all.py`: 修复直接访问 QTableWidget API 的问题
-
-**验收**：pytest 103/103 ✅ | verify_all 通过（4 项既有失败无关）
-
-### 2026-07-30 | ✅ T-02 | app/theme.py | 主题系统收敛至 app/theme.py
-
-**变更**：
-- 将 `THEMES`、`get_color()`、`set_theme()`、`get_theme()` 从 `config.py` 移至 `app/theme.py`（内联定义，非重新导出）
-- `app/__init__.py` 移除主题函数的重新导出
-- `config.py` 仅保留路径、日期格式、字体常量
-- 所有消费者统一从 `app.theme` 导入
-
-**验收**：pytest 103/103 ✅ | verify_all 通过（同 4 项既有失败）
-
-### 2026-07-30 | 架构评审 | Python Architecture Review
-
-**范围**：全项目 16 个 Python 模块  
-**方法**：`/improve-python-architecture` — 逐项检查摩擦信号  
-**输出**：[`python-arch-review-20260730T120000.html`](./python-arch-review-20260730T120000.html)
-
-**发现 5 个候选优化项**（详见 [`TO-TICKETS.md`](./TO-TICKETS.md)）：
-
-| # | 候选 | 信号类型 | 优先级 |
-|---|------|----------|--------|
-| T-01 | `ProfitCalculatorLogic` 返回颜色字符串 — 边界泄漏 | 边界泄漏 | **P0** |
-| T-02 | 主题系统碎片化 — 三个导入路径到同一函数 | 透传 __init__ | **P1** |
-| T-03 | MainWindow 缺乏 DI seam — 硬创建依赖 | 胖委托者 | **P2** |
-| T-04 | 4 个 UI 模块缺乏 `__all__` | 未定义表面 | **P3** |
-| T-05 | ChartWidget 内部状态扩散 — 20+ 实例变量 | 胖委托者 | **P4** |
-
-**顶层建议**：优先处理 T-01——剥离颜色耦合后，`calculator.py` 不再导入 UI 模块，为 T-02（将主题数据移至 `app/theme.py`）解锁路径。
-
----
-
-## Phase 3 — 架构深度优化 P0-P5 ✅（已完成）
-
-> **时间**：2026-07-28 ~ 2026-07-29  
-> **详情**：见 [`CONSENSUS.md`](./CONSENSUS.md) 第四节
-
-### 2026-07-29 | 完成 | 全部五项
-
-- [x] **P0** — 删除 Tkinter 迁移残留（5 文件 / 52 KB）
-- [x] **P1** — config 穿透合并（`app/config.py` 停止重新导出）
-- [x] **P2** — 删除孤立模块级颜色常量（24 个导出名称）
-- [x] **P3** — 为 `calculator.py`, `formatting.py`, `data_store.py`, `app/__init__.py` 定义 `__all__`
-- [x] **P4** — 图表性能优化（FillBetweenItem 去重建、输入去抖、主题增量更新）
-- [x] **P5** — 单实例保证（QLocalServer 防多开）
-
-**验证**：`pytest` 103 项通过 ✅ | `verify_all.py` 全量通过 ✅
-
----
-
-## Phase 2 — PySide6 迁移 ✅（已完成）
-
-> **时间**：2026-07-?? ~ 2026-07-28
-
-从 Tkinter + matplotlib 迁移至 PySide6 + pyqtgraph。
-
-- 新框架：PySide6（LGPL，Qt 官方绑定）
-- 新图表库：pyqtgraph（原生 Qt 渲染）
-- 保留了所有功能：双字段输入、金额校验、K/M/B 后缀、JSON 原子写入与滚动备份、7 日滚动、亮暗主题、窗口置顶、PNG 导出
-- 新增：收益率列、盈亏标签列、双栏表格布局（左 4 右 3）
-
----
-
-## Phase 1 — Tkinter 内增强 ✅（已完成）
-
-> **时间**：2026-07-?? ~ 2026-07-??
-
-在 Tkinter 版本上新增功能：
-- 表格新增"收益率"列（1 位小数，红涨绿跌）
-- 表格新增"盈亏标签"列（单字盈/亏 + 彩色圆角 Badge）
-- 计算逻辑单元测试通过（70 → 106 项全部 PASS）
+- 新增收益率列（1 位小数，红涨绿跌）+ 盈亏标签列（单字盈/亏 + 彩色圆角 Badge）；测试 70→106 PASS
