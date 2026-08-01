@@ -6,6 +6,20 @@
 
 ---
 
+### 2026-08-01 | 运维+打包 | %TEMP% + 收益计算器.spec + dist/收益计算器 | O-21 打包 UPX 压缩瘦身 + O-20 待办闭环（_MEI 残留清理）
+
+**O-20 待办闭环（`%TEMP%` 孤儿 `_MEI*` 清理）**：单文件模式遗留的 5 个 `_MEI*` 解压目录（各 181M，共 905MB，确认无进程占用）已 `rm -rf` 清除，O-20 日志「待办」闭环。
+
+**UPX 安装**：winget 装 UPX 5.2.0（`UPX.UPX`，官方 releases 直连验证可下载），`upx.exe`（615K）复制到用户指定工具目录 `D:\Desktop\tools\UPX\`。
+
+**spec 压缩开启**：`upx=False`→`upx=True`（EXE + COLLECT 两处 + 头部注释）。⚠️ PyInstaller 不读 `UPX_DIR` 环境变量（仅 `--upx-dir` CLI / PATH 搜索），构建命令须显式 `pyinstaller --upx-dir D:/Desktop/tools/UPX`。
+
+**结果**：dist `收益计算器/` 117M → 64M（-45%）。未达 ~45MB 理论值：Qt6*.dll 与 MSVCP*/VCRUNTIME 为 CFG（Control Flow Guard）构建，PyInstaller 自动跳过 UPX（`Disabling UPX ... due to CFG`）防损坏；实际压缩的是 8 个 Qt *.pyd 与 Python 扩展（UPX `--lzma`）。CFG 检测是 PyInstaller 6.x 的安全行为，不强压（强压会损坏 DLL）。
+
+**验证**：exe 启动烟测通过（进程常驻 ~180MB 无崩溃，二次实例被单实例锁拦截，taskkill 干净退出）；pytest 180/180 ✅（源码零改动，spec 不影响测试）；`upx -t` 确认 QtCore.pyd packed / Qt6Core.dll 未 packed（CFG 跳过符合预期）。
+
+---
+
 ### 2026-08-01 | 打包 | 收益计算器.spec + main.py | O-20 打包 onedir 化 + 体积瘦身（exe 过大 + 启动慢）
 
 **背景**：单文件 exe 80MB，每次启动把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；且 `%TEMP%` 残留 5 个孤儿 `_MEI` 目录（共 905MB，待用户确认后清理）。

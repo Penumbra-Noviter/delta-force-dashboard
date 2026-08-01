@@ -25,7 +25,8 @@
 #       GL 上下文（pyqtgraph PlotWidget 为 QPainter 光栅渲染），永不加载。
 #    5. 剔除未使用插件：tls（无 SSL）、networkinformation（无网络状态查询）。
 #
-# upx=False：本机未安装 UPX，此前 upx=True 一直是空转。
+# upx=True：UPX 5.2.0 已安装（D:/Desktop/tools/UPX/upx.exe），onedir 内 exe/DLL 经 UPX 压缩瘦身。
+# 若换机器未装 UPX，PyInstaller 会回退为不压缩，不影响产物正确性。
 # =============================================================================
 
 # 保留的 Qt 二进制（DLL）：运行所需 + link-time 依赖闭包
@@ -126,7 +127,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
@@ -142,7 +143,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=False,
+    upx=True,
     upx_exclude=[],
     name='收益计算器',
 )
