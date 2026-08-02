@@ -12,13 +12,12 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-02）：6 个深层化候选（grilling 拍板，源：2026-08-02 架构评审 `architecture-review-20260802.html`）。ADR-0001 已随 C 候选录入同日创建；D-01 已完成见归档。
+> 活跃表（2026-08-02）：5 个深层化候选（grilling 拍板，源：2026-08-02 架构评审 `architecture-review-20260802.html`）。ADR-0001 已随 C 候选录入同日创建；D-01~D-02 已完成见归档。
 
 ### 深层化候选（2026-08-02，grilling 已拍板）
 
 | Ticket | 标题 | 强度 | 拍板方案 | 依赖 |
 |--------|------|------|----------|------|
-| D-02 | 原子写 seam：`json_file.py` + `SettingsStore` | 🟡 Worth exploring | `json_file.py`（`atomic_write_json`/`try_load_json`）；新增 `SettingsStore`（容错读→`{}`、原子写→失败 warning）；MainWindow 只留编码/解码；CSV 不进 seam | 无 |
 | D-03 | 序列化边界：`data`→`dict[str, DayRecord]` + `serialize()` | 🟡 Worth exploring | ADR-0001；解析收敛 `__init__`；`serialize()` 返回新 dict（消灭别名）；`get_record` 退化一行查询；MainWindow 改走 `logic.serialize()` | 无 |
 | D-04 | 被测试的路径=真实路径：QTest 打事件链路 | 🟡 Worth exploring | QTest 打 textChanged→去抖→signal→按钮 / 失焦立即校验 / 聚焦反格式化护栏；`refresh_validity` 保留为同步 seam，不再当测试后门 | 无 |
 | D-05 | 现金⊆仓库不变式单一所有者 | ⚪ Speculative | `is_cash_under_warehouse(cash, warehouse)` 纯函数；三处字面量（告警/红框/拦截）改调用，语义不动 | 无 |
@@ -34,6 +33,7 @@
 | Ticket | 标题 | 强度 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
 | D-01 | 趋势判定收敛：`format_signed_money` 纯函数 | 🟢 Strong | 2026-08-02 | `cea6bb7` |
+| D-02 | 原子写 seam：`json_file.py` + `SettingsStore` | 🟡 Worth exploring | 2026-08-02 | `4a5ede4` |
 
 ### C 系列（2026-07-31）
 

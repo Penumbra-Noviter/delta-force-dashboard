@@ -8,15 +8,21 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **192/192** ✅（D-01 后）；基线演进 103→192，各阶段计数见下方条目
+- **测试**：pytest **204/204** ✅（D-02 后）；基线演进 103→204，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D-02~D-07 深层化候选；D-01 ✅（2026-08-02，见 TO-TICKETS 归档表）
+- **活跃工单**：D-03~D-07 深层化候选；D-01~D-02 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 重构 | D-02 原子写 seam：json_file.py + SettingsStore
+- `json_file.py`：`atomic_write_json`（.tmp→os.replace，失败清理并抛 OSError）+ `try_load_json`（容错读，缺失/解析失败返回 None，形状校验交调用方）；**CSV 不进 seam**（导出格式非持久化状态）；DataStore 保留其更丰富的写路径（备份+恢复），未改用 seam
+- `settings_store.py` `SettingsStore`：容错读（缺失→{} 静默 / 解析失败→warning+{} / 顶层非 dict→warning+{}）+ 原子写（失败仅 warning 不抛）；MainWindow 只留「编码/解码」——`_save_settings` 委托 `settings_store.save`，删静态 `_load_settings`，`__init__` 注入 `settings_store` 参数（默认 `SettingsStore(SETTINGS_FILE)`，settings_guard monkeypatch 兼容）
+- 行为等价性：warning 文案（读取失败/顶层非 dict/写入失败）与 D-02 前逐字一致，测试断言子串不变
+- 测试：原 test_ui_smoke 3 个设置容错测试移至 `tests/test_settings_store.py`（15 项新文件），test_ui_smoke 26→23；pytest 204/204 ✅（192-3+15）；CODE_WIKI 新增 4.11/4.12 + 依赖图/导入清单/测试表同步
 
 ### 2026-08-02 | 重构 | D-01 趋势判定收敛：format_signed_money 纯函数
 - `ProfitCalculatorLogic.format_signed_money(value) -> (str, RateSignal)`：None→`—` / 正→`+¥…` / 负→`¥-…` / 零→`¥0.00`（无 + 前缀）；较前日差值 / 总盈亏展示统一走它
