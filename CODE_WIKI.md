@@ -139,7 +139,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~502 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~505 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 

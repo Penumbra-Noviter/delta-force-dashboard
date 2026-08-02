@@ -102,8 +102,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("收益计算器")
 
         # 基础大小（双栏表格需更宽）
-        base_w, base_h = 820, 920
-        self.setMinimumSize(680, 700)
+        base_w, base_h = 820, 880
+        self.setMinimumSize(680, 650)
 
         # 恢复上次几何
         saved_geo = self._settings.get("geometry", "")
@@ -254,12 +254,15 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(table_card, 1)
         root_layout.addSpacing(8)
 
-        # ── 图表（卡片容器，置底固定高度，不随窗口扩张）──
+        # ── 图表（卡片容器，置底固定区间高度，不随窗口扩张）──
+        # 上限：PlotWidget 默认 sizeHint 480px，不设上限会吃掉整块纵向空间，
+        # 挤压表格（stretch=1）只剩 ~107px。卡在 [140, 220]，给表格让出空间。
         chart_card = self._build_card()
         chart_card_layout = QVBoxLayout(chart_card)
         chart_card_layout.setContentsMargins(12, 10, 12, 10)
         self.chart = ChartWidget()
-        self.chart.setMinimumHeight(220)
+        self.chart.setMinimumHeight(140)
+        self.chart.setMaximumHeight(220)
         chart_card_layout.addWidget(self.chart)
         root_layout.addWidget(chart_card, 0)
         root_layout.addSpacing(8)

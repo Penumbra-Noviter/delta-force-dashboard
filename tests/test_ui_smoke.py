@@ -91,7 +91,8 @@ def test_ui_initialization(sample_window):
 
     # 基本属性
     assert win.windowTitle() == "收益计算器"
-    assert win.minimumWidth() >= 560 and win.minimumHeight() >= 700
+    # 最小窗口随布局收紧（O 系列后下调）：图表封顶 + 表格获得更多纵向空间
+    assert win.minimumWidth() >= 560 and win.minimumHeight() >= 650
 
     # 子组件存在
     assert hasattr(win, "input_panel")

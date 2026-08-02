@@ -233,7 +233,7 @@ class ChartWidget(QWidget):
             axisItems={"left": left_axis, "right": right_axis}
         )
         self._plot_widget.setBackground(chart_bg)
-        self._layout.addWidget(self._plot_widget, 1)
+        self._layout.addWidget(self._plot_widget, 0)
 
         p1 = self._plot_widget.plotItem
         p1.showAxis("right")
