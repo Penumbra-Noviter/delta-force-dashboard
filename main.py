@@ -20,7 +20,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.main_window import MainWindow
 from config import APP_DIR, DATA_DIR, LOG_FILE
-from data_store import migrate_legacy_data
+from data_store import log_legacy_cleanup_hint, migrate_legacy_data
 
 # 单实例锁名称（全局唯一）
 _SERVER_NAME = "profit_calculator_singleton_lock"
@@ -104,6 +104,8 @@ def main() -> None:
     # ── 旧数据一次性迁移（O-22）：运行态数据统一到 ~/收益计算器 ──
     # 目标目录已有数据则跳过；旧数据保留原位置（复制非移动）。
     migrate_legacy_data(APP_DIR, DATA_DIR)
+    # 迁移完成后提示旧数据源可手动清理（F-02）：仅打日志，删除须用户手动确认。
+    log_legacy_cleanup_hint(APP_DIR, DATA_DIR)
 
     window = MainWindow()
     window.show()

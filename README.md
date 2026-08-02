@@ -45,7 +45,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（221 项测试，含 offscreen UI 烟测） |
+| 测试框架 | pytest（229 项测试，含 offscreen UI 烟测） |
 
 ---
 
@@ -53,7 +53,7 @@
 
 ### 方式一：直接运行打包版（推荐）
 
-前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（zip），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `C:\Users\<你的用户名>\收益计算器\`（开发版与打包版共用；旧版 exe 目录/项目根内的数据会在首次启动时自动迁移过去）。
+前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（zip），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `C:\Users\<你的用户名>\收益计算器\`（开发版与打包版共用；旧版 exe 目录/项目根内的数据会在首次启动时自动迁移过去；迁移完成后若旧源仍存在，启动时会提示可手动清理旧数据源，应用不会自动删除）。
 
 ### 方式二：从源码运行
 
@@ -107,7 +107,8 @@ profit-calculator/
 ├── config.py                # 路径、日期格式、数据保留条数
 ├── data_store.py            # JSON 持久化（原子写入 + 备份）
 ├── formatting.py            # 金额格式化与输入解析
-├── tests/                   # 测试（221 项，含 offscreen UI 烟测）
+├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
+├── tests/                   # 测试（229 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── 收益计算器.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）

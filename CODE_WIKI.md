@@ -1,8 +1,8 @@
 # 收益计算器 (Profit Calculator) — Code Wiki
 
-> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列全部完成）  
-> 生成日期：2026-07-29  
-> 测试状态：204 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维全部完成）  
+> 生成日期：2026-08-02  
+> 测试状态：229 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,8 +17,8 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（221 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）全部完成 |
+| 测试框架 | pytest（229 项） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）全部完成 |
 
 ---
 
@@ -95,16 +95,21 @@ Profit Calculator/
 ├── json_file.py             ← [持久化 seam] JSON 原子写 + 容错读（D-02）
 ├── settings_store.py        ← [持久化] SettingsStore — 设置容错读 + 原子写（D-02）
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
+├── scripts/                 ← [F-01 文档同步工具链] CODE_WIKI 机械标记生成/校验
+│   ├── doc_sync.py          ← 三类机械标记（lines/tests/sig）生成 + `--check` 校验（stdlib）
+│   ├── pre-commit.sh        ← pre-commit 钩子源：跑 `doc_sync.py --check` 拦截漂移
+│   └── install-hooks.bat    ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 73 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
-│   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
-│   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
-│   ├── test_input_panel.py  ← 21 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
-│   ├── test_table_theme.py  ← 4 个测试（C1 主题色实时解析 + D-01 零差值）
-│   ├── test_settings_store.py ← 18 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
-│   ├── test_migration.py    ← 7 个测试（O-22 数据目录迁移 + mkdir 顺序回归）
-│   └── test_ui_smoke.py     ← 22 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->73<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
+│   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
+│   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
+│   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
+│   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
+│   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
+│   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->22<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -120,21 +125,21 @@ Profit Calculator/
 
 ## 四、核心模块详细说明
 
-### 4.1 `main.py` — 程序入口（~92 行）
+### 4.1 `main.py` — 程序入口（<!--AUTO:lines:main.py-->~98 行<!--/AUTO-->）
 
 **职责**：启动 PySide6 应用，单实例保证，应用图标，事件循环管理。
 
 | 元素 | 说明 |
 |------|------|
 | `_SERVER_NAME` | 单实例锁名称 `"profit_calculator_singleton_lock"` |
-| `_is_already_running()` | 通过 QLocalServer 检测是否已有实例运行 |
-| `main()` | 高 DPI 设置 → 创建 QApplication → 单实例检查 → 创建 MainWindow → 事件循环 → 清理 |
+| <!--AUTO:sig:main.py:_is_already_running-->`_is_already_running()`<!--/AUTO--> | 通过 QLocalServer 检测是否已有实例运行 |
+| <!--AUTO:sig:main.py:main-->`main()`<!--/AUTO--> | 高 DPI 设置 → 创建 QApplication → 单实例检查 → 创建 MainWindow → 事件循环 → 清理 |
 
 **单实例机制**：使用 QLocalServer（Qt 原生方案），崩溃后自动清理残留 socket 文件。若已有实例运行则静默 `sys.exit(0)`。
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（~456 行）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~485 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -144,20 +149,20 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| `__init__()` | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
-| `_setup_window()` | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
-| `_build_ui()` | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
-| `_connect_signals()` | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
-| `save_today()` | 解析输入 → 验证 → 保存到 logic → 轮转保留最近 7 条 → 持久化 → 刷新显示 |
-| `refresh_display()` | 获取 records → 刷新汇总/今日未录入/表格/图表 |
-| `_export_csv()` | QFileDialog 选路径，utf-8-sig 写入 `logic.export_csv()`（O-04） |
-| `_update_today_status()` | 今日无记录时显示「今日未录入」，有则隐藏（O-05） |
-| `_start_edit(date_str, record)` | 进入编辑模式，回填数据到输入面板 |
-| `_cancel_edit()` | 退出编辑模式，清空输入框 |
-| `_delete_record(date_str)` | 确认对话框 → 删除数据 → 持久化 → 刷新 |
-| `_toggle_theme()` | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
-| `_toggle_pin()` | 切换窗口置顶状态 |
-| `_save_settings()` | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02） |
+| <!--AUTO:sig:app/main_window.py:MainWindow.__init__-->`__init__(store=None, logic=None, settings_store=None)`<!--/AUTO--> | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
+| <!--AUTO:sig:app/main_window.py:MainWindow._setup_window-->`_setup_window()`<!--/AUTO--> | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._build_ui-->`_build_ui()`<!--/AUTO--> | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._connect_signals-->`_connect_signals()`<!--/AUTO--> | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
+| <!--AUTO:sig:app/main_window.py:MainWindow.save_today-->`save_today()`<!--/AUTO--> | 解析输入 → 验证 → 保存到 logic → 轮转保留最近 7 条 → 持久化 → 刷新显示 |
+| <!--AUTO:sig:app/main_window.py:MainWindow.refresh_display-->`refresh_display()`<!--/AUTO--> | 获取 records → 刷新汇总/今日未录入/表格/图表 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._export_csv-->`_export_csv()`<!--/AUTO--> | QFileDialog 选路径，utf-8-sig 写入 `logic.export_csv()`（O-04） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._update_today_status-->`_update_today_status()`<!--/AUTO--> | 今日无记录时显示「今日未录入」，有则隐藏（O-05） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._start_edit-->`_start_edit(date_str, record)`<!--/AUTO--> | 进入编辑模式，回填数据到输入面板 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._cancel_edit-->`_cancel_edit()`<!--/AUTO--> | 退出编辑模式，清空输入框 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._delete_record-->`_delete_record(date_str)`<!--/AUTO--> | 确认对话框 → 删除数据 → 持久化 → 刷新 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._toggle_theme-->`_toggle_theme()`<!--/AUTO--> | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._toggle_pin-->`_toggle_pin()`<!--/AUTO--> | 切换窗口置顶状态 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._save_settings-->`_save_settings()`<!--/AUTO--> | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02） |
 
 #### 信号连接
 
@@ -172,7 +177,7 @@ Profit Calculator/
 
 ---
 
-### 4.3 `app/input_panel.py` — 输入面板（~294 行）
+### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~354 行<!--/AUTO-->）
 
 #### 类：`MoneyLineEdit(QLineEdit)`
 
@@ -180,13 +185,13 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| `__init__()` | 设置占位文本、右对齐、150ms 去抖 QTimer |
-| `_on_text_changed(text)` | 文本变化时重启去抖计时器 |
-| `_update_validity()` | 校验当前输入：空 → normal / 合法 → valid / 非法 → invalid |
-| `refresh_validity()` | 立即同步重校验当前文本（公开 seam，委托 `_update_validity()`，O-02；D-04 保留为同步 seam，行为用例走真实事件链路） |
-| `_set_validity_state(state)` | 设置 `validity` 属性，触发 QSS 重绘边框 |
-| `focusInEvent()` | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
-| `focusOutEvent()` | 失焦时格式化：`1234.56` → `¥1,234.56` |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.__init__-->`__init__(parent=None)`<!--/AUTO--> | 设置占位文本、右对齐、150ms 去抖 QTimer |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit._on_text_changed-->`_on_text_changed(text)`<!--/AUTO--> | 文本变化时重启去抖计时器 |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit._update_validity-->`_update_validity()`<!--/AUTO--> | 校验当前输入：空 → normal / 合法 → valid / 非法 → invalid |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.refresh_validity-->`refresh_validity()`<!--/AUTO--> | 立即同步重校验当前文本（公开 seam，委托 `_update_validity()`，O-02；D-04 保留为同步 seam，行为用例走真实事件链路） |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit._set_validity_state-->`_set_validity_state(state)`<!--/AUTO--> | 设置 `validity` 属性，触发 QSS 重绘边框 |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusInEvent-->`focusInEvent(event)`<!--/AUTO--> | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
+| <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusOutEvent-->`focusOutEvent(event)`<!--/AUTO--> | 失焦时格式化：`1234.56` → `¥1,234.56` |
 
 **信号**：`validity_changed(bool)`
 
@@ -194,23 +199,25 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| `_build()` | 构建现金/仓库输入行 + 保存按钮 + 取消编辑按钮 + 指示器 |
-| `_update_save_btn_state()` | 两个输入框都合法且非空时启用保存按钮 |
-| `set_edit_mode(date_str, cash, warehouse)` | 切换编辑模式，填充数据，改变按钮样式（橙色） |
-| `cancel_edit()` | 退出编辑模式，恢复默认状态 |
-| `is_editing()` / `get_editing_date()` | 编辑状态查询（**单方归属 InputPanel**，C4） |
-| `get_cash_value()` / `get_warehouse_value()` | 解析当前输入返回金额；空→`None`，非法→`ValueError`（C4 seam） |
-| `get_cash_raw()` / `get_warehouse_raw()` | 返回输入框原始文本（供解析失败提示） |
-| `refresh_validity()` | 立即重新校验两个输入框的有效性（经公开 seam，O-02；D-04 后仅供程序化改动，测试不再当后门） |
-| `fill_values(cash, warehouse)` | 填入金额并选中现金框（不触发焦点格式化） |
-| `clear_fields()` | 清空输入框，保留已保存指示器 |
-| `set_saved_indicator(text)` | 设置保存成功提示文本 |
-| `focus_cash()` | 聚焦现金输入框 |
-| `apply_theme()` | 更新标签颜色 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.__init__-->`__init__(parent=None)`<!--/AUTO--> | 初始化两个输入框与状态标志（C4 起单方归属输入状态） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel._build-->`_build()`<!--/AUTO--> | 构建现金/仓库输入行 + 保存按钮 + 取消编辑按钮 + 指示器 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel._update_save_btn_state-->`_update_save_btn_state()`<!--/AUTO--> | 两个输入框都合法且非空时启用保存按钮 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel._update_invariant_state-->`_update_invariant_state()`<!--/AUTO--> | 现金>仓库时置红框警告并禁用保存（O-08，不变式 D-05） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.set_edit_mode-->`set_edit_mode(date_str, cash, warehouse)`<!--/AUTO--> | 切换编辑模式，填充数据，改变按钮样式（橙色） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.cancel_edit-->`cancel_edit()`<!--/AUTO--> | 退出编辑模式，恢复默认状态 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.is_editing-->`is_editing()`<!--/AUTO--> / `get_editing_date()` | 编辑状态查询（**单方归属 InputPanel**，C4） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.get_cash_value-->`get_cash_value()`<!--/AUTO--> / `get_warehouse_value()` | 解析当前输入返回金额；空→`None`，非法→`ValueError`（C4 seam） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.get_cash_raw-->`get_cash_raw()`<!--/AUTO--> / `get_warehouse_raw()` | 返回输入框原始文本（供解析失败提示） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.refresh_validity-->`refresh_validity()`<!--/AUTO--> | 立即重新校验两个输入框的有效性（经公开 seam，O-02；D-04 后仅供程序化改动，测试不再当后门） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.fill_values-->`fill_values(cash, warehouse)`<!--/AUTO--> | 填入金额并选中现金框（不触发焦点格式化） |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.clear_fields-->`clear_fields()`<!--/AUTO--> | 清空输入框，保留已保存指示器 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.set_saved_indicator-->`set_saved_indicator(text)`<!--/AUTO--> | 设置保存成功提示文本 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.focus_cash-->`focus_cash()`<!--/AUTO--> | 聚焦现金输入框 |
+| <!--AUTO:sig:app/input_panel.py:InputPanel.apply_theme-->`apply_theme()`<!--/AUTO--> | 更新标签颜色 |
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（~332 行）
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~344 行<!--/AUTO-->）
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -228,8 +235,8 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| `draw(records, today, prev_warehouse)` | 逐行绘制：日期、现金、仓库、较前日差值、收益率、盈亏标签、操作按钮 |
-| `_create_action_buttons(date_str, record)` | 创建"编辑"+"删除"按钮，带 hover 样式 |
+| <!--AUTO:sig:app/table_widget.py:_DaySubTable.draw-->`draw(records, today, prev_warehouse=None)`<!--/AUTO--> | 逐行绘制：日期、现金、仓库、较前日差值、收益率、盈亏标签、操作按钮 |
+| <!--AUTO:sig:app/table_widget.py:_DaySubTable._create_action_buttons-->`_create_action_buttons(date_str, record)`<!--/AUTO--> | 创建"编辑"+"删除"按钮，带 hover 样式 |
 
 **7 列定义**：
 
@@ -249,31 +256,51 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| `draw(records, today)` | 拆分 records 为左右两栏，传递跨栏的 prev_warehouse 给右栏 |
+| <!--AUTO:sig:app/table_widget.py:TableWidget.__init__-->`__init__(parent=None)`<!--/AUTO--> | 构建左右两栏容器（各含标题 + _DaySubTable） |
+| <!--AUTO:sig:app/table_widget.py:TableWidget.draw-->`draw(records, today)`<!--/AUTO--> | 拆分 records 为左右两栏，传递跨栏的 prev_warehouse 给右栏 |
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（~413 行）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~448 行<!--/AUTO-->）
 
 #### 类：`KMBAxisItem(pg.AxisItem)`
 
 自定义 Y 轴刻度标签，将数值显示为 K/M/B 财务单位。
 
-#### 类：`ChartWidget(QWidget)`
+#### 类：`_ChartPanel(QWidget)`
 
-pyqtgraph 双曲线图组件。
+管理单个图表面板（一条曲线 + 填充区域 + hover 交互 + 端点标注），
+封装一个 PlotWidget 及其全部子元素，消除 ChartWidget 中 top/bottom 对称实例变量带来的代码重复。
 
 | 方法 | 说明 |
 |------|------|
-| `draw(records)` | n≥2 时渲染图表，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
-| `_create_chart(records)` | 从零创建上下双图 PlotWidget（仓库价值 + 现金） |
-| `_update_chart(records)` | 原地更新曲线数据（不重建 PlotWidget / FillBetweenItem） |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.__init__-->`__init__(label, color_key, line_style=Qt.PenStyle.SolidLine, symbol='s', series_name='', show_x_axis=False, parent=None)`<!--/AUTO--> | 惰性初始化面板：存配置 + 子元素引用为 None，等待首次 draw 创建 |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.draw-->`draw(x, values, dates)`<!--/AUTO--> | 首次渲染或更新数据：首次创建 PlotWidget，后续仅 setData 原地更新 |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.update_theme-->`update_theme()`<!--/AUTO--> | 主题切换后增量更新曲线/填充/轴/hover 颜色，不重建 |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.clear_panel-->`clear_panel()`<!--/AUTO--> | 销毁内部组件并重置状态 |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.plot_widget-->`plot_widget`<!--/AUTO--> | 属性：底层 pg.PlotWidget（惰性创建，未创建为 None） |
+| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.values-->`values`<!--/AUTO--> | 属性：当前面板数值缓存 |
+| `_create(x, values)` | 从零创建 PlotWidget + 曲线 + 填充 + 端点标注 + hover + 自适应 Y 轴 + 图例 |
+| `_update_data(x, values)` | 原地更新曲线/填充/端点/Y 轴/X 轴标签（不重建） |
+| `_on_mouse_moved(evt)` | 鼠标移动时显示最近数据点的竖线 + 数值标签 |
 | `_set_adaptive_ylim(plot_widget, values)` | 自适应 Y 轴范围（底部留 10%，顶部留 8%） |
-| `_setup_context_menu()` | 绑定右键菜单（导出 PNG） |
-| `export_png()` | 导出当前图表为 PNG 文件 |
-| `_clear_all()` | 销毁图表及占位组件 |
-| `apply_theme()` | 主题切换时增量更新颜色，不重建图表 |
-| `_update_theme_colors()` | 更新曲线/填充/背景/轴颜色 |
+
+#### 类：`ChartWidget(QWidget)`
+
+pyqtgraph 双曲线图组件，内部委托给两个 `_ChartPanel` 实例（上：仓库价值；下：现金）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.draw-->`draw(records)`<!--/AUTO--> | n≥2 时渲染双图，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_sparse_hint-->`_show_sparse_hint()`<!--/AUTO--> | n=2~3 时叠加半透明「数据较少」提示（不触碰曲线与交互） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.resizeEvent-->`resizeEvent(event)`<!--/AUTO--> | overlay 提示不参与 layout，手动跟随 widget 尺寸 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_placeholder-->`_show_placeholder(n)`<!--/AUTO--> | n=0 显示「暂无数据」，n=1 显示「至少需要两天数据」 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_placeholder-->`_clear_placeholder()`<!--/AUTO--> | 移除占位/稀疏提示 label |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._setup_context_menu-->`_setup_context_menu()`<!--/AUTO--> | 为两个 PlotWidget 绑定右键菜单（导出 PNG） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_context_menu-->`_show_context_menu(pos, source)`<!--/AUTO--> | 在指定位置弹出右键菜单 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.export_png-->`export_png()`<!--/AUTO--> | 导出当前图表为 PNG 文件 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_all-->`_clear_all()`<!--/AUTO--> | 销毁图表及占位组件 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换时增量更新两个面板颜色，不重建图表 |
 
 **图表结构**：
 
@@ -290,26 +317,26 @@ pyqtgraph 双曲线图组件。
 └─────────────────────────────────┘
 ```
 
-**性能优化**：使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅调用 `setData()`，避免重建。填充边界曲线 `_fill_curve_top` / `_fill_curve_bottom` 也持久化，消除了 Phase 3 之前的 FillBetweenItem 重建开销。
+**性能优化**：每个 `_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅调用 `setData()`，避免重建。填充边界曲线 `_ChartPanel._fill_curve` 也随面板持久化，消除了 Phase 3 之前的 FillBetweenItem 重建开销。
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（~391 行）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~362 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
 | 函数 | 说明 |
 |------|------|
-| `generate_qss(theme_name)` | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
-| `get_theme()` / `set_theme(name)` | 读取 / 切换当前主题（"light" \| "dark"） |
-| `get_color(key)` | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**） |
-| `signal_color(signal)` | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
+| <!--AUTO:sig:app/theme.py:generate_qss-->`generate_qss(theme_name)`<!--/AUTO--> | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
+| <!--AUTO:sig:app/theme.py:get_theme-->`get_theme()`<!--/AUTO--> / <!--AUTO:sig:app/theme.py:set_theme-->`set_theme(name)`<!--/AUTO--> | 读取 / 切换当前主题（"light" \| "dark"） |
+| <!--AUTO:sig:app/theme.py:get_color-->`get_color(key)`<!--/AUTO--> | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**） |
+| <!--AUTO:sig:app/theme.py:signal_color-->`signal_color(signal)`<!--/AUTO--> | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（~350 行）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~291 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -323,23 +350,23 @@ pyqtgraph 双曲线图组件。
 
 | 方法 | 参数 | 返回 | 说明 |
 |------|------|------|------|
-| `__init__` | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目并记 warning，ADR-0001——下次保存不再写回，自愈清除） |
-| `get_record` | `date_str: str` | `DayRecord \| None` | 一行查询；不存在返回 None（非法条目已由加载时解析过滤） |
-| `save_record` | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例） |
-| `serialize` | — | `dict` | 转磁盘持久化形态裸 dict（`{日期: {cash, warehouse}}`）；返回**新 dict**，与内部 data 断共享（ADR-0001） |
-| `last_record_before` | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
-| `recent_records` | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
-| `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
-| `format_rate` | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
-| `format_signed_money` | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
-| `is_cash_under_warehouse` | `cash, warehouse` | `bool` | 现金⊆仓库不变式判定（唯一所有者 D-05，告警/拦截/红框三处共用） |
-| `format_summary` | `count, total, days=7` | `(str, str)` | 汇总标签文本纯函数（D-07）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
-| `format_saved_indicator` | `save_date, warehouse, today, deleted, keep_days=7` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07） |
-| `get_pnl_label` | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
-| `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
-| `rotate_weekly` | `days=7` | `list[str]` | 保留最近 days 条实际录入记录，超过上限删除最旧；返回被删除日期列表（升序，O-14） |
-| `summary` | `days=7` | `(int, float \| None)` | 最近 days 条记录总盈亏（最新−最旧，录入条数语义） |
-| `export_csv` | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.__init__-->`__init__`<!--/AUTO--> | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目并记 warning，ADR-0001——下次保存不再写回，自愈清除） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.get_record-->`get_record`<!--/AUTO--> | `date_str: str` | `DayRecord \| None` | 一行查询；不存在返回 None（非法条目已由加载时解析过滤） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.save_record-->`save_record`<!--/AUTO--> | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.serialize-->`serialize`<!--/AUTO--> | — | `dict` | 转磁盘持久化形态裸 dict（`{日期: {cash, warehouse}}`）；返回**新 dict**，与内部 data 断共享（ADR-0001） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.last_record_before-->`last_record_before`<!--/AUTO--> | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.recent_records-->`recent_records`<!--/AUTO--> | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.calculate_rate-->`calculate_rate`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_rate-->`format_rate`<!--/AUTO--> | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_signed_money-->`format_signed_money`<!--/AUTO--> | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.is_cash_under_warehouse-->`is_cash_under_warehouse`<!--/AUTO--> | `cash, warehouse` | `bool` | 现金⊆仓库不变式判定（唯一所有者 D-05，告警/拦截/红框三处共用） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_summary-->`format_summary`<!--/AUTO--> | `count, total, days=7` | `(str, str)` | 汇总标签文本纯函数（D-07）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_saved_indicator-->`format_saved_indicator`<!--/AUTO--> | `save_date, warehouse, today, deleted, keep_days=7` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.get_pnl_label-->`get_pnl_label`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.delete_record-->`delete_record`<!--/AUTO--> | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.rotate_weekly-->`rotate_weekly`<!--/AUTO--> | `days=7` | `list[str]` | 保留最近 days 条实际录入记录，超过上限删除最旧；返回被删除日期列表（升序，O-14） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.summary-->`summary`<!--/AUTO--> | `days=7` | `(int, float \| None)` | 最近 days 条记录总盈亏（最新−最旧，录入条数语义） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.export_csv-->`export_csv`<!--/AUTO--> | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
 
 **关键业务规则**：
 - `data` 为 `dict[str, DayRecord]`（ADR-0001）；磁盘持久化走 `serialize()` 单向导出（返回新 dict，消灭 logic 与磁盘共享别名）；MainWindow 不直接触碰内部 data 形态
@@ -353,7 +380,7 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.8 `config.py` — 基础配置（~20 行）
+### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~21 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
@@ -370,18 +397,18 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.9 `data_store.py` — 数据持久化（~113 行）
+### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~159 行<!--/AUTO-->）
 
 #### 类：`DataStore`
 
 | 方法 | 说明 |
 |------|------|
-| `__init__(data_file, backup_file, max_backups=3)` | 初始化存储路径和备份数量 |
-| `load()` | 加载数据：主文件 → 损坏则依次尝试 bak.1 → bak.2 → bak.3 → bak → 空字典 |
-| `save(data)` | 保存数据：滚动备份 → 原子写入 |
-| `_try_load(path)` | 安全读取 JSON 文件，损坏返回 None |
-| `_atomic_write(data, target)` | 原子写入：先写 `.tmp`，再 `os.replace` 覆盖 |
-| `_rotate_backups()` | 滚动备份：bak.2→bak.3, bak.1→bak.2, 当前→bak.1 + bak；复制失败记日志不中断（O-01） |
+| <!--AUTO:sig:data_store.py:DataStore.__init__-->`__init__(data_file=DATA_FILE, backup_file=BACKUP_FILE, max_backups=3)`<!--/AUTO--> | 初始化存储路径和备份数量 |
+| <!--AUTO:sig:data_store.py:DataStore.load-->`load()`<!--/AUTO--> | 加载数据：主文件 → 损坏则依次尝试 bak.1 → bak.2 → bak.3 → bak → 空字典 |
+| <!--AUTO:sig:data_store.py:DataStore.save-->`save(data)`<!--/AUTO--> | 保存数据：滚动备份 → 原子写入 |
+| <!--AUTO:sig:data_store.py:DataStore._try_load-->`_try_load(path)`<!--/AUTO--> | 安全读取 JSON 文件，损坏返回 None |
+| <!--AUTO:sig:data_store.py:DataStore._atomic_write-->`_atomic_write(data, target)`<!--/AUTO--> | 原子写入：先写 `.tmp`，再 `os.replace` 覆盖 |
+| <!--AUTO:sig:data_store.py:DataStore._rotate_backups-->`_rotate_backups()`<!--/AUTO--> | 滚动备份：bak.2→bak.3, bak.1→bak.2, 当前→bak.1 + bak；复制失败记日志不中断（O-01） |
 
 **关键机制**：
 - **原子写入**：`.tmp` → `os.replace`，保证写入过程中进程崩溃不会损坏原文件
@@ -390,19 +417,31 @@ pyqtgraph 双曲线图组件。
 - **损坏恢复**：主文件 JSON 解析失败时自动从最近可用备份恢复，全部损坏则返回空字典
 - **日志**：备份复制失败仅记 `logger.warning`，不影响主流程保存（O-01）
 
+#### 模块级迁移函数（O-22 / F-02）
+
+| 名字 | 说明 |
+|------|------|
+| <!--AUTO:sig:data_store.py:migrate_legacy_data-->`migrate_legacy_data(legacy_dir, target_dir)`<!--/AUTO--> | 旧数据目录一次性迁移到统一目录；复制非移动、目标已有 `data.json` 跳过、失败仅 warning；成功后写 `.migrated` 完成标记（目标已权威也补写，幂等） |
+| `MIGRATED_MARKER_NAME` | `.migrated` 完成标记文件名（写入目标数据目录） |
+| <!--AUTO:sig:data_store.py:log_legacy_cleanup_hint-->`log_legacy_cleanup_hint(legacy_dir, target_dir)`<!--/AUTO--> | `.migrated` 标记存在且旧源 `data.json` 仍在时打 info 日志「旧数据源可手动清理」；绝不删源 |
+
+**源清理策略（F-02）**：源清理时间点 = 目标数据确认健康之后，由用户确认后手动执行。脚本绝不自动删源；删除必须是用户确认的手动动作。
+
 ---
 
-### 4.10 `formatting.py` — 金额格式化工具（~116 行）
+### 4.10 `formatting.py` — 金额格式化工具（<!--AUTO:lines:formatting.py-->~116 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
-| `format_money(value)` | 格式化显示：None→"—"，<1M→`¥x,xxx.xx`，≥1M→`¥x,xxx.xK`，≥100M→`¥x,xxx.xM` |
-| `parse_money_input(text)` | 解析输入：支持 `¥/￥/$`、千分位逗号、`K/M/B` 后缀、负号、空格；空值返回 None；非法格式抛 ValueError |
-| `is_valid_money_input(text)` | 校验输入合法性（空字符串为合法占位） |
-| `format_input_value(value)` | 输入框失焦时格式化（调用 `format_money`） |
-| `unformat_input_value(text)` | 输入框聚焦时反格式化：`¥1,234.56` → `1234.56`，尾零去除 |
-| `_normalize_numeric_string(text)` | 去除货币符号、逗号、空格，保留 `0-9`、`.`、`-` |
-| `_strip_invisible(text)` | 移除 Unicode 不可见字符（零宽空格、BOM 等） |
+| <!--AUTO:sig:formatting.py:format_compact-->`format_compact(value, *, prefix='')`<!--/AUTO--> | 紧凑 K/M/B 财务单位（SI 阈值 K≥1e3/M≥1e6/B≥1e9，低于 1e3 整数）；图表 Y 轴刻度与 hover/端点标注共用（D-01 收敛点） |
+| <!--AUTO:sig:formatting.py:format_short_date-->`format_short_date(date_str)`<!--/AUTO--> | 完整日期 `YYYY-MM-DD` 截取为短格式 `MM-DD`（表格/图表标题展示用） |
+| <!--AUTO:sig:formatting.py:format_money-->`format_money(value)`<!--/AUTO--> | 格式化显示：None→"—"，<1M→`¥x,xxx.xx`，≥1M→`¥x,xxx.xK`，≥100M→`¥x,xxx.xM` |
+| <!--AUTO:sig:formatting.py:parse_money_input-->`parse_money_input(text)`<!--/AUTO--> | 解析输入：支持 `¥/￥/$`、千分位逗号、`K/M/B` 后缀、负号、空格；空值返回 None；非法格式抛 ValueError |
+| <!--AUTO:sig:formatting.py:is_valid_money_input-->`is_valid_money_input(text)`<!--/AUTO--> | 校验输入合法性（空字符串为合法占位） |
+| <!--AUTO:sig:formatting.py:format_input_value-->`format_input_value(value)`<!--/AUTO--> | 输入框失焦时格式化（调用 `format_money`） |
+| <!--AUTO:sig:formatting.py:unformat_input_value-->`unformat_input_value(text)`<!--/AUTO--> | 输入框聚焦时反格式化：`¥1,234.56` → `1234.56`，尾零去除 |
+| <!--AUTO:sig:formatting.py:_normalize_numeric_string-->`_normalize_numeric_string(text)`<!--/AUTO--> | 去除货币符号、逗号、空格，保留 `0-9`、`.`、`-` |
+| <!--AUTO:sig:formatting.py:_strip_invisible-->`_strip_invisible(text)`<!--/AUTO--> | 移除 Unicode 不可见字符（零宽空格、BOM 等） |
 
 **单位后缀映射**（大小写不敏感）：
 - `K` → ×1,000
@@ -411,32 +450,32 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.11 `json_file.py` — JSON 原子写 seam（D-02，~52 行）
+### 4.11 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~41 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
-| `atomic_write_json(path, data)` | 原子写入：先写 `.tmp` 再 `os.replace`；失败清理临时文件并抛出 OSError，由调用方决定告警/降级 |
-| `try_load_json(path, on_error=None)` | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None；解析/IO 失败时若提供 `on_error`，以实际异常为参数调用（供调用方恢复带异常详情的告警） |
+| <!--AUTO:sig:json_file.py:atomic_write_json-->`atomic_write_json(path, data)`<!--/AUTO--> | 原子写入：先写 `.tmp` 再 `os.replace`；失败清理临时文件并抛出 OSError，由调用方决定告警/降级 |
+| <!--AUTO:sig:json_file.py:try_load_json-->`try_load_json(path, on_error=None)`<!--/AUTO--> | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None；解析/IO 失败时若提供 `on_error`，以实际异常为参数调用（供调用方恢复带异常详情的告警） |
 
 **范围**：通用 JSON 持久化 seam（当前消费方为 `SettingsStore`）。`DataStore` 保留其更丰富的写路径（滚动备份 + 损坏恢复），未改用本 seam；**CSV 不走本 seam**（CSV 是导出格式而非持久化状态，D-02 拍板）。
 
 ---
 
-### 4.12 `settings_store.py` — 设置持久化（D-02，~55 行）
+### 4.12 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~41 行<!--/AUTO-->）
 
 #### 类：`SettingsStore`
 
 | 方法 | 说明 |
 |------|------|
-| `__init__(settings_file=SETTINGS_FILE)` | 设置文件路径 |
-| `load()` | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning（含异常详情，D-02 前逐字文案）+ `{}`；顶层非 dict → warning + `{}` |
-| `save(settings)` | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题） |
+| <!--AUTO:sig:settings_store.py:SettingsStore.__init__-->`__init__(settings_file=SETTINGS_FILE)`<!--/AUTO--> | 设置文件路径 |
+| <!--AUTO:sig:settings_store.py:SettingsStore.load-->`load()`<!--/AUTO--> | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning（含异常详情，D-02 前逐字文案）+ `{}`；顶层非 dict → warning + `{}` |
+| <!--AUTO:sig:settings_store.py:SettingsStore.save-->`save(settings)`<!--/AUTO--> | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题） |
 
 **职责边界**：MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
 
 ---
 
-### 4.13 `signals.py` — 领域信号枚举（~32 行）
+### 4.13 `signals.py` — 领域信号枚举（<!--AUTO:lines:signals.py-->~23 行<!--/AUTO-->）
 
 | 枚举 | 说明 |
 |------|------|
@@ -539,10 +578,12 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 73 | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
-| `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
-| `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
-| `tests/test_settings_store.py` | 18 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
+| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->73<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
+| `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
+| `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
+| `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
+| `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 
 **运行方式**：在项目根目录执行 `pytest`
 
@@ -553,9 +594,9 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | 22 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
-| `tests/test_input_panel.py` | 21 | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
-| `tests/test_table_theme.py` | 4 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->22<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
+| `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
 **运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）
 
@@ -597,13 +638,25 @@ pip install pyinstaller
 python -m PyInstaller 收益计算器.spec --noconfirm
 ```
 
-**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `~/收益计算器`（O-22），与 exe 位置/重建解耦——`dist/` 每次构建整体覆盖也不影响用户数据。旧版 exe 目录/项目根内的数据在首次启动时由 `migrate_legacy_data` 自动复制（复制非移动，源保留）。
+**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `~/收益计算器`（O-22），与 exe 位置/重建解耦——`dist/` 每次构建整体覆盖也不影响用户数据。旧版 exe 目录/项目根内的数据在首次启动时由 `migrate_legacy_data` 自动复制（复制非移动，源保留）。迁移完成后写 `.migrated` 完成标记（F-02）；启动时若标记存在且旧源 `data.json` 仍在，打 info 日志提示「旧数据源可手动清理」。**源清理时间点 = 目标数据确认健康之后，用户确认后手动执行**：应用绝不自动删源，删除是用户确认的手动动作。
 
 **为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致；O-22 后运行态数据不再依赖 `APP_DIR`，改走 `DATA_DIR`（`Path.home()/收益计算器`）。
 
 **体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件。`upx=False`（本机未装 UPX，此前为空转）。
 
 **图标**：`收益计算器.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随包内嵌，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
+
+### 8.5 文档同步（F-01）
+
+`CODE_WIKI.md` 中的三类机械标记（§4 各模块 `（~N 行）`、§7 各测试文件用例数、§4 方法表签名）由 `scripts/doc_sync.py` 从代码生成，**修改代码后需运行它保持同步**：
+
+```bash
+python scripts/doc_sync.py               # 就地刷新所有现有标记（不新增标记）
+python scripts/doc_sync.py --check       # 校验；有漂移则 exit 1（pre-commit 钩子调用）
+python scripts/install-hooks.bat         # 安装 pre-commit 钩子到 .git/hooks（换机器需重装）
+```
+
+钩子在每次 commit 前自动跑 `--check`，漂移即拦截提交。**边界**：工具只维护「数字/签名」类机械标记，不生成叙述性文字（F-01 规模悖论）；新增测试文件 / 新增 §4 模块标题时需在 CODE_WIKI 手动补对应标记，`--check` 会提示缺失。
 
 ---
 

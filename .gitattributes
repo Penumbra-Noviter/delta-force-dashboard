@@ -1,0 +1,5 @@
+# F-01: line-ending policy for the hook toolchain (2026-08-02).
+# The pre-commit hook source must stay LF — Git for Windows' sh is the consumer.
+# install-hooks.bat must stay CRLF — cmd.exe is the consumer (LF .bat breaks on some systems).
+*.sh text eol=lf
+*.bat text eol=crlf

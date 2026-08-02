@@ -14,22 +14,33 @@ from config import BACKUP_FILE, DATA_FILE
 
 __all__ = [
     "DataStore",
+    "MIGRATED_MARKER_NAME",
     "migrate_legacy_data",
+    "log_legacy_cleanup_hint",
 ]
 
 logger = logging.getLogger(__name__)
+
+# F-02 迁移完成标记：写入目标数据目录，用于提示「旧数据源可手动清理」。
+# 幂等——任何使目标目录成为权威数据源的分支都会写它；应用绝不自动删源。
+MIGRATED_MARKER_NAME = ".migrated"
 
 
 def migrate_legacy_data(legacy_dir: Path, target_dir: Path) -> None:
     """一次性迁移旧版数据目录到统一数据目录（O-22）。
 
-    - 目标目录已有 ``data.json`` → 视为已迁移，直接返回（新数据权威，绝不覆盖）。
-    - legacy 目录无 ``data.json`` → 无需迁移，直接返回。
-    - 否则创建目标目录，复制 ``data.json`` + 全部滚动备份 + ``settings.json``。
+    - 目标目录已有 ``data.json`` → 视为已迁移，补写 ``.migrated`` 标记后返回（新数据权威，绝不覆盖）。
+    - legacy 目录无 ``data.json`` → 无需迁移，直接返回（不写标记）。
+    - 否则创建目标目录，复制 ``data.json`` + 全部滚动备份 + ``settings.json``，成功后写 ``.migrated`` 标记。
     - 采用复制而非移动：源文件保留、迁移可逆；失败仅记 warning，不中断启动。
+    - 完成标记（F-02）：任何「目标目录已是权威数据源」的分支都写标记，用于配合
+      :func:`log_legacy_cleanup_hint` 提示源清理；脚本绝不自动删源，删除是用户确认后的手动动作。
     """
     target_data = target_dir / "data.json"
-    if target_data.exists() or not (legacy_dir / "data.json").exists():
+    if target_data.exists():
+        _write_migrated_marker(target_dir)
+        return
+    if not (legacy_dir / "data.json").exists():
         return
 
     files: list[tuple[Path, Path]] = [(legacy_dir / "data.json", target_data)]
@@ -46,7 +57,38 @@ def migrate_legacy_data(legacy_dir: Path, target_dir: Path) -> None:
     except OSError as e:
         logger.warning("旧数据迁移失败（数据仍在原位置，不影响启动）: %s", e)
         return
+    _write_migrated_marker(target_dir)
     logger.info("已从 %s 迁移数据到 %s", legacy_dir, target_dir)
+
+
+def _write_migrated_marker(target_dir: Path) -> None:
+    """写 ``.migrated`` 完成标记（F-02）。幂等；失败仅记 warning，不影响主流程。"""
+    try:
+        marker = target_dir / MIGRATED_MARKER_NAME
+        marker.write_text(
+            "数据已统一至本目录。确认数据健康后，旧数据源可由用户手动清理；"
+            "应用不会自动删除。\n",
+            encoding="utf-8",
+        )
+    except OSError as e:
+        logger.warning("迁移完成标记写入失败: %s", e)
+
+
+def log_legacy_cleanup_hint(legacy_dir: Path, target_dir: Path) -> None:
+    """迁移完成后，若旧数据源仍残留，提示用户可手动清理（F-02）。
+
+    判定条件：``.migrated`` 标记存在（迁移已完成）且 ``legacy_dir/data.json`` 仍在。
+    仅打 info 日志、绝不删除任何文件——源清理必须是用户确认后的手动动作。
+    """
+    if not (target_dir / MIGRATED_MARKER_NAME).exists():
+        return
+    if not (legacy_dir / "data.json").exists():
+        return
+    logger.info(
+        "旧数据源可手动清理：%s（数据已迁移至 %s，确认健康后由用户手动删除，应用不自动删源）",
+        legacy_dir,
+        target_dir,
+    )
 
 
 class DataStore:

@@ -6,17 +6,48 @@
 
 ---
 
-## 滚动摘要（2026-08-01）
+## 滚动摘要（2026-08-02）
 
-- **测试**：pytest **221/221** ✅（D-08 评审修正后）；基线演进 103→221，各阶段计数见下方条目
+- **测试**：pytest **229/229** ✅（F-01 +1）；基线演进 103→229，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。UPX 5.2.0 已在 PATH（WinGet），spec `upx=True` 直接命中；无 PATH 环境兜底：显式 `--upx-dir D:/Desktop/tools/UPX`
-- **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D 系列全 ✅（D-01~D-08，2026-08-02，见 TO-TICKETS 归档表）；当前无活跃工单
+- **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning；迁移完成写 `.migrated` 标记，启动时旧源仍在则提示可手动清理（F-02，脚本不自动删源）
+- **文档**：`CODE_WIKI` 三类机械标记（§4 行数 / §7 测试数 / §4 方法签名）由 `scripts/doc_sync.py` 从代码生成 + pre-commit 钩子防漂移（F-01）；`--check` 强制校验、漂移拦截提交
+- **活跃工单**：D 系列全 ✅（D-01~D-08）+ F-01/F-02 全 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 修复 | F-01 安装脚本 install-hooks.bat 括号转义 bug + CRLF 行尾
+- 背景：安装钩子被权限分类器拦下（写入 `.git/hooks` 属持久化动作），授权代跑时发现 `cmd /c scripts\install-hooks.bat` 恒静默 exit 1——钩子能装、验证脚本却永远报失败
+- 根因（cmd 经典陷阱）：`echo ... (not a git repo root?)` 内未转义 `)` 提前闭合 `if not exist (...)` 块，第 13 行 `exit /b 1` 无条件执行，成功路径也被 1 退出；另行为 LF 且 `.bat` 无 CRLF（`type` 正常但块解析易踩边界）
+- 修复：`scripts/install-hooks.bat:12` 括号转义 `^(...^)`；行尾统一 CRLF
+- 验证：`cmd //c "scripts\\install-hooks.bat"` → exit 0；`.git/hooks/pre-commit` 与 `scripts/pre-commit.sh` 字节一致；`sh .git/hooks/pre-commit` → exit 0（`doc_sync --check` 通过）
+- 纯运维修复，pytest 229/229 不受影响
+
+### 2026-08-02 | 运维 | F-01 文档同步自动化：scripts/doc_sync.py + pre-commit 防漂移钩子
+- **背景**：`CODE_WIKI` §7 测试表各文件用例和 214 ≠ 实际 pytest 221、漏 `test_migration.py`——手工表格已多次漂移（复盘 3.6 教训现场）
+- **工具**：`scripts/doc_sync.py`（纯 stdlib，秒级）生成三类机械标记：① `lines:<module>` §4 标题 `（~N 行）`= 非空行计数；② `tests:<test_file>` §7 用例数 = 解析 `pytest --collect-only -q`（实际收集口径，含参数化）；③ `sig:<module>:<symbol>` §4 方法签名 = AST 提取（剥 self/cls、渲染默认值、property 无括号）。`--check` 比对现文 + 结构校验（tests/lines 双向覆盖 + sig 符号存在性），漂移 exit 1；无参模式就地刷新现有标记
+- **钩子**：`scripts/pre-commit.sh`（跑 `--check` 拦截漂移）+ `scripts/install-hooks.bat`（复制到 `.git/hooks/pre-commit`，不入库）；已手动验证：同步 → exit 0、故意篡改行数 → exit 1 拦截
+- **CODE_WIKI 基线同步**：插入 133 个标记；修复漂移——§7 补 `test_doc_sync` 行（§7.1 单测表）、§4.5 chart_widget 方法表重写（`_create_chart`/`_update_chart`/`_update_theme_colors` 三陈旧方法 → `_ChartPanel` 面板类 + 新 ChartWidget 方法表）、§4.10 补 `format_compact`/`format_short_date`、§3 文件树补 `scripts/`、§4 行数全部对齐实测值；`--update` 收敛 11 处签名（如 `MainWindow.__init__(store=None, logic=None, settings_store=None)`）；新增 §8.5 文档同步说明
+- **边界（规模悖论）**：只自动「数字/签名类」机械标记，不生成叙述性文字；工具脚本只加 1 个冒烟测试（`tests/test_doc_sync.py`：`doc_sync.py --check` rc==0 即基线同步锁死），不堆数量
+- 测试：+1；pytest 229/229 ✅（228+1）
+- TO-TICKETS F-01 → ✅ 归档（2026-08-02，提交哈希待回填）
+
+### 2026-08-02 | 运维 | F-02 数据迁移「源清理时间点」策略：.migrated 标记 + 启动提示
+- `migrate_legacy_data` 迁移成功后写 `.migrated` 完成标记到目标数据目录（幂等）；目标已有 `data.json` 视为已权威同样补写标记（覆盖 F-02 上线前已迁移用户）
+- 新增 `log_legacy_cleanup_hint`：`.migrated` 标记存在且旧源 `data.json` 仍在 → info 日志「旧数据源可手动清理：<路径>」；`main.py` 迁移后调用
+- **安全原则**：脚本绝不自动删源，删除是用户确认后的手动动作；CODE_WIKI §4.9/§8.4 记策略「源清理时间点 = 目标数据确认健康之后，用户确认后手动执行」
+- 测试 +7（标记写入/目标已权威补写/二次幂等/无旧数据不写 + 清理提示 3 态）；test_migration 7→14；pytest 228/228 ✅
+- TO-TICKETS F-02 → ✅ 归档（2026-08-02，提交哈希待回填）
+
+### 2026-08-02 | 待办 | 复盘反思评估 → F 系列工单录入（TO-TICKETS）
+- 来源：`D:\Desktop\knowledge base\demo\experience\收益计算器项目经验复盘.md` 五、复盘反思（5 条可提升方向）
+- 评估：① **文档同步自动化 ✅ 值得做**——实测 `CODE_WIKI` §7 测试表各文件用例和 214 ≠ 实际 pytest 221，且漏 `test_migration.py`，手工同步又漂移（正是 3.6 教训现场）→ 录 **F-01**；④ **数据迁移源清理时间点 ✅ 值得做**——O-22 复制非移动的源清理时间点模糊（E-04 本机残留已清），转为前瞻性策略 → 录 **F-02**
+- 不建工单：② 提交前 code-review——交互式 skill 无法进 git 钩子，习惯已由流程覆盖，可行自动化（AST 守卫 + doc-sync）并入 F-01；③ 并行开发命名/接口先约——流程约定，O 系列合并教训已留痕，无需代码；⑤ 规模悖论——原则性边界，作为后续工单验收标准（覆盖真实路径 + 防复发，不堆测试数量）
+- 现状核对：根目录 `data.json.bak*` 4 份（E-04 暂缓项）已清空，无残留；`~/收益计算器/` 数据自足健康
+- 2026-08-02 拍板：F-01 / F-02 均采纳（待开发）；本次 TO-TICKETS / DEV_LOG 变更**未提交**（用户指示，工作区保留）
 
 ### 2026-08-02 | 运维 | 项目评估报告核对 + E 系列工单收口
 - 背景：外部 AI 评估报告（`项目评估报告.md`，8.80/10）与 HEAD 逐条核对——3 条 P1 中 2 条已存在（纯函数 docstring / ADR 文档），1 条论据过期（其引用的 `DATA_RETENTION_DAYS` 常量 O-17 已删）；报告文件已不在工作区（用户自行处理，git 零引用）
