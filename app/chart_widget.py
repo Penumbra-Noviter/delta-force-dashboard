@@ -5,10 +5,13 @@
 - 现金（子项）— 右 Y 轴，青色虚线
 - 双曲线共享同一 PlotWidget 与 X 轴（副 ViewBox 经 setXLink + linkToView 联动），
   各自独立 Y 轴量纲——避免现金量级远小于仓库时被压成直线
+- hover 共享竖线 + 每系列一个彩色数值标签（按所属 ViewBox 顶部堆叠定位）
 - 右键菜单 → 导出 PNG
 
-设计决策：O-C2 原型（throwaway 分支 prototype/chart-merge，提交 b6800bb）验证
-方案 B（双 Y 轴）为唯一「两线清晰且不丢绝对值」的合并方案，落地见 ADR-0002。
+设计决策：O-C2 原型（throwaway 分支 prototype/chart-merge）验证方案 B（双 Y 轴）
+为唯一「两线清晰且不丢绝对值」的合并方案，落地见 ADR-0002。样式对齐原型评审
+修正版（提交 0559537）：无填充区域、hover 标签按所属 ViewBox 定位（跨轴高度
+不可比，标签叠放只显数值不比较线段）。
 """
 
 from __future__ import annotations
@@ -64,14 +67,16 @@ class ChartWidget(QWidget):
         color_key="CHART_WAREHOUSE",
         style=Qt.PenStyle.SolidLine,
         symbol="s",
-        name="仓库价值（总收益）",
+        legend_name="仓库价值（总收益）",
+        hover_name="仓库价值",
     )
     _RIGHT_SERIES = dict(
         label="现金 (¥)",
         color_key="CHART_CASH",
         style=Qt.PenStyle.DashLine,
         symbol="o",
-        name="现金（子项）",
+        legend_name="现金（子项）",
+        hover_name="现金",
     )
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -88,12 +93,12 @@ class ChartWidget(QWidget):
         self._right_vb: pg.ViewBox | None = None
         self._warehouse_curve: pg.PlotCurveItem | None = None
         self._cash_curve: pg.PlotCurveItem | None = None
-        self._warehouse_fill: pg.FillBetweenItem | None = None
-        self._cash_fill: pg.FillBetweenItem | None = None
         self._warehouse_endpoint: pg.TextItem | None = None
         self._cash_endpoint: pg.TextItem | None = None
         self._vline: pg.InfiniteLine | None = None
         self._hover_labels: list[pg.TextItem] = []
+        self._hover_views: list[pg.ViewBox] = []   # 每个 hover 标签所属 ViewBox（定位坐标系）
+        self._hover_series: list[dict] = []        # 每个 hover 标签所属系列配置（短名/颜色键）
         self._proxy = None
 
         # 缓存数据
@@ -163,12 +168,6 @@ class ChartWidget(QWidget):
                 symbolBrush=c_color, symbolPen=c_color,
             )
 
-        # 填充区域颜色
-        if self._warehouse_fill is not None:
-            self._warehouse_fill.setBrush(pg.mkBrush(color=w_color, alpha=50))
-        if self._cash_fill is not None:
-            self._cash_fill.setBrush(pg.mkBrush(color=c_color, alpha=50))
-
         # 轴标签与颜色
         if self._plot_item is not None:
             self._plot_item.getAxis("left").setLabel(
@@ -196,8 +195,8 @@ class ChartWidget(QWidget):
             self._vline.setPen(
                 pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine)
             )
-        for label, color in zip(self._hover_labels, (w_color, c_color)):
-            label.setColor(color)
+        for label, s in zip(self._hover_labels, self._hover_series):
+            label.setColor(get_color(s["color_key"]))
             label.fill = pg.mkBrush(chart_bg)
 
         # 图例文字色
@@ -267,11 +266,6 @@ class ChartWidget(QWidget):
             symbolBrush=w_color, symbolPen=w_color,
         )
         p1.addItem(self._warehouse_curve)
-        self._warehouse_fill = pg.FillBetweenItem(
-            self._warehouse_curve, pg.PlotCurveItem(x, warehouse_vals),
-            brush=pg.mkBrush(color=w_color, alpha=50),
-        )
-        p1.addItem(self._warehouse_fill)
 
         self._warehouse_endpoint = pg.TextItem(
             text=self._format_value(warehouse_vals[-1]),
@@ -288,11 +282,6 @@ class ChartWidget(QWidget):
             symbolBrush=c_color, symbolPen=c_color,
         )
         p2.addItem(self._cash_curve)
-        self._cash_fill = pg.FillBetweenItem(
-            self._cash_curve, pg.PlotCurveItem(x, cash_vals),
-            brush=pg.mkBrush(color=c_color, alpha=50),
-        )
-        p2.addItem(self._cash_fill)
 
         self._cash_endpoint = pg.TextItem(
             text=self._format_value(cash_vals[-1]),
@@ -308,8 +297,8 @@ class ChartWidget(QWidget):
 
         # ── 图例（副 ViewBox 项目不会自动注册到主 PlotItem 图例，需显式 addItem）──
         legend = p1.addLegend(offset=(10, 10), labelTextColor=label_color)
-        legend.addItem(self._warehouse_curve, self._LEFT_SERIES["name"])
-        legend.addItem(self._cash_curve, self._RIGHT_SERIES["name"])
+        legend.addItem(self._warehouse_curve, self._LEFT_SERIES["legend_name"])
+        legend.addItem(self._cash_curve, self._RIGHT_SERIES["legend_name"])
 
         # ── hover 竖线 + 双数值标签（各自坐标系，随各自曲线）──
         self._vline = pg.InfiniteLine(
@@ -326,6 +315,8 @@ class ChartWidget(QWidget):
         c_hover.setVisible(False)
         p2.addItem(c_hover)
         self._hover_labels = [w_hover, c_hover]
+        self._hover_views = [p1.vb, p2]
+        self._hover_series = [self._LEFT_SERIES, self._RIGHT_SERIES]
 
         # ── 右键菜单 ──
         self._setup_context_menu()
@@ -365,7 +356,11 @@ class ChartWidget(QWidget):
             self._right_vb.setYRange(*_adaptive_range(cash_vals))
 
     def _on_mouse_moved(self, evt) -> None:
-        """鼠标移动时显示最近数据点的竖线 + 双曲线数值标签。"""
+        """鼠标移动时显示竖线 + 每系列一个彩色数值标签。
+
+        标签按所属 ViewBox 的 top 做堆叠定位（跨轴高度不可比，不贴数据点），
+        文案为「系列短名 + 值」——对齐原型评审修正版（0559537）。
+        """
         if not self._dates or self._plot_item is None:
             return
 
@@ -387,27 +382,27 @@ class ChartWidget(QWidget):
 
         idx = max(0, min(n - 1, round(mouse_x)))
         idx = min(idx, len(self._warehouse_vals) - 1, len(self._cash_vals) - 1)
-        w_color = get_color(self._LEFT_SERIES["color_key"])
-        c_color = get_color(self._RIGHT_SERIES["color_key"])
 
         if self._vline is not None:
             self._vline.setPos(idx)
             self._vline.setVisible(True)
 
-        if len(self._hover_labels) >= 2:
-            self._hover_labels[0].setText(
-                f"{self._dates[idx]}  {self._format_value(self._warehouse_vals[idx])}",
-                color=w_color,
+        vals = (self._warehouse_vals[idx], self._cash_vals[idx])
+        # 各自量纲 + 极端值下 scale 归零的兜底（与原型 _attach_crosshair 同款 span）
+        for j, (label, series, view) in enumerate(
+            zip(self._hover_labels, self._hover_series, self._hover_views)
+        ):
+            if view is None:
+                label.setVisible(False)
+                continue
+            ymax = view.viewRange()[1][1]
+            span = max(abs(ymax), 1.0)
+            label.setText(
+                f"{series['hover_name']} {self._format_value(vals[j])}",
+                color=get_color(series["color_key"]),
             )
-            self._hover_labels[0].setPos(idx, self._warehouse_vals[idx])
-            self._hover_labels[0].setVisible(True)
-
-            self._hover_labels[1].setText(
-                f"{self._dates[idx]}  {self._format_value(self._cash_vals[idx])}",
-                color=c_color,
-            )
-            self._hover_labels[1].setPos(idx, self._cash_vals[idx])
-            self._hover_labels[1].setVisible(True)
+            label.setPos(idx, ymax - span * (0.06 + 0.10 * j))
+            label.setVisible(True)
 
     @staticmethod
     def _format_value(v: float) -> str:
@@ -526,12 +521,12 @@ class ChartWidget(QWidget):
         self._right_vb = None
         self._warehouse_curve = None
         self._cash_curve = None
-        self._warehouse_fill = None
-        self._cash_fill = None
         self._warehouse_endpoint = None
         self._cash_endpoint = None
         self._vline = None
         self._hover_labels = []
+        self._hover_views = []
+        self._hover_series = []
         self._proxy = None
         self._created = False
         self._dates = []

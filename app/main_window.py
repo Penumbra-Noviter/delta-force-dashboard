@@ -247,16 +247,18 @@ class MainWindow(QMainWindow):
         table_card_layout.setContentsMargins(12, 10, 12, 10)
         self.table = TableWidget()
         table_card_layout.addWidget(self.table)
-        root_layout.addWidget(table_card)
+        # 表格为弹性区（stretch=1）：随窗口伸缩，为后续 7/30 天记录预留高度
+        root_layout.addWidget(table_card, 1)
         root_layout.addSpacing(8)
 
-        # ── 图表（卡片容器）──
+        # ── 图表（卡片容器，置底固定高度，不随窗口扩张）──
         chart_card = self._build_card()
         chart_card_layout = QVBoxLayout(chart_card)
         chart_card_layout.setContentsMargins(12, 10, 12, 10)
         self.chart = ChartWidget()
+        self.chart.setMinimumHeight(220)
         chart_card_layout.addWidget(self.chart)
-        root_layout.addWidget(chart_card, 1)
+        root_layout.addWidget(chart_card, 0)
         root_layout.addSpacing(8)
 
         # ── 底部提示栏 ──

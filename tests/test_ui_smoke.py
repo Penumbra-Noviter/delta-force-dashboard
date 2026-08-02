@@ -569,6 +569,32 @@ def test_chart_sparse_data_hint(sample_window):
     assert "至少需要两天数据" in label.text()
 
 
+# ── 双 Y 轴合并图结构（G-01 评审修正 0559537：无填充、hover 按所属 ViewBox 定位）──
+
+
+def test_chart_dual_axis_no_fill_and_hover_views(sample_window):
+    """合并图结构：单 PlotWidget 双曲线/双轴、无填充区域、hover 标签按所属 ViewBox 定位。"""
+    win = sample_window
+    records = win.logic.recent_records(7)
+    assert len(records) >= 2
+    win.chart.draw(records)
+
+    pw = win.chart._plot_widget
+    assert pw is not None
+    assert not hasattr(win.chart, "_warehouse_fill")
+    assert not hasattr(win.chart, "_cash_fill")
+
+    # 双曲线各挂在所属 ViewBox（仓库→主 ViewBox / 左轴；现金→副 ViewBox / 右轴）
+    assert win.chart._warehouse_curve is not None
+    assert win.chart._cash_curve is not None
+    assert win.chart._right_vb is not None
+
+    # hover 结构：两条标签 + 标签所属 ViewBox（各系列独立坐标系定位）
+    assert len(win.chart._hover_labels) == 2
+    assert len(win.chart._hover_views) == 2
+    assert len(win.chart._hover_series) == 2
+
+
 # ── G-01. 图表双 Y 轴合并（ADR-0002）────────────────────
 
 

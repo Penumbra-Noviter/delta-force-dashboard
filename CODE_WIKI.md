@@ -108,7 +108,7 @@ Profit Calculator/
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
-│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->23<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->24<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -139,7 +139,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~485 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~487 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -261,7 +261,7 @@ Profit Calculator/
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~456 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~452 行<!--/AUTO-->）
 
 #### 函数：`_adaptive_range(values)`
 
@@ -282,11 +282,11 @@ Profit Calculator/
 | 方法 | 说明 |
 |------|------|
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.draw-->`draw(records)`<!--/AUTO--> | n≥2 时渲染双 Y 轴曲线，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget._create-->`_create(x, warehouse_vals, cash_vals, dates)`<!--/AUTO--> | 从零创建 PlotWidget + 双 ViewBox + 曲线/填充/端点/hover/图例/右键菜单 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._create-->`_create(x, warehouse_vals, cash_vals, dates)`<!--/AUTO--> | 从零创建 PlotWidget + 双 ViewBox + 曲线/端点/hover/图例/右键菜单 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._update_data-->`_update_data(x, warehouse_vals, cash_vals, dates)`<!--/AUTO--> | 原地更新曲线/端点/双 Y 轴/X 轴标签（不重建） |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget._on_mouse_moved-->`_on_mouse_moved(evt)`<!--/AUTO--> | 鼠标移动时显示竖线 + 双曲线数值标签（各自坐标系） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._on_mouse_moved-->`_on_mouse_moved(evt)`<!--/AUTO--> | 鼠标移动时显示竖线 + 每系列一个彩色数值标签（按所属 ViewBox 顶部堆叠定位，不贴数据点） |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._format_value-->`_format_value(v)`<!--/AUTO--> | 格式化图表数值为紧凑 K/M/B（与 Y 轴共用 format_compact，带 ¥ 前缀） |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换时增量更新双曲线/填充/双轴/hover/图例颜色，不重建 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换时增量更新双曲线/双轴/hover/图例颜色，不重建 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_sparse_hint-->`_show_sparse_hint()`<!--/AUTO--> | n=2~3 时叠加半透明「数据较少」提示（不触碰曲线与交互） |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.resizeEvent-->`resizeEvent(event)`<!--/AUTO--> | overlay 提示不参与 layout，手动跟随 widget 尺寸 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_placeholder-->`_show_placeholder(n)`<!--/AUTO--> | n=0 显示「暂无数据」，n=1 显示「至少需要两天数据」 |
@@ -300,17 +300,22 @@ Profit Calculator/
 
 ```
 ┌────────────────────────────────────────────┐
-│  仓库价值（总收益）— 左轴 琥珀实线+方块+填充 │
-│  现金（子项）— 右轴 青色虚线+圆点+填充     │
+│  仓库价值（总收益）— 左轴 琥珀实线+方块    │
+│  现金（子项）— 右轴 青色虚线+圆点          │
 │  共享 X 轴：日期标签（MM-DD）              │
 │  右轴刻度随现金曲线同色（防归属误读）      │
 └────────────────────────────────────────────┘
 ```
 
-**性能优化**：单 PlotWidget + 持久化 `PlotCurveItem`/`FillBetweenItem`，更新时仅
-`setData()` 原地刷新（FillBetweenItem 经 `sigPlotChanged` 自动跟随），不重建。
-副 ViewBox 与主 ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，
-resize 时漏同步会两线 x 错位（ADR-0002 记录的实现坑位）。
+**性能优化**：单 PlotWidget + 持久化 `PlotCurveItem`，更新时仅 `setData()` 原地
+刷新，不重建。原生无填充区域（对齐原型评审修正版 0559537）。副 ViewBox 与主
+ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resize 时漏同步
+会两线 x 错位（ADR-0002 记录的实现坑位）。
+
+**hover 交互**（对齐原型 `_attach_crosshair`）：共享一根竖线 + 每系列一个彩色
+数值标签（文案「系列短名 + 值」）。标签按所属 ViewBox 的顶部做堆叠定位
+（`ymax - span*(0.06+0.10j)`），不贴数据点——因双轴跨轴高度不可比，标签只叠放
+数值不比较线段长度（ADR-0002 代价项落地）。
 
 ---
 
@@ -587,7 +592,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->23<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->24<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 

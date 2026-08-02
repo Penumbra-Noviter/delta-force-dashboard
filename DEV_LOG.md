@@ -6,19 +6,25 @@
 
 ---
 
-## 滚动摘要（2026-08-02）
+## 滚动摘要（2026-08-03）
 
-- **测试**：pytest **230/230** ✅（G-01 +1，图表双 Y 轴结构烟测）；基线演进 103→230，各阶段计数见下方条目
-- **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。UPX 5.2.0 已在 PATH（WinGet），spec `upx=True` 直接命中；无 PATH 环境兜底：显式 `--upx-dir D:/Desktop/tools/UPX`
-- **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning；迁移完成写 `.migrated` 标记，启动时旧源仍在则提示可手动清理（F-02，脚本不自动删源）
-- **文档**：`CODE_WIKI` 三类机械标记（§4 行数 / §7 测试数 / §4 方法签名）由 `scripts/doc_sync.py` 从代码生成 + pre-commit 钩子防漂移（F-01）；`--check` 强制校验、漂移拦截提交
-- **图表**：双曲线合并到同一坐标系（G-01，ADR-0002，选双 Y 轴方案 B）——仓库左轴/现金右轴，副 ViewBox 经 `setXLink+linkToView` 共享 X 轴；原型（A 单轴/B 双轴/C 归一化）在 throwaway 分支 `prototype/chart-merge`（`b6800bb`）留一手来源
-- **活跃工单**：D 系列全 ✅（D-01~D-08）+ F-01/F-02 全 ✅ + G-01 ✅（2026-08-02，见 TO-TICKETS 归档表）
-- **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
+- **测试**：pytest **231/231** ✅（2026-08-03 图表 hover/无填充结构回归 +1）
+- **图表**：样式对齐原型评审修正版（0559537）——删填充区域、hover 改「系列短名+值、按所属 ViewBox 顶部堆叠定位」；布局把曲线图置底固定高度、表格改弹性区，为后续 7/30 天记录预留高度（用户预告将记录天数设为 7/30 天）
+- **活跃工单**：见 TO-TICKETS 归档表（G-01 图表样式对齐已归档为 H-01）
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 重构 | 图表样式对齐原型评审修正版（0559537）+ 布局：曲线图置底为表格预留
+- 需求：将 G-01 落地图改为「原型最后设计的样式」，并把曲线图移至最下方，为后续 7/30 天表格预留高度（用户预告将记录天数设为 7/30 天）
+- 样式对齐 `prototype/chart-merge` 评审修正版（提交 `0559537`）：
+  - **删填充区域**：`FillBetweenItem` 两条全删（`_warehouse_fill`/`_cash_fill` 及其 `__init__`/`_create`/`apply_theme`/`_clear_all` 触点），双轴合并图只留曲线+端点
+  - **hover 对齐原型 `_attach_crosshair`**：从「日期+数值贴数据点」改为「共享竖线 + 每系列一个彩色数值标签」，文案「系列短名 + 值」；标签按**所属 ViewBox** 的顶部堆叠定位（`ymax - span*(0.06+0.10j)`，span 兜底量纲归零）——因跨轴不可比，标签只叠放数值不贴数据点不比较线段
+  - 新增 `_hover_views`/`_hover_series` 记录每个标签所属 ViewBox 与系列配置（短名/颜色键）
+- 布局（`main_window.py`）：`table_card` 改 `stretch=1`（弹性区，随窗伸缩，为 7/30 天记录预留高度）；`chart_card` 改 `stretch=0` + `new ChartWidget().setMinimumHeight(220)` 置底固定高度，不随窗口扩张
+- 测试：新增 `test_chart_dual_axis_no_fill_and_hover_views`（无填充 + 双 hover 标签/所属 ViewBox/系列），231/231 ✅
+- 文档：CODE_WIKI §4.5 去「填充」叙述 + 增「hover 交互」说明；doc_sync 刷新机械标记
 
 ### 2026-08-02 | 功能 | G-01 图表双曲线合并到同一坐标系（双 Y 轴，方案 B，ADR-0002）
 - 需求：把「仓库价值 + 现金」上下双图合并进同一坐标系（原 `_ChartPanel` 双面板结构）
