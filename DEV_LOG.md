@@ -24,7 +24,7 @@
 - 根因（cmd 经典陷阱）：`echo ... (not a git repo root?)` 内未转义 `)` 提前闭合 `if not exist (...)` 块，第 13 行 `exit /b 1` 无条件执行，成功路径也被 1 退出；另行为 LF 且 `.bat` 无 CRLF（`type` 正常但块解析易踩边界）
 - 修复：`scripts/install-hooks.bat:12` 括号转义 `^(...^)`；行尾统一 CRLF
 - 验证：`cmd //c "scripts\\install-hooks.bat"` → exit 0；`.git/hooks/pre-commit` 与 `scripts/pre-commit.sh` 字节一致；`sh .git/hooks/pre-commit` → exit 0（`doc_sync --check` 通过）
-- 纯运维修复，pytest 229/229 不受影响
+- 纯运维修复，pytest 229/229 不受影响；随 F-01 提交 `fc28fff` 一并入库
 
 ### 2026-08-02 | 运维 | F-01 文档同步自动化：scripts/doc_sync.py + pre-commit 防漂移钩子
 - **背景**：`CODE_WIKI` §7 测试表各文件用例和 214 ≠ 实际 pytest 221、漏 `test_migration.py`——手工表格已多次漂移（复盘 3.6 教训现场）
@@ -33,14 +33,14 @@
 - **CODE_WIKI 基线同步**：插入 133 个标记；修复漂移——§7 补 `test_doc_sync` 行（§7.1 单测表）、§4.5 chart_widget 方法表重写（`_create_chart`/`_update_chart`/`_update_theme_colors` 三陈旧方法 → `_ChartPanel` 面板类 + 新 ChartWidget 方法表）、§4.10 补 `format_compact`/`format_short_date`、§3 文件树补 `scripts/`、§4 行数全部对齐实测值；`--update` 收敛 11 处签名（如 `MainWindow.__init__(store=None, logic=None, settings_store=None)`）；新增 §8.5 文档同步说明
 - **边界（规模悖论）**：只自动「数字/签名类」机械标记，不生成叙述性文字；工具脚本只加 1 个冒烟测试（`tests/test_doc_sync.py`：`doc_sync.py --check` rc==0 即基线同步锁死），不堆数量
 - 测试：+1；pytest 229/229 ✅（228+1）
-- TO-TICKETS F-01 → ✅ 归档（2026-08-02，提交哈希待回填）
+- TO-TICKETS F-01 → ✅ 归档（2026-08-02，提交 `fc28fff`）
 
 ### 2026-08-02 | 运维 | F-02 数据迁移「源清理时间点」策略：.migrated 标记 + 启动提示
 - `migrate_legacy_data` 迁移成功后写 `.migrated` 完成标记到目标数据目录（幂等）；目标已有 `data.json` 视为已权威同样补写标记（覆盖 F-02 上线前已迁移用户）
 - 新增 `log_legacy_cleanup_hint`：`.migrated` 标记存在且旧源 `data.json` 仍在 → info 日志「旧数据源可手动清理：<路径>」；`main.py` 迁移后调用
 - **安全原则**：脚本绝不自动删源，删除是用户确认后的手动动作；CODE_WIKI §4.9/§8.4 记策略「源清理时间点 = 目标数据确认健康之后，用户确认后手动执行」
 - 测试 +7（标记写入/目标已权威补写/二次幂等/无旧数据不写 + 清理提示 3 态）；test_migration 7→14；pytest 228/228 ✅
-- TO-TICKETS F-02 → ✅ 归档（2026-08-02，提交哈希待回填）
+- TO-TICKETS F-02 → ✅ 归档（2026-08-02，提交 `fc28fff`）
 
 ### 2026-08-02 | 待办 | 复盘反思评估 → F 系列工单录入（TO-TICKETS）
 - 来源：`D:\Desktop\knowledge base\demo\experience\收益计算器项目经验复盘.md` 五、复盘反思（5 条可提升方向）
