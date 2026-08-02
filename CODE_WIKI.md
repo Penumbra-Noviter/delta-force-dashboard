@@ -261,7 +261,7 @@ Profit Calculator/
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~452 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~457 行<!--/AUTO-->）
 
 #### 函数：`_adaptive_range(values)`
 

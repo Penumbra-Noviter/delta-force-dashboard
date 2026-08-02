@@ -233,13 +233,19 @@ class ChartWidget(QWidget):
             axisItems={"left": left_axis, "right": right_axis}
         )
         self._plot_widget.setBackground(chart_bg)
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.5)
         self._layout.addWidget(self._plot_widget, 1)
 
         p1 = self._plot_widget.plotItem
         p1.showAxis("right")
         p1.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
         self._plot_item = p1
+
+        # 网格策略（G-02 修正）：双 Y 轴各自量纲、刻度高低交错，任何一条水平
+        # 网格都会与另一轴刻度叠成「百叶窗/蓖齿」密集纹理。故三轴全部关闭网格，
+        # 只靠左右轴刻度标签承当读数参考——曲线最干净，轴线本身已指明趋势方向。
+        p1.getAxis("left").setGrid(False)
+        p1.getAxis("right").setGrid(False)
+        p1.getAxis("bottom").setGrid(False)
 
         # ── 副 ViewBox（现金）：共享 X，独立 Y ──
         p2 = pg.ViewBox()
