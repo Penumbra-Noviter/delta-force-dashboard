@@ -39,6 +39,7 @@ from app.theme import (
     generate_qss,
     get_color,
     set_theme,
+    signal_color,
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
@@ -585,15 +586,9 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if total > 0:
-            text = f"{prefix}+{format_money(total)}"
-            color = get_color("FG_POS")
-        elif total < 0:
-            text = f"{prefix}{format_money(total)}"
-            color = get_color("FG_NEG")
-        else:
-            text = f"{prefix}{format_money(total)}"
-            color = get_color("FG_MUTED")
+        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total)
+        text = f"{prefix}{total_text}"
+        color = signal_color(total_signal)
 
         self._summary_label.setText(text)
         self._summary_label.setStyleSheet(

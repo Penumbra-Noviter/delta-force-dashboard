@@ -150,6 +150,26 @@ class ProfitCalculatorLogic:
         return "0.0%", RateSignal.NEUTRAL
 
     @staticmethod
+    def format_signed_money(value: float | None) -> tuple[str, RateSignal]:
+        """根据带符号金额返回 (格式化字符串, 信号) 二元组。
+
+        带符号金额（较前日差值、总盈亏）的统一展示入口：
+        - None → "—"（NONE）
+        - 正数 → "+¥…"（POSITIVE）
+        - 负数 → "¥-…"（NEGATIVE，format_money 自带负号）
+        - 零 → "¥0.00"（NEUTRAL，无 + 前缀）
+
+        UI 层应将信号映射为当前主题颜色（见 app.theme.signal_color）。
+        """
+        if value is None:
+            return "—", RateSignal.NONE
+        if value > 0:
+            return f"+{format_money(value)}", RateSignal.POSITIVE
+        if value < 0:
+            return format_money(value), RateSignal.NEGATIVE
+        return format_money(0.0), RateSignal.NEUTRAL
+
+    @staticmethod
     def get_pnl_label(
         prev_warehouse: float | None, current_warehouse: float
     ) -> tuple[str, PnLSignal]:

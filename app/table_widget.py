@@ -22,32 +22,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.theme import get_color
+from app.theme import get_color, signal_color
 from formatting import format_money, format_short_date
-from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnLSignal
+from calculator import DayRecord, ProfitCalculatorLogic, PnLSignal
 
-# ── 信号 → 主题颜色键映射 ──────────────────────────────
-# 业务层返回语义信号；这里只做「信号 → 主题键」的静态映射。
-# 具体色值在渲染时经 get_color() 解析——颜色绝不在 import 期冻结，
-# 主题切换后渲染路径自动取到新主题色。
-_SIGNAL_TO_KEY = {
-    RateSignal.POSITIVE: "FG_POS",
-    RateSignal.NEGATIVE: "FG_NEG",
-    RateSignal.NEUTRAL: "FG_MUTED",
-    RateSignal.NONE: "FG_MUTED",
-}
-
+# ── 盈亏信号 → 主题颜色键映射 ────────────────────────
+# 收益率信号（RateSignal）→ 颜色映射已收敛到 app.theme.signal_color；
+# 这里仅保留盈亏标签专属的 PnLSignal 映射。
 _PNL_TO_KEY = {
     PnLSignal.盈: "FG_POS",
     PnLSignal.亏: "FG_NEG",
     PnLSignal.平: "FG_MUTED",
     PnLSignal.无: "FG_MUTED",
 }
-
-
-def _signal_color(signal: RateSignal) -> str:
-    """收益率信号 → 当前主题颜色（渲染时解析）。"""
-    return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
 
 
 def _pnl_color(signal: PnLSignal) -> str:
@@ -220,16 +207,10 @@ class _DaySubTable(QTableWidget):
 
             # 3: 较前日
             if prev_warehouse is not None:
-                delta = record.warehouse - prev_warehouse
-                diff = (
-                    f"+{format_money(delta)}"
-                    if delta >= 0
-                    else format_money(delta)
+                diff, delta_signal = ProfitCalculatorLogic.format_signed_money(
+                    record.warehouse - prev_warehouse
                 )
-                delta_color = (
-                    get_color("FG_POS") if delta > 0
-                    else (get_color("FG_NEG") if delta < 0 else get_color("FG_MUTED"))
-                )
+                delta_color = signal_color(delta_signal)
             else:
                 diff = "—"
                 delta_color = get_color("FG_MUTED")
@@ -243,7 +224,7 @@ class _DaySubTable(QTableWidget):
             # 4: 收益率
             rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
             rate_str, rate_signal = ProfitCalculatorLogic.format_rate(rate)
-            rate_color = _signal_color(rate_signal)
+            rate_color = signal_color(rate_signal)
             item = QTableWidgetItem(rate_str)
             item.setForeground(QColor(rate_color))
             item.setBackground(row_bg)

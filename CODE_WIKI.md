@@ -230,7 +230,7 @@ Profit Calculator/
 | 0 | 日期 | 80 | 显示 `MM-DD`，今日加蓝色"今天"后缀 |
 | 1 | 现金 | 100 | 格式化金额，右对齐 |
 | 2 | 仓库（总收益） | 110 | 格式化金额，粗体，右对齐 |
-| 3 | 较前日 | 100 | 差值，红涨绿跌，无前日数据显示"—" |
+| 3 | 较前日 | 100 | 差值，红涨绿跌，零值显示"¥0.00"（无 + 前缀），无前日数据显示"—" |
 | 4 | 收益率 | 80 | 1 位小数百分比，红涨绿跌 |
 | 5 | 盈亏 | 55 | PnLBadge 组件 |
 | 6 | 操作 | 120 | 编辑 + 删除按钮 |
@@ -320,6 +320,7 @@ pyqtgraph 双曲线图组件。
 | `recent_records` | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
 | `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
 | `format_rate` | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
+| `format_signed_money` | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
 | `get_pnl_label` | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
 | `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
 | `rotate_weekly` | `days=7` | `list[str]` | 保留最近 days 条实际录入记录，超过上限删除最旧；返回被删除日期列表（升序，O-14） |
@@ -330,6 +331,7 @@ pyqtgraph 双曲线图组件。
 - `total` = `warehouse`（非 `warehouse + cash`）
 - 收益率 = `(今日warehouse - 前日warehouse) / 前日warehouse × 100%`，精度 1 位小数
 - 盈亏标签：盈（绿底）/ 亏（红底）/ —（灰底，无前日数据或持平）
+- 较前日差值 / 总盈亏展示统一走 `format_signed_money`：正数 `+¥…`、负数 `¥-…`、零 `¥0.00`（无 + 前缀）、无前值 `—`（D-01）
 - CSV「较前日」= 当日仓库值 − 前一有记录日仓库值；无前日数据为 `—`；总收益 = 仓库已含现金
 
 ---

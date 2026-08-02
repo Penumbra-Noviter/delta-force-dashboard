@@ -281,6 +281,32 @@ def test_format_rate_none():
     assert text == "—"
     assert signal == RateSignal.NONE
 
+# ── ProfitCalculatorLogic.format_signed_money ──────────
+
+def test_format_signed_money_positive():
+    text, signal = ProfitCalculatorLogic.format_signed_money(300.0)
+    assert text == "+¥300.00"
+    assert signal == RateSignal.POSITIVE
+
+
+def test_format_signed_money_negative():
+    text, signal = ProfitCalculatorLogic.format_signed_money(-30.0)
+    assert text == "¥-30.00"
+    assert signal == RateSignal.NEGATIVE
+
+
+def test_format_signed_money_zero_has_no_prefix():
+    """零值无 + 前缀（表格较前日列 +¥0.00 → ¥0.00，D-01）。"""
+    text, signal = ProfitCalculatorLogic.format_signed_money(0.0)
+    assert text == "¥0.00"
+    assert signal == RateSignal.NEUTRAL
+
+
+def test_format_signed_money_none():
+    text, signal = ProfitCalculatorLogic.format_signed_money(None)
+    assert text == "—"
+    assert signal == RateSignal.NONE
+
 
 # ── ProfitCalculatorLogic.get_pnl_label ──────────────
 

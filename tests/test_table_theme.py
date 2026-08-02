@@ -110,6 +110,22 @@ def test_rate_column_differs_across_themes(qapp, theme_guard):
     )
 
 
+def test_diff_cell_zero_delta_has_no_plus_prefix(qapp, theme_guard):
+    """较前日为零时显示 ¥0.00（无 + 前缀，D-01），而非 +¥0.00。"""
+    from app.table_widget import COL_DIFF
+
+    table = _make_table()
+    theme_mod.set_theme("light")
+    table.draw(
+        records=[("2026-07-30", DayRecord(cash=50.0, warehouse=200.0, date="2026-07-30"))],
+        today="2026-07-30",
+        prev_warehouse=200.0,  # 前后仓库相等 → 差值 0
+    )
+    item = table.item(0, COL_DIFF)
+    assert item is not None, "较前日单元格未被绘制"
+    assert item.text() == "¥0.00"
+
+
 # ── 静态检查：防 import 期冻结复发 ───────────────────────
 
 

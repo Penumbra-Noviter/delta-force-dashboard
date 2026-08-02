@@ -8,15 +8,21 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **187/187** ✅（O-22 修复后）；基线演进 103→187，各阶段计数见下方条目
+- **测试**：pytest **192/192** ✅（D-01 后）；基线演进 103→192，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D-01~D-07 深层化候选（2026-08-02 grilling 拍板，见 TO-TICKETS 活跃表）
+- **活跃工单**：D-02~D-07 深层化候选；D-01 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 重构 | D-01 趋势判定收敛：format_signed_money 纯函数
+- `ProfitCalculatorLogic.format_signed_money(value) -> (str, RateSignal)`：None→`—` / 正→`+¥…` / 负→`¥-…` / 零→`¥0.00`（无 + 前缀）；较前日差值 / 总盈亏展示统一走它
+- 表格较前日列改用它：零值 `+¥0.00`→`¥0.00`；颜色经 `app.theme.signal_color`（信号→色映射自 table_widget 收敛至 theme，C1「颜色不在 import 期冻结」语义不变）
+- 汇总标签 `_update_summary`：≥2 条分支改走 `format_signed_money` + `signal_color`；「仅 1 条」/「数据不足」灰字分支保持原样（仓库值非趋势，不加 + 前缀）；CSV 较前日列保持无前缀（O-16 语义不变）
+- 测试：+5（4 单测 + 1 表格零差值渲染回归）；pytest 192/192 ✅（187+5）；CODE_WIKI 同步方法表/较前日列说明
 
 ### 2026-08-02 | 决策 | 架构评审 7 候选 grilling 拍板 + 录入 TO-TICKETS（D-01~D-07）
 - 来源：`architecture-review-20260802.html` 深层化机会（O/C 系列热点）；用 grilling 逐分支走决策树，7 分支全部确认

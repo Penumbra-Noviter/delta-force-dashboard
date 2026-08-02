@@ -6,12 +6,15 @@
 
 from __future__ import annotations
 
+from calculator import RateSignal
+
 __all__ = [
     "THEMES",
     "generate_qss",
     "get_color",
     "get_theme",
     "set_theme",
+    "signal_color",
 ]
 
 # ── 主题色板 ──────────────────────────────────────────
@@ -127,6 +130,23 @@ def set_theme(name: str) -> None:
 def get_color(key: str) -> str:
     """获取当前主题下指定颜色值。"""
     return THEMES[_current_theme].get(key, "")
+
+
+
+# ── 信号 → 主题色映射 ───────────────────────────────
+# 业务层只返回语义信号（RateSignal），这里完成「信号 → 主题键」映射；
+# 具体色值在调用 get_color() 时实时解析，避免 import 期冻结（C1）。
+_SIGNAL_TO_KEY = {
+    RateSignal.POSITIVE: "FG_POS",
+    RateSignal.NEGATIVE: "FG_NEG",
+    RateSignal.NEUTRAL: "FG_MUTED",
+    RateSignal.NONE: "FG_MUTED",
+}
+
+
+def signal_color(signal: RateSignal) -> str:
+    """收益率信号 → 当前主题颜色（渲染时实时解析，C1 防冻结）。"""
+    return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
 
 
 def generate_qss(theme_name: str) -> str:
