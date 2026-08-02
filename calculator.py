@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from config import DATE_FORMAT, WEEK_DAYS
+from config import DATE_FORMAT, RETENTION_LIMIT, WEEK_DAYS
 from formatting import format_money, format_short_date
 from signals import PnLSignal, RateSignal
 
@@ -216,7 +216,7 @@ class ProfitCalculatorLogic:
         warehouse: float,
         today: str,
         deleted: list[str],
-        keep_days: int = WEEK_DAYS,
+        keep_days: int = RETENTION_LIMIT,
     ) -> str:
         """保存成功状态栏文本的纯函数（今日/历史日期 + 轮转清理提示）。
 
@@ -262,14 +262,18 @@ class ProfitCalculatorLogic:
             return True
         return False
 
-    def rotate_weekly(self, days: int = WEEK_DAYS) -> list[str]:
+    def rotate_weekly(self, days: int = RETENTION_LIMIT) -> list[str]:
         """保留最近 days 条实际录入记录：数据条数超过 days 时删除最旧记录。
 
         以「录入条数」而非日历天数为基准（与 recent_records / summary 一致）：
         间断录入时，只要记录条数未超上限，较早日期的记录仍会保留。
 
+        默认保留上限 = RETENTION_LIMIT（30，J 系列：存储与视图解耦，
+        RETENTION_LIMIT 决定「最多保留」；视图 7/30 是独立筛窗，不影响存储）。
+        满上限不删、超上限才删最旧（excess=len-days）。
+
         返回被删除的日期列表（升序）；删除时记录 info 日志，
-        供调用方（save_today）在状态栏向用户提示（O-14）。
+        通常在调用方（save_today）在状态栏向用户提示（O-14）。
         """
         if len(self.data) <= days:
             return []

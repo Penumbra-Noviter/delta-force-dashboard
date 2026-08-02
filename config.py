@@ -24,4 +24,8 @@ SETTINGS_FILE = DATA_DIR / "settings.json"
 LOG_FILE = DATA_DIR / "profit_calculator.log"
 DATE_FORMAT = "%Y-%m-%d"
 
-WEEK_DAYS = 7
+WEEK_DAYS = 7          # 视图默认窗口（沿用，启动默认 7）
+
+# J 系列（多视图）：保留上限与视图解耦。rotate_weekly 用此常量决定
+# 「最多保留 N 条录入」；视图 7/30 切换只从存量里筛窗口（CONSENSUS §7）。
+RETENTION_LIMIT = 30

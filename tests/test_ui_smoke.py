@@ -215,12 +215,14 @@ def test_close_while_editing_asks_confirmation(sample_window, monkeypatch):
 
 
 def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
-    """保存后触发 7 日裁剪：状态提示展示自动删除（O-14）。"""
+    """保存后触发裁剪：状态提示展示自动删除（O-14，J 系列上限 30 条）。"""
     from app.main_window import MainWindow
+    from config import RETENTION_LIMIT
 
     today = datetime.now()
+    # 31 个日期键（含今天），超出保留上限 RETENTION_LIMIT 1 条 → 触发裁剪
     data = {}
-    for off in range(7, -1, -1):  # 8 个日期键（含今天），超出 7 日上限 1 条
+    for off in range(RETENTION_LIMIT, -1, -1):
         d = (today - timedelta(days=off)).strftime(DATE_FORMAT)
         data[d] = {"cash": 100.0, "warehouse": 200.0 + off}
 
@@ -228,14 +230,14 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
     )
-    assert len(win.logic.data) == 8
+    assert len(win.logic.data) == RETENTION_LIMIT + 1
 
     win.input_panel.fill_values(100, 300)
     win.save_today()
 
-    assert len(win.logic.data) == 7  # 最旧 1 条被自动裁剪
+    assert len(win.logic.data) == RETENTION_LIMIT  # 最旧 1 条被自动裁剪
     indicator = win.input_panel.saved_indicator.text()
-    assert "已保留最近 7 条记录" in indicator
+    assert f"已保留最近 {RETENTION_LIMIT} 条记录" in indicator
     assert "自动清理 1 条较早记录" in indicator
     win.close()
 
@@ -626,3 +628,81 @@ def test_chart_dual_axis_merged(sample_window):
     assert p1.getAxis("right").linkedView() is win.chart._right_vb
     assert p1.legend is not None
     assert len(p1.legend.items) == 2
+
+
+# ── 14. 视图切换 7/30（J 系列）─────────────────────────
+
+
+@pytest.fixture
+def view_switch_window(qapp, settings_guard, tmp_path):
+    """30 条记录的 MainWindow（相对今天生成，隔离真实数据/settings）。
+
+    J 系列：视图切换用例需超 7 条的存量来验证 7↔30 窗口联动与
+    「切回 7 不丢存储」（Q5 视图/存储解耦）。
+    """
+    from app.main_window import MainWindow
+    from data_store import DataStore
+
+    today = datetime.now()
+    data = {}
+    for off in range(30):
+        d = (today - timedelta(days=off)).strftime(DATE_FORMAT)
+        data[d] = {"cash": 100.0 + off, "warehouse": 200.0 + off * 1000}
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        logic=ProfitCalculatorLogic(data),
+    )
+    yield win
+    win.close()
+
+
+def test_view_default_is_7(sample_window):
+    """启动默认视图 7：_view_n=7、7天按钮选中、双栏均分 ceil(n/2)。"""
+    win = sample_window
+    assert win._view_n == 7
+    assert win.table.current_view() == 7
+    checked = [b.property("days") for b in win.table._view_buttons if b.isChecked()]
+    assert checked == [7]
+
+    win.refresh_display()
+    # 样本 6 条 → mid=ceil(6/2)=3 → 3+3（Q7 均分）
+    assert win.table._left_table.rowCount() == 3
+    assert win.table._right_table.rowCount() == 3
+
+
+def test_view_switch_to_30_refreshes_all(view_switch_window):
+    """切到 30：view_changed(30) 信号 → _view_n=30 → 表格 15+15 + 汇总最近30条 全联动。"""
+    win = view_switch_window
+    assert win._view_n == 7
+    win.refresh_display()
+    assert win.table._left_table.rowCount() + win.table._right_table.rowCount() == 7
+
+    received = []
+    win.table.view_changed.connect(received.append)
+    btn30 = next(b for b in win.table._view_buttons if b.property("days") == 30)
+    btn30.click()
+
+    assert received == [30]           # 信号契约（Q8：emit 当前视图条数）
+    assert win._view_n == 30          # MainWindow 视角同步（Q10 单一开关）
+    assert win.table.current_view() == 30
+    assert win.table._left_table.rowCount() == 15   # 30 → 15+15 均分（Q7）
+    assert win.table._right_table.rowCount() == 15
+    assert "最近30条" in win._summary_label.text()   # 汇总联动（Q9）
+
+
+def test_view_switch_back_to_7_keeps_storage(view_switch_window):
+    """切回 7：窗口收窄到 7 条，存储仍 30 条（Q5 解耦，切回不丢数据）。"""
+    win = view_switch_window
+    btn30 = next(b for b in win.table._view_buttons if b.property("days") == 30)
+    btn30.click()
+    assert win.table.current_view() == 30
+
+    btn7 = next(b for b in win.table._view_buttons if b.property("days") == 7)
+    btn7.click()
+
+    assert win.table.current_view() == 7
+    assert win._view_n == 7
+    rows = win.table._left_table.rowCount() + win.table._right_table.rowCount()
+    assert rows == 7
+    assert len(win.logic.data) == 30      # 存储不丢
+    assert "最近7条" in win._summary_label.text()

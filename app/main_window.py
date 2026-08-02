@@ -31,6 +31,7 @@ from app.chart_widget import ChartWidget
 from config import (
     DATA_DIR,
     DATE_FORMAT,
+    RETENTION_LIMIT,
     SETTINGS_FILE,
     WEEK_DAYS,
 )
@@ -72,6 +73,8 @@ class MainWindow(QMainWindow):
         self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self.today = datetime.now().strftime(DATE_FORMAT)
+        # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
+        self._view_n = WEEK_DAYS
         self._pinned = False
         self._settings = self.settings_store.load()
         self._theme = self._settings.get("theme", "light")
@@ -295,6 +298,7 @@ class MainWindow(QMainWindow):
         self.input_panel.reuse_cancel_requested.connect(self._cancel_reuse)
         self.table.edit_requested.connect(self._start_edit)
         self.table.delete_requested.connect(self._delete_record)
+        self.table.view_changed.connect(self._on_view_changed)
 
         # 键盘快捷键
         save_shortcut = QAction(self)
@@ -368,8 +372,22 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _get_records(self) -> list:
-        """返回最近 WEEK_DAYS 条实际录入的 (date_str, DayRecord) 列表。"""
-        return self.logic.recent_records(WEEK_DAYS)
+        """返回最近 self._view_n 条实际录入的 (date_str, DayRecord) 列表。
+
+        J 系列：视图条数由按钮组驱动（默认 WEEK_DAYS=7），取代硬编码 WEEK_DAYS；
+        存储保留上限（RETENTION_LIMIT=30）与视图解耦，这里只筛窗口。
+        """
+        return self.logic.recent_records(self._view_n)
+
+    def _on_view_changed(self, n: int) -> None:
+        """视图按钮组切换：更新当前视图条数并重绘（表格+曲线图+汇总联动）。
+
+        Q9/Q10：单一开关驱动三处同变，数据流一致（同源自 recent_records(_view_n)）。
+        """
+        if n == self._view_n:
+            return
+        self._view_n = n
+        self.refresh_display()
 
     # ═══════════════════════════════════════════════════════
     # 保存
@@ -428,7 +446,7 @@ class MainWindow(QMainWindow):
         self.refresh_display()
 
         indicator = ProfitCalculatorLogic.format_saved_indicator(
-            save_date, warehouse, self.today, deleted
+            save_date, warehouse, self.today, deleted, RETENTION_LIMIT
         )
         self.input_panel.set_saved_indicator(indicator)
 
@@ -562,8 +580,8 @@ class MainWindow(QMainWindow):
         D-07：文本与信号由 format_summary 纯函数生成，本方法只做
         信号→颜色映射与样式落地（颜色映射留 UI）。
         """
-        count, total = self.logic.summary(WEEK_DAYS)
-        text, signal = ProfitCalculatorLogic.format_summary(count, total)
+        count, total = self.logic.summary(self._view_n)
+        text, signal = ProfitCalculatorLogic.format_summary(count, total, self._view_n)
         self._summary_label.setText(text)
         if signal is RateSignal.NONE:
             # 数据不足 / 仅 1 条记录：弱化提示（灰字小号）

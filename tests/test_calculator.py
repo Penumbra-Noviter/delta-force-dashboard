@@ -419,7 +419,7 @@ def test_format_saved_indicator_with_rotation_hint():
     )
     assert text == (
         "✓ 今日已保存 — 仓库总收益 ¥460.9M"
-        "（已保留最近 7 条记录，自动清理 1 条较早记录）"
+        "（已保留最近 30 条记录，自动清理 1 条较早记录）"
     )
 
 
@@ -468,35 +468,43 @@ def test_delete_record_missing():
 # ── ProfitCalculatorLogic.rotate_weekly ────────────
 
 def test_rotate_weekly_under_limit():
-    """数据不超过 7 天时不做裁剪。"""
-    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 17)}
+    """数据不超过保留上限 30 条时不做裁剪。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 32)}
     logic = ProfitCalculatorLogic(data)
     assert logic.rotate_weekly() == []
-    assert len(logic.data) == 7
+    assert len(logic.data) == 22
+
+
+def test_rotate_weekly_at_limit_no_trim():
+    """恰好 30 条时不删（满上限不删，第 31 条才删最旧）。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(1, 31)}
+    logic = ProfitCalculatorLogic(data)
+    assert logic.rotate_weekly() == []
+    assert len(logic.data) == 30
 
 
 def test_rotate_weekly_trims_oldest():
-    """超过 7 天时删除最旧记录，保留最近 7 条。"""
-    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 19)}
+    """超过 30 条时删除最旧记录，保留最近 30 条。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(1, 33)}
     logic = ProfitCalculatorLogic(data)
     deleted = logic.rotate_weekly()
     dates = sorted(logic.data.keys())
-    assert len(dates) == 7
-    assert "2026-07-10" not in dates
-    assert "2026-07-11" not in dates
-    assert "2026-07-12" in dates  # 保留下来的最旧一天
-    assert "2026-07-18" in dates
+    assert len(dates) == 30
+    assert "2026-07-01" not in dates
+    assert "2026-07-02" not in dates
+    assert "2026-07-03" in dates  # 保留下来的最旧一天
+    assert "2026-07-32" in dates
     # 返回被删除的日期列表（O-14）
-    assert deleted == ["2026-07-10", "2026-07-11"]
+    assert deleted == ["2026-07-01", "2026-07-02"]
 
 
 def test_rotate_weekly_logs_deletion(caplog):
-    """裁剪时记录 info 日志，供状态栏提示溯源（O-14）。"""
-    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(10, 19)}
+    """裁剪时记录 info 日志，便于状态栏提示溯源（O-14）。"""
+    data = {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0} for d in range(1, 33)}
     logic = ProfitCalculatorLogic(data)
     with caplog.at_level("INFO", logger="calculator"):
         logic.rotate_weekly()
-    assert any("2026-07-10" in r.message for r in caplog.records)
+    assert any("2026-07-01" in r.message for r in caplog.records)
 
 
 # ── ProfitCalculatorLogic.summary ──────────────────
@@ -567,6 +575,24 @@ def test_summary_caps_to_recent_days():
     count, total = logic.summary()
     assert count == 7
     assert total == 0.0  # 07-11~07-17 仓库值恒为 200，07-01 不在最近 7 条内
+
+
+def test_format_summary_days_parameterized():
+    """J 系列：format_summary 的「最近N条」前缀随 days 参数走（N 不写死 7）。"""
+    text, signal = ProfitCalculatorLogic.format_summary(2, 300.0, days=30)
+    assert text == "最近30条总盈亏：+¥300.00"
+    assert signal == RateSignal.POSITIVE
+
+
+def test_summary_days_parameterized_window():
+    """J 系列：summary(days) 的窗口随参数收窄/放宽（视图 7/30 同源统计）。"""
+    logic = ProfitCalculatorLogic(
+        {f"2026-07-{d:02d}": {"cash": 100.0, "warehouse": 200.0 + d} for d in range(1, 31)}
+    )
+    count_7, _ = logic.summary(7)
+    count_30, _ = logic.summary(30)
+    assert count_7 == 7
+    assert count_30 == 30
 
 
 def test_export_csv_empty():

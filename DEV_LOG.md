@@ -8,14 +8,23 @@
 
 ## 滚动摘要（2026-08-03）
 
+- **J 系列**：记录保留上限 7→30（`RETENTION_LIMIT`）+ 视图 7/30 可切换（`TableWidget` 按钮组 + `view_changed` 信号），存储与视图解耦、切回 7 不丢数据；ADR-0003 落档，详见日志正文
 - **打包**：主分支重新打包（H-01/G-01 后），`dist/收益计算器/` 64M，烟测通过（详见日志正文）
-- **测试**：pytest **231/231** ✅（2026-08-03 图表 hover/无填充结构回归 +1）
+- **测试**：pytest **237/237** ✅（2026-08-03 J 系列视图切换 UI 用例 +3、summary/format_summary 参数化纯函数 +2）
 - **图表**：样式对齐原型评审修正版（0559537）——删填充区域、hover 改「系列短名+值、按所属 ViewBox 顶部堆叠定位」；布局把曲线图置底固定高度、表格改弹性区，为后续 7/30 天记录预留高度（用户预告将记录天数设为 7/30 天）
 - **活跃工单**：见 TO-TICKETS 归档表（G-01 图表样式对齐已归档为 H-01）
 
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 实现 | J-01 保留上限 7→30 + J-02 视图 7/30 切换（ADR-0003，存储/视图解耦）
+- 需求：用户「记录天数上限 7→30 + 多视图切换」（Grilling Q1–Q11 收敛，`CONSENSUS.md` §7）。核心=把**保留 Retention**与**视图 View**解耦
+- **J-01（数据模型）**：`config.py` 新增 `RETENTION_LIMIT=30`（保留上限），`rotate_weekly()`/`format_saved_indicator()` 默认改引用它——`rotate_weekly` 保留边界「满 30 不删、第 31 条才删最旧」（Q11）；清理文案「已保留最近 30 条记录」
+- **J-02（UI）**：`TableWidget` 加 7/30 按钮组（`QButtonGroup` + `QRadioButton`）+ `view_changed(int)` 信号 + 持有 `_view_days`（Q6/Q8 深模块——表格是视图窗口主人，MainWindow 只订阅）；分栏均分 `mid=ceil(n/2)`（Q7：7→4+3、30→15+15）；`MainWindow` 持 `_view_n`（启动默认 7，会话内存不持久化 §7.5）、`_get_records`/`_update_summary` 去硬编码 `WEEK_DAYS` 改走 `_view_n`；切视图 `_on_view_changed → refresh_display`，表格+曲线图+汇总同源联动（Q9/Q10）
+- 测试：`test_ui_smoke.py` +3（默认视图 7+按钮组状态 / 切 30 信号+15+15+汇总「最近30条」 / 切回 7 不丢存储 Q5）、`test_calculator.py` +2（`format_summary(days=30)` 前缀 / `summary(7)` vs `summary(30)` 窗口参数化）；rotate_weekly 既有用例改 30 上限
+- 文档：ADR-0003 落档（可选方案 A 纯扩容/B 解耦/C 日历口径 → 选 B）；CODE_WIKI/PROJECT_REFERENCE/README 同步「最近 30 条 + 视图 7/30」文案；doc_sync 刷新机械标记
+- 验证：pytest 237/237 ✅；`doc_sync --check` 通过
 
 ### 2026-08-03 | 打包 | 主分支重新打包（H-01 图表样式 + G-01 双轴合并后，含图表改动）
 - 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）

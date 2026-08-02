@@ -12,14 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-03）：J 系列 — 记录保留 30 + 多视图 7/30 切换（规格见 `CONSENSUS.md` §7，Grilling Q1–Q11 收敛）。
+> 活跃表（2026-08-03）：J 系列已全部完成归档（见下）；当前无待办工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| J-01 | 保留上限 7→30：`config` 新增 `RETENTION_LIMIT=30` + `rotate_weekly` 改引用它 + `format_summary`/`format_saved_indicator` 文案联动（N 不写死 7） | 功能（数据模型） | 📝 已录入 | ⚪ Speculative |
-| J-02 | 视图切换 7/30：`TableWidget` 加按钮组（7/30）+ `view_changed(int)` 信号 + 分栏均分 `mid=ceil(n/2)`；`MainWindow` 持 `_view_n`（启动默认 7）、`_get_records`/`_update_summary` 改走 `_view_n`；`chart` 随 records 自适应 | 功能（UI） | 📝 已录入 | ⚪ Speculative |
-
-> **依赖链**：J-01（保留上限冻结）→ J-02（UI 联动依赖视图条数逻辑）。两段接入点都在 `MainWindow`（`_get_records`/`_update_summary` 当前硬编码 `WEEK_DAYS`）：J-01 是 calculator/config 纯逻辑层，J-02 把接入点参数化 + 加切换控件。
 
 ---
 
@@ -31,6 +27,13 @@
 |--------|------|------|------|----------|------|
 | F-01 | 文档同步自动化：`scripts/doc_sync.py`（测试数/模块行数/方法表）+ pre-commit 防漂移钩子 | 运维（文档自动化） | 🟡 Worth exploring | 2026-08-02 | `fc28fff` |
 | F-02 | 数据迁移「源清理时间点」策略 + `.migrated` 完成标记 | 运维（数据迁移） | ⚪ Speculative | 2026-08-02 | `fc28fff` |
+
+### J 系列（2026-08-03，保留 30 + 多视图 7/30 切换，规格见 `CONSENSUS.md` §7 / ADR-0003）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| J-01 | 保留上限 7→30：`config` 新增 `RETENTION_LIMIT=30` + `rotate_weekly` 改引用它 + `format_summary`/`format_saved_indicator` 文案联动（N 不写死 7） | 功能（数据模型） | 2026-08-03 |  |
+| J-02 | 视图切换 7/30：`TableWidget` 按钮组（7/30）+ `view_changed(int)` 信号 + 分栏均分 `mid=ceil(n/2)`；`MainWindow` 持 `_view_n`（默认 7）、`_get_records`/`_update_summary` 走 `_view_n`；`chart` 随 records 自适应 | 功能（UI） | 2026-08-03 |  |
 
 ### H 系列（2026-08-03，图表样式对齐 + 布局）
 

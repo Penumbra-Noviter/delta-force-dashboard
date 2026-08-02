@@ -1,21 +1,30 @@
 """
-七日数据表格：PySide6 双栏布局。
+可切换视图数据表格：PySide6 双栏布局。
 
-左栏显示前4天数据，右栏显示后3天数据，减少滚动操作。
+视图窗口 7/30 可切换（J 系列，Consensus §7）：按钮组 7天/30天，
+默认 7 天。存储与视图解耦——30 是「隐藏累积」的全量存储，控制在
+calculator.rotate_weekly 的 RETENTION_LIMIT；本表只是从存量里筛出
+当前视图条数来展示，切回 7 不丢数据。
+
+双栏按 mid=ceil(n/2) 均分（7→4+3、30→15+15），减少滚动操作。
 7 列：日期、现金、仓库（总收益）、较前日、收益率、盈亏标签、操作。
 """
 
 from __future__ import annotations
+
+from math import ceil
 
 __all__ = ["PnLBadge", "TableWidget"]
 
 from PySide6.QtCore import Qt, Signal, QModelIndex
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QPushButton,
+    QRadioButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -58,6 +67,9 @@ COL_DIFF = 3
 COL_RATE = 4
 COL_PNL = 5
 COL_ACTIONS = 6
+
+# 可切换的视图窗口（J 系列）：与存储保留上限 RETENTION_LIMIT 解耦的展示口径。
+VIEW_DAYS = (7, 30)
 
 
 class PnLBadge(QWidget):
@@ -324,20 +336,62 @@ class _DaySubTable(QTableWidget):
 
 
 class TableWidget(QWidget):
-    """双栏布局表格：左栏前4天 + 右栏后3天数据。"""
+    """双栏布局表格：视图 7/30 可切换（按钮组），按 mid=ceil(n/2) 均分栏位。
+
+    表格是「视图窗口」的主人（Consensus §7 Q8）：持有当前视图条数
+    self._view_days 与按钮组，切换时 emit view_changed(int)；MainWindow
+    只订阅、据此改 _view_n 重新拉取 records —— 深模块，分割逻辑留在表内。
+    """
 
     edit_requested = Signal(str, object)  # date_str, DayRecord
     delete_requested = Signal(str)  # date_str
+    view_changed = Signal(int)  # 当前视图条数（7 / 30）
 
     def columnCount(self) -> int:
-        """委派给左子表的列数（双栏列数相同）。"""
+        """返回左栏子表的列数（双栏列数相同）。"""
         return self._left_table.columnCount()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def current_view(self) -> int:
+        """返回当前视图条数（7 / 30）。"""
+        return self._view_days
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        default_view: int = VIEW_DAYS[0],
+    ) -> None:
         super().__init__(parent)
-        self._layout = QHBoxLayout(self)
+        self._view_days = default_view
+
+        # 视图切换栏（按钮组 7/30，Q8：进表内、emit 信号）
+        self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(12)
+        self._layout.setSpacing(6)
+
+        self._view_bar = QWidget()
+        view_layout = QHBoxLayout(self._view_bar)
+        view_layout.setContentsMargins(0, 0, 0, 0)
+        view_layout.setSpacing(8)
+        view_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._btn_group = QButtonGroup(self)
+        self._view_buttons: list[QRadioButton] = []
+        for days in VIEW_DAYS:
+            btn = QRadioButton(f"{days} 天")
+            btn.setProperty("days", days)
+            btn.setChecked(days == default_view)
+            self._btn_group.addButton(btn)
+            self._view_buttons.append(btn)
+            btn.toggled.connect(self._on_view_toggled)
+            view_layout.addWidget(btn)
+        self._layout.addWidget(self._view_bar)
+
+        # 双栏主体
+        self._body = QWidget()
+        self._body_layout = QHBoxLayout(self._body)
+        self._body_layout.setContentsMargins(0, 0, 0, 0)
+        self._body_layout.setSpacing(12)
+        self._layout.addWidget(self._body)
 
         # 左栏
         self._left_column = QWidget()
@@ -354,7 +408,7 @@ class TableWidget(QWidget):
         self._left_table.delete_requested.connect(self.delete_requested.emit)
         left_layout.addWidget(self._left_table)
 
-        self._layout.addWidget(self._left_column, 1)
+        self._body_layout.addWidget(self._left_column, 1)
 
         # 右栏
         self._right_column = QWidget()
@@ -371,7 +425,7 @@ class TableWidget(QWidget):
         self._right_table.delete_requested.connect(self.delete_requested.emit)
         right_layout.addWidget(self._right_table)
 
-        self._layout.addWidget(self._right_column, 1)
+        self._body_layout.addWidget(self._right_column, 1)
 
     def draw(self, records: list, today: str) -> None:
         """根据 records 绘制双栏表格。
@@ -381,7 +435,8 @@ class TableWidget(QWidget):
             today: 今日日期字符串 YYYY-MM-DD
         """
         n = len(records)
-        mid = min(4, n)
+        # 均分：mid=ceil(n/2)（Q7：7→4+3、30→15+15，双栏均衡）
+        mid = ceil(n / 2)
         left_records = records[:mid]
         right_records = records[mid:]
 
@@ -406,3 +461,17 @@ class TableWidget(QWidget):
         # 绘制右表：传入左表最后一条记录的仓库值作为 prev_warehouse
         prev = left_records[-1][1].warehouse if left_records else None
         self._right_table.draw(right_records, today, prev_warehouse=prev)
+
+    def _on_view_toggled(self) -> None:
+        """按钮组切换：更新当前视图条数并 emit view_changed(int)。
+
+        QRadioButton 互斥保证同一时刻仅一个 checked；取选中按钮的 days 属性，
+        非选中（关）状态的红利 toggle 忽略。
+        """
+        checked = self._btn_group.checkedButton()
+        if checked is None:
+            return
+        current_days = int(checked.property("days"))
+        if current_days != self._view_days:
+            self._view_days = current_days
+            self.view_changed.emit(current_days)
