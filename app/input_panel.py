@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import get_color
+from calculator import ProfitCalculatorLogic
 from formatting import (
     format_input_value,
     format_short_date,
@@ -251,7 +252,11 @@ class InputPanel(QWidget):
         except ValueError:
             cash = None
             warehouse = None
-        violated = cash is not None and warehouse is not None and cash > warehouse
+        violated = (
+            cash is not None
+            and warehouse is not None
+            and not ProfitCalculatorLogic.is_cash_under_warehouse(cash, warehouse)
+        )
         self.cash_entry.set_invariant_warning(violated)
         self.warehouse_entry.set_invariant_warning(violated)
 

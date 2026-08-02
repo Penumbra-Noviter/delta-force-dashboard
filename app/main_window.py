@@ -44,7 +44,7 @@ from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
-from calculator import DayRecord, ProfitCalculatorLogic
+from calculator import DayRecord, ProfitCalculatorLogic, RateSignal
 from settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
@@ -402,7 +402,7 @@ class MainWindow(QMainWindow):
             return
 
         # 不变式：现金 ⊆ 仓库（仓库价值已含现金）。违反时拦截保存（O-08）。
-        if cash > warehouse:
+        if not ProfitCalculatorLogic.is_cash_under_warehouse(cash, warehouse):
             QMessageBox.warning(
                 self,
                 "数据不合逻辑",
@@ -424,16 +424,9 @@ class MainWindow(QMainWindow):
 
         self.refresh_display()
 
-        if save_date == self.today:
-            indicator = f"✓ 今日已保存 — 仓库总收益 {format_money(warehouse)}"
-        else:
-            indicator = (
-                f"✓ {format_short_date(save_date)} 已更新 — "
-                f"仓库总收益 {format_money(warehouse)}"
-            )
-        if deleted:
-            # O-14/O-17：保留策略按「录入条数」轮转（保留最近 WEEK_DAYS 条），文案如实表述
-            indicator += f"（已保留最近 {WEEK_DAYS} 条记录，自动清理 {len(deleted)} 条较早记录）"
+        indicator = ProfitCalculatorLogic.format_saved_indicator(
+            save_date, warehouse, self.today, deleted
+        )
         self.input_panel.set_saved_indicator(indicator)
 
         # 非编辑模式保存后清空输入框并回焦，便于连续录入
@@ -561,26 +554,21 @@ class MainWindow(QMainWindow):
         )
 
     def _update_summary(self) -> None:
-        """读取 logic 的最近记录汇总（按录入条数），并格式化为标签展示。"""
-        count, total = self.logic.summary(WEEK_DAYS)
-        prefix = f"最近{WEEK_DAYS}条总盈亏："
+        """读取 logic 的最近记录汇总（按录入条数），并格式化为标签展示。
 
-        # 数据不足或仅一条记录：弱化提示（灰字小号）
-        if total is None or count == 1:
-            text = f"{prefix}数据不足" if total is None else (
-                f"{prefix}{format_money(total)}（仅 1 条记录）"
-            )
-            self._summary_label.setText(text)
-            self._summary_label.setStyleSheet(
+        D-07：文本与信号由 format_summary 纯函数生成，本方法只做
+        信号→颜色映射与样式落地（颜色映射留 UI）。
+        """
+        count, total = self.logic.summary(WEEK_DAYS)
+        text, signal = ProfitCalculatorLogic.format_summary(count, total)
+        self._summary_label.setText(text)
+        if signal is RateSignal.NONE:
+            # 数据不足 / 仅 1 条记录：弱化提示（灰字小号）
+            style = (
                 f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
             )
-            return
-
-        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total)
-        text = f"{prefix}{total_text}"
-        color = signal_color(total_signal)
-
-        self._summary_label.setText(text)
-        self._summary_label.setStyleSheet(
-            f"color: {color}; font-size: 13px; font-weight: bold;"
-        )
+        else:
+            style = (
+                f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
+            )
+        self._summary_label.setStyleSheet(style)

@@ -9,27 +9,6 @@ from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnLSignal
 
 # ── DayRecord ────────────────────────────────────────
 
-def test_day_record_total():
-    """total = warehouse（仓库已包含现金）。"""
-    r = DayRecord(cash=1000.0, warehouse=500.0, date="2026-07-20")
-    assert r.total == 500.0
-
-
-def test_day_record_zero():
-    r = DayRecord(cash=0.0, warehouse=0.0, date="2026-07-20")
-    assert r.total == 0.0
-
-
-def test_day_record_float():
-    r = DayRecord(cash=100.25, warehouse=50.75, date="2026-07-20")
-    assert r.total == 50.75
-
-
-def test_day_record_negative():
-    r = DayRecord(cash=-100.0, warehouse=200.0, date="2026-07-20")
-    assert r.total == 200.0
-
-
 def test_day_record_is_frozen():
     r = DayRecord(cash=100.0, warehouse=200.0, date="2026-07-20")
     with pytest.raises(Exception):
@@ -126,7 +105,6 @@ def test_save_new_record():
     record = logic.save_record("2026-07-20", 100.0, 200.0)
     assert record.cash == 100.0
     assert record.warehouse == 200.0
-    assert record.total == 200.0  # total = warehouse
     assert logic.serialize()["2026-07-20"]["cash"] == 100.0
 
 
@@ -156,7 +134,7 @@ def test_last_record_before_found():
     result = logic.last_record_before("2026-07-20")
     assert result is not None
     assert result[0] == "2026-07-18"
-    assert result[1].total == 200.0  # total = warehouse
+    assert result[1].warehouse == 200.0
 
 
 def test_last_record_before_none():
@@ -259,10 +237,9 @@ def test_full_flow():
 
     assert today is not None
     assert yesterday is not None
-    # total = warehouse
-    assert today.total == 600.0
+    assert today.warehouse == 600.0
     assert yesterday[0] == "2026-07-19"
-    assert yesterday[1].total == 500.0
+    assert yesterday[1].warehouse == 500.0
     # 收益变化 = warehouse 变化
     assert today.warehouse - yesterday[1].warehouse == 100.0
 
@@ -353,6 +330,86 @@ def test_format_signed_money_none():
     text, signal = ProfitCalculatorLogic.format_signed_money(None)
     assert text == "—"
     assert signal == RateSignal.NONE
+
+
+# ── ProfitCalculatorLogic.is_cash_under_warehouse ───
+
+def test_is_cash_under_warehouse_true():
+    """现金小于仓库：不变式成立。"""
+    assert ProfitCalculatorLogic.is_cash_under_warehouse(100.0, 500.0)
+
+
+def test_is_cash_under_warehouse_equal_boundary():
+    """现金等于仓库：不变式成立（边界，不触发警告/拦截/红框）。"""
+    assert ProfitCalculatorLogic.is_cash_under_warehouse(500.0, 500.0)
+
+
+def test_is_cash_under_warehouse_false():
+    """现金大于仓库：不变式违反。"""
+    assert not ProfitCalculatorLogic.is_cash_under_warehouse(600.0, 500.0)
+
+
+# ── ProfitCalculatorLogic.format_summary ─────────────
+
+def test_format_summary_empty():
+    """无记录（count 0）：数据不足提示，信号 NONE（灰字弱化）。"""
+    text, signal = ProfitCalculatorLogic.format_summary(0, None)
+    assert text == "最近7条总盈亏：数据不足"
+    assert signal == RateSignal.NONE
+
+
+def test_format_summary_single_record_no_plus_prefix():
+    """仅 1 条记录：仓库值非趋势，不加 + 前缀，信号 NONE。"""
+    text, signal = ProfitCalculatorLogic.format_summary(1, 500.0)
+    assert text == "最近7条总盈亏：¥500.00（仅 1 条记录）"
+    assert signal == RateSignal.NONE
+
+
+def test_format_summary_positive():
+    text, signal = ProfitCalculatorLogic.format_summary(2, 300.0)
+    assert text == "最近7条总盈亏：+¥300.00"
+    assert signal == RateSignal.POSITIVE
+
+
+def test_format_summary_negative():
+    text, signal = ProfitCalculatorLogic.format_summary(2, -30.0)
+    assert text == "最近7条总盈亏：¥-30.00"
+    assert signal == RateSignal.NEGATIVE
+
+
+def test_format_summary_zero():
+    text, signal = ProfitCalculatorLogic.format_summary(2, 0.0)
+    assert text == "最近7条总盈亏：¥0.00"
+    assert signal == RateSignal.NEUTRAL
+
+
+# ── ProfitCalculatorLogic.format_saved_indicator ─────
+
+def test_format_saved_indicator_today():
+    """保存今日：今日文案 + 仓库总收益。"""
+    text = ProfitCalculatorLogic.format_saved_indicator(
+        "2026-08-02", 460900000.0, "2026-08-02", []
+    )
+    assert text == "✓ 今日已保存 — 仓库总收益 ¥460.9M"
+
+
+def test_format_saved_indicator_historical_date():
+    """编辑历史日期：短日期「已更新」文案。"""
+    text = ProfitCalculatorLogic.format_saved_indicator(
+        "2026-07-20", 419900000.0, "2026-08-02", []
+    )
+    assert text == "✓ 07-20 已更新 — 仓库总收益 ¥419.9M"
+
+
+def test_format_saved_indicator_with_rotation_hint():
+    """触发轮转删除：追加清理提示（O-14/O-17 文案）。"""
+    text = ProfitCalculatorLogic.format_saved_indicator(
+        "2026-08-02", 460900000.0, "2026-08-02", ["2026-07-10"]
+    )
+    assert text == (
+        "✓ 今日已保存 — 仓库总收益 ¥460.9M"
+        "（已保留最近 7 条记录，自动清理 1 条较早记录）"
+    )
 
 
 # ── ProfitCalculatorLogic.get_pnl_label ──────────────

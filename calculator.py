@@ -13,7 +13,7 @@ from enum import Enum
 from typing import Optional
 
 from config import DATE_FORMAT, WEEK_DAYS
-from formatting import format_money
+from formatting import format_money, format_short_date
 
 __all__ = [
     "DayRecord",
@@ -52,11 +52,6 @@ class DayRecord:
     cash: float
     warehouse: float
     date: str
-
-    @property
-    def total(self) -> float:
-        """总收益 = 仓库价值（已包含现金）。"""
-        return self.warehouse
 
 
 class ProfitCalculatorLogic:
@@ -100,7 +95,7 @@ class ProfitCalculatorLogic:
         业务层不强制「现金 ⊆ 仓库」不变式（允许保留已录入的异常数据并继续展示），
         仅对违反不变式的写入记录 warning——拦截由 UI 层 save_today 负责（O-08）。
         """
-        if cash > warehouse:
+        if not self.is_cash_under_warehouse(cash, warehouse):
             logger.warning(
                 "记录违反不变式（现金 %.2f > 仓库 %.2f，date=%s）",
                 cash,
@@ -110,6 +105,16 @@ class ProfitCalculatorLogic:
         record = DayRecord(cash=cash, warehouse=warehouse, date=date_str)
         self.data[date_str] = record
         return record
+
+    @staticmethod
+    def is_cash_under_warehouse(cash: float, warehouse: float) -> bool:
+        """不变式判定：现金 ⊆ 仓库（仓库价值已含现金）。
+
+        返回 True 表示不变式成立（cash ≤ warehouse），False 表示违反。
+        唯一所有者（D-05）：save_record 告警 / save_today 拦截 / 输入框红框
+        三处共用此判定，不再各自内联比较字面量。
+        """
+        return cash <= warehouse
 
     def serialize(self) -> dict[str, dict[str, float]]:
         """转换为磁盘持久化形态的裸 dict（`{"日期": {"cash": ..., "warehouse": ...}}`）。
@@ -195,6 +200,58 @@ class ProfitCalculatorLogic:
         if value < 0:
             return format_money(value), RateSignal.NEGATIVE
         return format_money(0.0), RateSignal.NEUTRAL
+
+    @staticmethod
+    def format_summary(
+        count: int, total: float | None, days: int = WEEK_DAYS
+    ) -> tuple[str, RateSignal]:
+        """汇总标签展示文本的纯函数：按记录数与总盈亏返回 (文本, 信号)。
+
+        与 summary() 语义对齐（录入条数基准）：
+        - count == 0（total 为 None）：`最近N条总盈亏：数据不足`，信号 NONE；
+        - count == 1：`最近N条总盈亏：¥X（仅 1 条记录）`，信号 NONE
+          （仓库值非趋势，不加 + 前缀）；
+        - count >= 2：复用 format_signed_money（带符号、趋势信号）。
+
+        UI 层把信号映射为当前主题颜色（app.theme.signal_color），
+        弱化/常规字号等纯样式留 UI（D-07）。
+        """
+        prefix = f"最近{days}条总盈亏："
+        if total is None:
+            return f"{prefix}数据不足", RateSignal.NONE
+        if count == 1:
+            return f"{prefix}{format_money(total)}（仅 1 条记录）", RateSignal.NONE
+        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total)
+        return f"{prefix}{total_text}", total_signal
+
+    @staticmethod
+    def format_saved_indicator(
+        save_date: str,
+        warehouse: float,
+        today: str,
+        deleted: list[str],
+        keep_days: int = WEEK_DAYS,
+    ) -> str:
+        """保存成功状态栏文本的纯函数（今日/历史日期 + 轮转清理提示）。
+
+        - 保存日期为今日 → `✓ 今日已保存 — 仓库总收益 ¥X`；
+        - 历史日期（编辑）→ `✓ MM-DD 已更新 — 仓库总收益 ¥X`；
+        - 触发轮转删除（deleted 非空）追加「已保留最近 N 条记录，
+          自动清理 M 条较早记录」（O-14/O-17 文案）。
+        """
+        if save_date == today:
+            indicator = f"✓ 今日已保存 — 仓库总收益 {format_money(warehouse)}"
+        else:
+            indicator = (
+                f"✓ {format_short_date(save_date)} 已更新 — "
+                f"仓库总收益 {format_money(warehouse)}"
+            )
+        if deleted:
+            indicator += (
+                f"（已保留最近 {keep_days} 条记录，"
+                f"自动清理 {len(deleted)} 条较早记录）"
+            )
+        return indicator
 
     @staticmethod
     def get_pnl_label(
