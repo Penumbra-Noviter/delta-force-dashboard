@@ -9,7 +9,7 @@
 ## 滚动摘要（2026-08-01）
 
 - **测试**：pytest **221/221** ✅（D-08 评审修正后）；基线演进 103→221，各阶段计数见下方条目
-- **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
+- **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。UPX 5.2.0 已在 PATH（WinGet），spec `upx=True` 直接命中；无 PATH 环境兜底：显式 `--upx-dir D:/Desktop/tools/UPX`
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
 - **活跃工单**：D 系列全 ✅（D-01~D-08，2026-08-02，见 TO-TICKETS 归档表）；当前无活跃工单
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
@@ -17,6 +17,20 @@
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 运维 | 项目评估报告核对 + E 系列工单收口
+- 背景：外部 AI 评估报告（`项目评估报告.md`，8.80/10）与 HEAD 逐条核对——3 条 P1 中 2 条已存在（纯函数 docstring / ADR 文档），1 条论据过期（其引用的 `DATA_RETENTION_DAYS` 常量 O-17 已删）；报告文件已不在工作区（用户自行处理，git 零引用）
+- 拍板（用户）：E-01 保留天数可配置 **关闭**（不知配置对用户实际作用）；E-02 操作审计日志 **关闭**（单用户无追责场景 + 覆盖写日志留不下旧值，救不了撤销）；E-03 图表脚本化导出 **关闭**（不需要，YAGNI）；E-04 陈旧产物清理 **授权**（已录入 TO-TICKETS 活跃表 🔄）
+- E-04 执行：删 5 个 stale pyc（`app/__pycache__/` 下 logic/data_store/formatting/config + 根 `verify_all`——C5/D 系列重构残留，gitignore 已忽略无害）+ 根目录旧 `profit_calculator.log`（O-22 前 APP_DIR 日志，现日志在 `~/收益计算器/`）
+- ⚠️ **根目录 `data.json.bak*` 4 份暂缓**：核对发现值差异——bak 含 07-24 唯一记录、07-25/08-01 数值与权威 `~/收益计算器/data.json` 不同（疑 O-08 测试污染或旧快照）；权威数据自足健康（含当日 08-02 记录 + 完整备份链），07-24 系 08-02 保存时正常轮转删除。用户确认后删除（E-04 归档）
+- pytest 221/221 不受影响（纯运维 + 文档）
+
+### 2026-08-02 | 打包 | 主分支重新打包（D-08 后，含 signals.py）
+- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`）
+- ⚠️ UPX 现已在 PATH：WinGet 安装的 `upx 5.2.0`（`C:/Users/.../WinGet/Packages/UPX.UPX.../upx.exe`），spec `upx=True` 自动命中，无需再显式传 `--upx-dir`（滚动摘要第 12 行旧避坑已过时，保留为无 PATH 环境的兜底）
+- 产物：`dist/收益计算器/` **64M**（exe 6.5MB + `_internal/`，与 O-21 UPX 后持平）；`signals.py` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
+- 唯一 warn：`pyqtgraph.opengl` 子模块未收集（`No module named 'OpenGL'`，可选依赖，应用不加载，历次一致）
+- 烟测：exe 启动 6s 进程存活后终止 ✅（无启动崩溃）
 
 ### 2026-08-02 | 修复+文档 | D-08 D 系列评审修正：signals 叶子收敛 + 告警可观测性 + 文档漂移
 - **① 层反转修复（唯一设计分叉）**：`RateSignal`/`PnLSignal` 自 `calculator.py` 抽至新零依赖叶子 `signals.py`；`theme.py`/`table_widget.py`/`main_window.py`/`calculator.py` 改从叶子导入——`theme.py` 不再反向依赖业务层，保住 D-01 的 `signal_color` 收敛（评审：theme.py 依赖图「无外部依赖」陈）。
