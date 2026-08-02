@@ -11,12 +11,24 @@
 - **测试**：pytest **187/187** ✅（O-22 修复后）；基线演进 103→187，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：空（全部归档 TO-TICKETS.md）
+- **活跃工单**：D-01~D-07 深层化候选（2026-08-02 grilling 拍板，见 TO-TICKETS 活跃表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 决策 | 架构评审 7 候选 grilling 拍板 + 录入 TO-TICKETS（D-01~D-07）
+- 来源：`architecture-review-20260802.html` 深层化机会（O/C 系列热点）；用 grilling 逐分支走决策树，7 分支全部确认
+- 定案：D-01 趋势收敛（`format_signed_money` 纯函数，复用 RateSignal，零值 `¥0.00` 无前缀）；D-02 `json_file.py` 原子写 seam + `SettingsStore`；D-03 序列化边界（ADR-0001：`data`→`dict[str, DayRecord]` + `serialize()`）；D-04 QTest 打真实事件链路（`refresh_validity` 降级为同步 seam）；D-05 `is_cash_under_warehouse` 谓词三处收敛；D-06 删 `DayRecord.total`（生产零引用真死代码，`format_input_value` 保留）；D-07 `format_summary` 纯函数（依赖 D-01 信号 seam）
+- 新建：`docs/adr/0001-logic-data-dayrecord-map.md`（唯一满足 ADR 三条件的决策）；`CONTEXT.md`（领域词汇表，含序列化/有效性/跨字段校验/格式化等新词）；TO-TICKETS 活跃表 D-01~D-07
+- 纯文档/决策，未动代码；pytest 187/187 不受影响
+
+### 2026-08-02 | 运维 | 清理 %TEMP% 影子测试残留 + 陈旧产物提醒约定
+- 清理：`C:\Users\Administrator\AppData\Local\Temp\profit_calc_verify_*` **31 个目录（168K）** —— C5 迁移前 `verify_all.py` 的 settings 夹具残留，确认当前代码/测试零引用后 `rm -rf` 清除（`architecture-review-20260802.html` 按用户要求保留）
+- 教训：C5 删 `verify_all.py`（831 行）时其 tempfile 夹具目录未同步清理，8 天累积 31 个；**删除影子脚本/一次性工具后须同步清理其运行态残留**
+- 约定（用户要求）：此后开发中主动提醒清理陈旧临时产物（`%TEMP%` 残留、`_MEI*` 孤儿目录、旧备份等），清理前仍须用户确认
+- 纯运维，pytest 187/187 不受影响
 
 ### 2026-08-01 | 文档 | DEV_LOG 精简（滚动摘要 + 单行条目）+ 进度审计修复
 - 背景：DEV_LOG 615 行/46.6KB，每次会话读取耗 ~14K tokens；核心内容（决策/避坑/哈希/计数）与 TO-TICKETS 归档表大量重复

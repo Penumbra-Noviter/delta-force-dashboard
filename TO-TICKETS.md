@@ -12,7 +12,19 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-01）：**空**——O-22 已完成并归档，见「已完成归档」。O-18 已完成并归档。O-20（打包瘦身 onedir）已随本次会话完成并归档，见「已完成归档」。此前的 O-16/O-17/O-19 及 O-11~O-15（P2 第三批）均已完成并归档，见「已完成归档」。
+> 活跃表（2026-08-02）：7 个深层化候选（grilling 拍板，源：2026-08-02 架构评审 `architecture-review-20260802.html`）。ADR-0001 已随 C 候选录入同日创建。
+
+### 深层化候选（2026-08-02，grilling 已拍板）
+
+| Ticket | 标题 | 强度 | 拍板方案 | 依赖 |
+|--------|------|------|----------|------|
+| D-01 | 趋势判定收敛：`format_signed_money` 纯函数 | 🟢 Strong | `calculator.py` 纯函数 `(str, RateSignal)`；表格较前日列+汇总标签走它；零值 `¥0.00` 无前缀 NEUTRAL（表格 `+¥0.00`→`¥0.00`）；CSV 较前日列保持无前缀；颜色 key 不进业务层 | 无 |
+| D-02 | 原子写 seam：`json_file.py` + `SettingsStore` | 🟡 Worth exploring | `json_file.py`（`atomic_write_json`/`try_load_json`）；新增 `SettingsStore`（容错读→`{}`、原子写→失败 warning）；MainWindow 只留编码/解码；CSV 不进 seam | 无 |
+| D-03 | 序列化边界：`data`→`dict[str, DayRecord]` + `serialize()` | 🟡 Worth exploring | ADR-0001；解析收敛 `__init__`；`serialize()` 返回新 dict（消灭别名）；`get_record` 退化一行查询；MainWindow 改走 `logic.serialize()` | 无 |
+| D-04 | 被测试的路径=真实路径：QTest 打事件链路 | 🟡 Worth exploring | QTest 打 textChanged→去抖→signal→按钮 / 失焦立即校验 / 聚焦反格式化护栏；`refresh_validity` 保留为同步 seam，不再当测试后门 | 无 |
+| D-05 | 现金⊆仓库不变式单一所有者 | ⚪ Speculative | `is_cash_under_warehouse(cash, warehouse)` 纯函数；三处字面量（告警/红框/拦截）改调用，语义不动 | 无 |
+| D-06 | 删浅表面：`DayRecord.total` 删除 | ⚪ Speculative | 删 `total` property + 文档条目 + 6 处测试断言；`format_input_value` 保留（3 个生产调用点=实实现，不删） | 无 |
+| D-07 | 展示渲染移出编排器 | 🟡 Worth exploring | `format_summary(count, total)->(str, Signal)` 纯函数；`_saved_indicator_text(...)` 纯函数；不抽 service；颜色映射留 UI（依赖 D-01 信号 seam） | D-01 |
 
 ---
 
