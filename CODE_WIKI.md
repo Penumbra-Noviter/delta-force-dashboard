@@ -93,7 +93,7 @@ Profit Calculator/
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 61 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01）
+│   ├── test_calculator.py   ← 65 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03）
 │   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← 18 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式）
@@ -317,9 +317,10 @@ pyqtgraph 双曲线图组件。
 
 | 方法 | 参数 | 返回 | 说明 |
 |------|------|------|------|
-| `__init__` | `data: dict` | — | 绑定数据字典引用 |
-| `get_record` | `date_str: str` | `DayRecord \| None` | 查单日数据，字段缺失/格式异常返回 None |
-| `save_record` | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录 |
+| `__init__` | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目，ADR-0001） |
+| `get_record` | `date_str: str` | `DayRecord \| None` | 一行查询；不存在返回 None（非法条目已由加载时解析过滤） |
+| `save_record` | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例） |
+| `serialize` | — | `dict` | 转磁盘持久化形态裸 dict（`{日期: {cash, warehouse}}`）；返回**新 dict**，与内部 data 断共享（ADR-0001） |
 | `last_record_before` | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
 | `recent_records` | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
 | `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
@@ -332,6 +333,7 @@ pyqtgraph 双曲线图组件。
 | `export_csv` | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
 
 **关键业务规则**：
+- `data` 为 `dict[str, DayRecord]`（ADR-0001）；磁盘持久化走 `serialize()` 单向导出（返回新 dict，消灭 logic 与磁盘共享别名）；MainWindow 不直接触碰内部 data 形态
 - `total` = `warehouse`（非 `warehouse + cash`）
 - 收益率 = `(今日warehouse - 前日warehouse) / 前日warehouse × 100%`，精度 1 位小数
 - 盈亏标签：盈（绿底）/ 亏（红底）/ —（灰底，无前日数据或持平）

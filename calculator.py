@@ -63,11 +63,22 @@ class ProfitCalculatorLogic:
     """处理数据查询、历史对比与差值展示。"""
 
     def __init__(self, data: dict) -> None:
-        self.data = data
+        """绑定数据：接受磁盘形态裸 dict 或已解析的 dict[str, DayRecord]。
 
-    def get_record(self, date_str: str) -> Optional[DayRecord]:
-        """读取某一天的记录；字段缺失或格式异常时返回 None。"""
-        raw = self.data.get(date_str)
+        解析收敛到此处一次性完成（ADR-0001）：损坏/非法条目在加载时跳过，
+        语义与原先 get_record 对非法条目返回 None 一致。
+        """
+        self.data: dict[str, DayRecord] = {}
+        for date_str, raw in data.items():
+            record = self._parse_record(date_str, raw)
+            if record is not None:
+                self.data[date_str] = record
+
+    @staticmethod
+    def _parse_record(date_str: str, raw: object) -> DayRecord | None:
+        """把单条裸 dict 解析为 DayRecord；已是 DayRecord 直接返回，损坏/非法返回 None。"""
+        if isinstance(raw, DayRecord):
+            return raw
         if not isinstance(raw, dict):
             return None
         try:
@@ -78,6 +89,10 @@ class ProfitCalculatorLogic:
             )
         except (KeyError, ValueError, TypeError):
             return None
+
+    def get_record(self, date_str: str) -> DayRecord | None:
+        """读取某一天的记录；不存在时返回 None（非法条目已由加载时解析过滤）。"""
+        return self.data.get(date_str)
 
     def save_record(self, date_str: str, cash: float, warehouse: float) -> DayRecord:
         """保存某日记录并返回对应模型。
@@ -92,8 +107,20 @@ class ProfitCalculatorLogic:
                 warehouse,
                 date_str,
             )
-        self.data[date_str] = {"cash": cash, "warehouse": warehouse}
-        return DayRecord(cash=cash, warehouse=warehouse, date=date_str)
+        record = DayRecord(cash=cash, warehouse=warehouse, date=date_str)
+        self.data[date_str] = record
+        return record
+
+    def serialize(self) -> dict[str, dict[str, float]]:
+        """转换为磁盘持久化形态的裸 dict（`{"日期": {"cash": ..., "warehouse": ...}}`）。
+
+        返回新 dict，与内部 data 断共享（ADR-0001）：调用方对返回值的修改
+        不会影响只读的 logic 数据。
+        """
+        return {
+            date_str: {"cash": record.cash, "warehouse": record.warehouse}
+            for date_str, record in self.data.items()
+        }
 
     def last_record_before(
         self, date_str: str, max_days: int = 365

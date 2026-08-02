@@ -74,27 +74,74 @@ def test_get_record_bad_value():
 
 # ── ProfitCalculatorLogic.save_record ────────────────
 
+
+# ── ProfitCalculatorLogic.serialize / 加载时过滤（ADR-0001）──
+
+def test_init_filters_invalid_entries():
+    """加载时跳过损坏/非法条目，合法条目保留（ADR-0001 加载时过滤语义）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+            "2026-07-21": "not_a_dict",
+            "2026-07-22": {"warehouse": 200.0},  # 缺 cash
+            "2026-07-23": {"cash": "abc", "warehouse": 200.0},
+        }
+    )
+    assert sorted(logic.data) == ["2026-07-20"]
+    assert logic.get_record("2026-07-20") is not None
+    assert logic.get_record("2026-07-21") is None
+
+
+def test_serialize_round_trip():
+    """serialize 得到磁盘形态裸 dict，可回喂新 logic 重建。"""
+    logic = ProfitCalculatorLogic({})
+    logic.save_record("2026-07-20", 100.0, 200.0)
+    raw = logic.serialize()
+    assert raw == {"2026-07-20": {"cash": 100.0, "warehouse": 200.0}}
+    rebuilt = ProfitCalculatorLogic(raw)
+    record = rebuilt.get_record("2026-07-20")
+    assert record is not None
+    assert record.warehouse == 200.0
+
+
+def test_serialize_returns_new_dict():
+    """serialize 返回新 dict，修改它不影响内部 data（消灭别名，ADR-0001）。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    raw = logic.serialize()
+    assert raw is not logic.data
+    raw["2026-07-20"]["cash"] = 999.0
+    record = logic.get_record("2026-07-20")
+    assert record is not None
+    assert record.cash == 100.0
+
+
+def test_init_accepts_dayrecord_dict():
+    """构造函数兼容已解析的 dict[str, DayRecord]（复用/重建路径）。"""
+    record = DayRecord(cash=100.0, warehouse=200.0, date="2026-07-20")
+    logic = ProfitCalculatorLogic({"2026-07-20": record})
+    assert logic.get_record("2026-07-20") is record
+
 def test_save_new_record():
     logic = ProfitCalculatorLogic({})
     record = logic.save_record("2026-07-20", 100.0, 200.0)
     assert record.cash == 100.0
     assert record.warehouse == 200.0
     assert record.total == 200.0  # total = warehouse
-    assert logic.data["2026-07-20"]["cash"] == 100.0
+    assert logic.serialize()["2026-07-20"]["cash"] == 100.0
 
 
 def test_save_overwrite():
     logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 50.0, "warehouse": 60.0}})
     logic.save_record("2026-07-20", 999.0, 111.0)
-    assert logic.data["2026-07-20"]["cash"] == 999.0
+    assert logic.serialize()["2026-07-20"]["cash"] == 999.0
 
 def test_save_record_logs_warning_when_cash_exceeds_warehouse(caplog):
     """业务层不拦截异常记录（允许保留展示），仅记录 warning（O-08）。"""
     logic = ProfitCalculatorLogic({})
     with caplog.at_level("WARNING"):
         logic.save_record("2026-07-20", 200.0, 100.0)
-    assert logic.data["2026-07-20"]["cash"] == 200.0
-    assert logic.data["2026-07-20"]["warehouse"] == 100.0
+    assert logic.serialize()["2026-07-20"]["cash"] == 200.0
+    assert logic.serialize()["2026-07-20"]["warehouse"] == 100.0
     assert any("违反不变式" in rec.message for rec in caplog.records)
 
 

@@ -416,7 +416,7 @@ class MainWindow(QMainWindow):
         save_date = self.input_panel.get_editing_date() or self.today
         self.logic.save_record(save_date, cash, warehouse)
         deleted = self.logic.rotate_weekly()
-        self.store.save(self.logic.data)
+        self.store.save(self.logic.serialize())
 
         was_editing = self.input_panel.is_editing()
         if was_editing:
@@ -503,7 +503,7 @@ class MainWindow(QMainWindow):
             return
 
         self.logic.delete_record(date_str)
-        self.store.save(self.logic.data)
+        self.store.save(self.logic.serialize())
 
         if self.input_panel.get_editing_date() == date_str:
             self._cancel_edit()
