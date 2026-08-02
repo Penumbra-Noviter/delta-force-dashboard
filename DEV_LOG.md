@@ -8,15 +8,22 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **208/208** ✅（D-03 后）；基线演进 103→208，各阶段计数见下方条目
+- **测试**：pytest **210/210** ✅（D-04 后）；基线演进 103→210，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D-04~D-07 深层化候选；D-01~D-03 ✅（2026-08-02，见 TO-TICKETS 归档表）
+- **活跃工单**：D-05~D-07 深层化候选；D-01~D-04 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 测试重构 | D-04 被测试的路径=真实路径：QTest 打事件链路（`cfb15e1`）
+- 校验/联动断言不再把 `refresh_validity()` 当测试后门：conftest 新增 `type_and_settle` fixture（QTest `keyClicks` 键入 → 150ms 去抖 → `validity_changed` → save_btn 真实链路）；test_input_panel 校验/不变式 5 用例 + test_ui_smoke `test_input_validation_save_btn` 全改走它
+- `refresh_validity` 保留为同步 seam（主窗口 Esc 清空等程序化改动用，`_clear_focused_input`），只留 `test_money_line_edit_public_refresh_validity` 单一契约测试
+- 焦点事件收敛到真实路径：test_input_panel 新增 `shown_panel` fixture（offscreen 下 setFocus 焦点事件只对可见窗口派发）；新增聚焦反格式化护栏（`¥123,456.00`→`123456`+全选）/ 失焦立即校验（非法文本不等去抖）/ 失焦格式化 3 用例；test_ui_smoke 同名直派 `focusOutEvent` 用例迁入删除（-1）
+- 测试：+2（208→210）；test_input_panel 18→21、test_ui_smoke 23→22；3 连跑稳定；CODE_WIKI 方法表/文件树/测试表同步（顺带修正 test_calculator 61→65、test_table_theme 3→4 两处既有漂移）
+- 纯测试改动，无生产代码变更；pytest 210/210 ✅
 
 ### 2026-08-02 | 重构 | D-03 序列化边界：data→dict[str, DayRecord] + serialize()（ADR-0001，`54a23d0`）
 - `ProfitCalculatorLogic.data` 改为 `dict[str, DayRecord]`；解析收敛 `__init__`（私有 `_parse_record`：兼容已解析 DayRecord dict + 加载时跳过损坏/非法条目，语义=旧 get_record 对非法条目返回 None）

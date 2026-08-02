@@ -96,11 +96,11 @@ Profit Calculator/
 │   ├── test_calculator.py   ← 65 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03）
 │   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
-│   ├── test_input_panel.py  ← 18 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式）
+│   ├── test_input_panel.py  ← 21 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
 │   ├── test_table_theme.py  ← 4 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← 15 个测试（D-02 json_file seam + SettingsStore 容错）
 │   ├── test_migration.py    ← 7 个测试（O-22 数据目录迁移 + mkdir 顺序回归）
-│   └── test_ui_smoke.py     ← 23 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   └── test_ui_smoke.py     ← 22 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -179,7 +179,7 @@ Profit Calculator/
 | `__init__()` | 设置占位文本、右对齐、150ms 去抖 QTimer |
 | `_on_text_changed(text)` | 文本变化时重启去抖计时器 |
 | `_update_validity()` | 校验当前输入：空 → normal / 合法 → valid / 非法 → invalid |
-| `refresh_validity()` | 立即同步重校验当前文本（公开 seam，委托 `_update_validity()`，O-02） |
+| `refresh_validity()` | 立即同步重校验当前文本（公开 seam，委托 `_update_validity()`，O-02；D-04 保留为同步 seam，行为用例走真实事件链路） |
 | `_set_validity_state(state)` | 设置 `validity` 属性，触发 QSS 重绘边框 |
 | `focusInEvent()` | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
 | `focusOutEvent()` | 失焦时格式化：`1234.56` → `¥1,234.56` |
@@ -197,7 +197,7 @@ Profit Calculator/
 | `is_editing()` / `get_editing_date()` | 编辑状态查询（**单方归属 InputPanel**，C4） |
 | `get_cash_value()` / `get_warehouse_value()` | 解析当前输入返回金额；空→`None`，非法→`ValueError`（C4 seam） |
 | `get_cash_raw()` / `get_warehouse_raw()` | 返回输入框原始文本（供解析失败提示） |
-| `refresh_validity()` | 立即重新校验两个输入框的有效性（经公开 seam，O-02） |
+| `refresh_validity()` | 立即重新校验两个输入框的有效性（经公开 seam，O-02；D-04 后仅供程序化改动，测试不再当后门） |
 | `fill_values(cash, warehouse)` | 填入金额并选中现金框（不触发焦点格式化） |
 | `clear_fields()` | 清空输入框，保留已保存指示器 |
 | `set_saved_indicator(text)` | 设置保存成功提示文本 |
@@ -515,7 +515,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 61 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01） |
+| `tests/test_calculator.py` | 65 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01） |
 | `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | 15 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02） |
@@ -529,9 +529,9 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | 23 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
-| `tests/test_input_panel.py` | 18 | InputPanel getter 语义 / raw getter / refresh_validity 公开 seam / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
-| `tests/test_table_theme.py` | 3 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 |
+| `tests/test_ui_smoke.py` | 22 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_input_panel.py` | 21 | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
+| `tests/test_table_theme.py` | 4 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
 **运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）
 
