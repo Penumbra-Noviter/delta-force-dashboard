@@ -86,7 +86,7 @@ Profit Calculator/
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏最近 7 条数据表格（7 列）
-│   ├── chart_widget.py      ← pyqtgraph 双曲线图 + PNG 导出 + 稀疏数据提示
+│   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
 │   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
 ├── signals.py               ← [领域信号] RateSignal + PnLSignal 共享叶子（零依赖，D-01 收敛点）
@@ -108,7 +108,7 @@ Profit Calculator/
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
-│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->22<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->23<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -261,63 +261,56 @@ Profit Calculator/
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~448 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~456 行<!--/AUTO-->）
+
+#### 函数：`_adaptive_range(values)`
+
+自适应 Y 轴范围（底部留 10%，顶部留 8%）；仓库/现金两轴各自量纲独立调用。
 
 #### 类：`KMBAxisItem(pg.AxisItem)`
 
-自定义 Y 轴刻度标签，将数值显示为 K/M/B 财务单位。
-
-#### 类：`_ChartPanel(QWidget)`
-
-管理单个图表面板（一条曲线 + 填充区域 + hover 交互 + 端点标注），
-封装一个 PlotWidget 及其全部子元素，消除 ChartWidget 中 top/bottom 对称实例变量带来的代码重复。
-
-| 方法 | 说明 |
-|------|------|
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.__init__-->`__init__(label, color_key, line_style=Qt.PenStyle.SolidLine, symbol='s', series_name='', show_x_axis=False, parent=None)`<!--/AUTO--> | 惰性初始化面板：存配置 + 子元素引用为 None，等待首次 draw 创建 |
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.draw-->`draw(x, values, dates)`<!--/AUTO--> | 首次渲染或更新数据：首次创建 PlotWidget，后续仅 setData 原地更新 |
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.update_theme-->`update_theme()`<!--/AUTO--> | 主题切换后增量更新曲线/填充/轴/hover 颜色，不重建 |
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.clear_panel-->`clear_panel()`<!--/AUTO--> | 销毁内部组件并重置状态 |
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.plot_widget-->`plot_widget`<!--/AUTO--> | 属性：底层 pg.PlotWidget（惰性创建，未创建为 None） |
-| <!--AUTO:sig:app/chart_widget.py:_ChartPanel.values-->`values`<!--/AUTO--> | 属性：当前面板数值缓存 |
-| `_create(x, values)` | 从零创建 PlotWidget + 曲线 + 填充 + 端点标注 + hover + 自适应 Y 轴 + 图例 |
-| `_update_data(x, values)` | 原地更新曲线/填充/端点/Y 轴/X 轴标签（不重建） |
-| `_on_mouse_moved(evt)` | 鼠标移动时显示最近数据点的竖线 + 数值标签 |
-| `_set_adaptive_ylim(plot_widget, values)` | 自适应 Y 轴范围（底部留 10%，顶部留 8%） |
+自定义 Y 轴刻度标签，将数值显示为 K/M/B 财务单位（左/右轴共用）。
 
 #### 类：`ChartWidget(QWidget)`
 
-pyqtgraph 双曲线图组件，内部委托给两个 `_ChartPanel` 实例（上：仓库价值；下：现金）。
+单坐标系双 Y 轴曲线图：仓库价值（左轴，琥珀实线）与现金（右轴，青色虚线）合并进
+同一个 PlotWidget。主 ViewBox 承载仓库序列，副 ViewBox（右轴）承载现金序列，
+副 ViewBox 经 `setXLink` + `linkToView` 与主 ViewBox 共享 X 轴，两 Y 轴各自按
+自身量纲自适应——避免现金量级远小于仓库时被压成直线（ADR-0002，G-01）。
+合并前的上下双图结构（T-05 的 `_ChartPanel`）已删除。
 
 | 方法 | 说明 |
 |------|------|
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget.draw-->`draw(records)`<!--/AUTO--> | n≥2 时渲染双图，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.draw-->`draw(records)`<!--/AUTO--> | n≥2 时渲染双 Y 轴曲线，n<2 时显示占位提示文字；2≤n≤3 时叠加半透明「数据较少」提示 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._create-->`_create(x, warehouse_vals, cash_vals, dates)`<!--/AUTO--> | 从零创建 PlotWidget + 双 ViewBox + 曲线/填充/端点/hover/图例/右键菜单 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._update_data-->`_update_data(x, warehouse_vals, cash_vals, dates)`<!--/AUTO--> | 原地更新曲线/端点/双 Y 轴/X 轴标签（不重建） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._on_mouse_moved-->`_on_mouse_moved(evt)`<!--/AUTO--> | 鼠标移动时显示竖线 + 双曲线数值标签（各自坐标系） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._format_value-->`_format_value(v)`<!--/AUTO--> | 格式化图表数值为紧凑 K/M/B（与 Y 轴共用 format_compact，带 ¥ 前缀） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换时增量更新双曲线/填充/双轴/hover/图例颜色，不重建 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_sparse_hint-->`_show_sparse_hint()`<!--/AUTO--> | n=2~3 时叠加半透明「数据较少」提示（不触碰曲线与交互） |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.resizeEvent-->`resizeEvent(event)`<!--/AUTO--> | overlay 提示不参与 layout，手动跟随 widget 尺寸 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_placeholder-->`_show_placeholder(n)`<!--/AUTO--> | n=0 显示「暂无数据」，n=1 显示「至少需要两天数据」 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_placeholder-->`_clear_placeholder()`<!--/AUTO--> | 移除占位/稀疏提示 label |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget._setup_context_menu-->`_setup_context_menu()`<!--/AUTO--> | 为两个 PlotWidget 绑定右键菜单（导出 PNG） |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_context_menu-->`_show_context_menu(pos, source)`<!--/AUTO--> | 在指定位置弹出右键菜单 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._setup_context_menu-->`_setup_context_menu()`<!--/AUTO--> | 为 PlotWidget 绑定右键菜单（导出 PNG） |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_context_menu-->`_show_context_menu(pos)`<!--/AUTO--> | 在指定位置弹出右键菜单 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.export_png-->`export_png()`<!--/AUTO--> | 导出当前图表为 PNG 文件 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_all-->`_clear_all()`<!--/AUTO--> | 销毁图表及占位组件 |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换时增量更新两个面板颜色，不重建图表 |
 
 **图表结构**：
 
 ```
-┌─────────────────────────────────┐
-│  上图：仓库价值（总收益）        │
-│  琥珀色实线 + 方块标记 + 填充    │
-│  Y 轴：K/M/B 单位               │
-├─────────────────────────────────┤
-│  下图：现金（子项）              │
-│  蓝色虚线 + 圆点标记 + 填充      │
-│  Y 轴：K/M/B 单位               │
-│  X 轴：日期标签（MM-DD）         │
-└─────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│  仓库价值（总收益）— 左轴 琥珀实线+方块+填充 │
+│  现金（子项）— 右轴 青色虚线+圆点+填充     │
+│  共享 X 轴：日期标签（MM-DD）              │
+│  右轴刻度随现金曲线同色（防归属误读）      │
+└────────────────────────────────────────────┘
 ```
 
-**性能优化**：每个 `_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅调用 `setData()`，避免重建。填充边界曲线 `_ChartPanel._fill_curve` 也随面板持久化，消除了 Phase 3 之前的 FillBetweenItem 重建开销。
+**性能优化**：单 PlotWidget + 持久化 `PlotCurveItem`/`FillBetweenItem`，更新时仅
+`setData()` 原地刷新（FillBetweenItem 经 `sigPlotChanged` 自动跟随），不重建。
+副 ViewBox 与主 ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，
+resize 时漏同步会两线 x 错位（ADR-0002 记录的实现坑位）。
 
 ---
 
@@ -522,7 +515,7 @@ main.py
 | `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `settings_store`, `formatting`, `calculator`, `signals`, `PySide6` |
 | `app/input_panel.py` | `app.theme`, `formatting`, `calculator`, `PySide6` |
 | `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `signals`, `PySide6` |
-| `app/chart_widget.py` | `app.theme`, `numpy`, `pyqtgraph`, `PySide6` |
+| `app/chart_widget.py` | `app.theme`, `formatting`, `pyqtgraph`, `PySide6` |
 | `app/theme.py` | `signals`（`RateSignal`，零依赖叶子） |
 | `calculator.py` | `config`, `formatting`, `signals` |
 | `data_store.py` | `config` |
@@ -594,7 +587,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->22<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->23<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 

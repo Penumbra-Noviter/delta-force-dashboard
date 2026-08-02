@@ -8,16 +8,35 @@
 
 ## 滚动摘要（2026-08-02）
 
-- **测试**：pytest **229/229** ✅（F-01 +1）；基线演进 103→229，各阶段计数见下方条目
+- **测试**：pytest **230/230** ✅（G-01 +1，图表双 Y 轴结构烟测）；基线演进 103→230，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。UPX 5.2.0 已在 PATH（WinGet），spec `upx=True` 直接命中；无 PATH 环境兜底：显式 `--upx-dir D:/Desktop/tools/UPX`
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning；迁移完成写 `.migrated` 标记，启动时旧源仍在则提示可手动清理（F-02，脚本不自动删源）
 - **文档**：`CODE_WIKI` 三类机械标记（§4 行数 / §7 测试数 / §4 方法签名）由 `scripts/doc_sync.py` 从代码生成 + pre-commit 钩子防漂移（F-01）；`--check` 强制校验、漂移拦截提交
-- **活跃工单**：D 系列全 ✅（D-01~D-08）+ F-01/F-02 全 ✅（2026-08-02，见 TO-TICKETS 归档表）
+- **图表**：双曲线合并到同一坐标系（G-01，ADR-0002，选双 Y 轴方案 B）——仓库左轴/现金右轴，副 ViewBox 经 `setXLink+linkToView` 共享 X 轴；原型（A 单轴/B 双轴/C 归一化）在 throwaway 分支 `prototype/chart-merge`（`b6800bb`）留一手来源
+- **活跃工单**：D 系列全 ✅（D-01~D-08）+ F-01/F-02 全 ✅ + G-01 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 功能 | G-01 图表双曲线合并到同一坐标系（双 Y 轴，方案 B，ADR-0002）
+- 需求：把「仓库价值 + 现金」上下双图合并进同一坐标系（原 `_ChartPanel` 双面板结构）
+- 流程：O-C2「评审×原型双驱动」——先 `/prototype`（UI 分支，QComboBox 切 A 单轴/B 双轴/C 归一化 4 视图），offscreen 渲染 + PIL 像素扫描验证：
+  - A 共享单轴：现金线仅 16px 高（量级 ~20 倍差被压扁）❌
+  - B 双 Y 轴：两线均占满图高 ✅ **拍板**
+  - C 归一化：丢绝对值（¥10→12 与 ¥1M→1.2M 同高）❌
+- 实现：`chart_widget.py` 重写——单 PlotWidget + 主 ViewBox（仓库/左轴）+ 副 ViewBox（现金/右轴，`setXLink`+`linkToView` 共享 X）；`_sync` 闭包固化 resize 同步坑位；图例显式注册双曲线（副 ViewBox 项目不自动进主 PlotItem 图例）；端点标注/hover 双值/PNG 导出/主题切换全保留；`_ChartPanel` 删除
+- 避坑记录（ADR-0002）：跨轴高度不可比、右轴刻度须与曲线同色、resize 漏同步两线 x 错位
+- 测试：新增 `test_chart_dual_axis_merged`（双 ViewBox 归属 + 右轴链接 + 图例双项），230/230 ✅
+- 文档：CODE_WIKI §4.5 重写（去 `_ChartPanel`）+ 依赖表修正（去 numpy，加 formatting）+ ADR-0002 + TO-TICKETS G-01 归档
+- 原型留存：throwaway 分支 `prototype/chart-merge`（`b6800bb`），主分支不含原型文件
+
+### 2026-08-02 | 打包 | 主分支重新打包（F-01/F-02 后，含 .migrated 标记 + 清理提示）
+- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`，UPX 已在 PATH）
+- 产物：`dist/收益计算器/` **64M**（exe 6.5MB + `_internal/`）；F-02 `.migrated` 标记 + `log_legacy_cleanup_hint` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
+- 唯一 warn：`pyqtgraph.opengl` 子模块未收集（`No module named 'OpenGL'`，可选依赖，应用不加载，历次一致）
+- 烟测：exe 启动 8s 进程存活后终止 ✅（无启动崩溃）；pytest 229/229 ✅
 
 ### 2026-08-02 | 修复 | F-01 安装脚本 install-hooks.bat 括号转义 bug + CRLF 行尾
 - 背景：安装钩子被权限分类器拦下（写入 `.git/hooks` 属持久化动作），授权代跑时发现 `cmd /c scripts\install-hooks.bat` 恒静默 exit 1——钩子能装、验证脚本却永远报失败

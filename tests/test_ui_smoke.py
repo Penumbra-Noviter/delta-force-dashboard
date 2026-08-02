@@ -567,3 +567,36 @@ def test_chart_sparse_data_hint(sample_window):
     label = win.chart._placeholder_label
     assert label is not None
     assert "至少需要两天数据" in label.text()
+
+
+# ── G-01. 图表双 Y 轴合并（ADR-0002）────────────────────
+
+
+def test_chart_dual_axis_merged(sample_window):
+    """G-01：双曲线合并到同一坐标系后，一次 draw 即渲染两线于同一 PlotWidget。
+
+    仓库（左轴）与现金（右轴）各自落入独立 ViewBox（各自 Y 量纲，共享 X 轴）；
+    图例显式注册两条曲线（副 ViewBox 项目不会自动进主 PlotItem 图例）。
+    """
+    win = sample_window
+    records = win.logic.recent_records(7)
+    assert len(records) >= 5  # 样本数据充足
+
+    win.chart.draw(records)
+
+    # 单 PlotWidget + 双 ViewBox 就位
+    assert win.chart._plot_widget is not None
+    assert win.chart._right_vb is not None
+
+    # 两条曲线均已渲染且挂到各自 ViewBox
+    wc, cc = win.chart._warehouse_curve, win.chart._cash_curve
+    assert wc is not None and cc is not None
+    assert wc.xData is not None and cc.xData is not None
+    assert wc.getViewBox() is win.chart._plot_item.vb
+    assert cc.getViewBox() is win.chart._right_vb
+
+    # 右轴已链接现金 ViewBox（双轴联动核心）；图例显式含两条曲线
+    p1 = win.chart._plot_item
+    assert p1.getAxis("right").linkedView() is win.chart._right_vb
+    assert p1.legend is not None
+    assert len(p1.legend.items) == 2

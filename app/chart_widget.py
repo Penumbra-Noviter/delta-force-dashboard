@@ -1,10 +1,14 @@
 """
-图表渲染模块：pyqtgraph 双曲线图。
+图表渲染模块：pyqtgraph 双 Y 轴曲线图（单坐标系）。
 
-- 上图：仓库价值（总收益）— 琥珀色实线
-- 下图：现金（子项）— 蓝色虚线
-- 两图共享 X 轴，各自独立 Y 轴
+- 仓库价值（总收益）— 左 Y 轴，琥珀色实线
+- 现金（子项）— 右 Y 轴，青色虚线
+- 双曲线共享同一 PlotWidget 与 X 轴（副 ViewBox 经 setXLink + linkToView 联动），
+  各自独立 Y 轴量纲——避免现金量级远小于仓库时被压成直线
 - 右键菜单 → 导出 PNG
+
+设计决策：O-C2 原型（throwaway 分支 prototype/chart-merge，提交 b6800bb）验证
+方案 B（双 Y 轴）为唯一「两线清晰且不丢绝对值」的合并方案，落地见 ADR-0002。
 """
 
 from __future__ import annotations
@@ -36,340 +40,75 @@ class KMBAxisItem(pg.AxisItem):
         return [format_compact(v) for v in values]
 
 
-# ═══════════════════════════════════════════════════════════
-# 内部辅助：单个图表面板
-# ═══════════════════════════════════════════════════════════
+def _adaptive_range(values: list[float]) -> tuple[float, float]:
+    """自适应 Y 轴范围（底部留 10%，顶部留 8%）。"""
+    lo, hi = min(values), max(values)
+    rng = hi - lo
+    if rng == 0:
+        m = max(abs(lo) * 0.05, 1.0)
+        return lo - m, hi + m
+    return lo - rng * 0.10, hi + rng * 0.08
 
-class _ChartPanel(QWidget):
-    """管理单个图表面板（一条曲线 + 填充区域 + hover 交互 + 端点标注）。
-
-    封装一个 PlotWidget 及其全部子元素，消除 ChartWidget 中
-    top/bottom 对称实例变量带来的代码重复。
-    """
-
-    def __init__(
-        self,
-        label: str,                 # Y 轴标签，如 "仓库价值 (¥)"
-        color_key: str,             # 主题色板键，如 "CHART_WAREHOUSE"
-        line_style: Qt.PenStyle = Qt.PenStyle.SolidLine,
-        symbol: str = "s",          # 标记样式："s"=方块, "o"=圆点
-        series_name: str = "",      # 图例名称
-        show_x_axis: bool = False,  # 是否显示 X 轴标签（底部面板才显示日期）
-        parent: QWidget | None = None,
-    ) -> None:
-        super().__init__(parent)
-        self._label = label
-        self._color_key = color_key
-        self._line_style = line_style
-        self._symbol = symbol
-        self._series_name = series_name
-        self._show_x_axis = show_x_axis
-
-        # 子元素（惰性创建）
-        self._plot_widget: pg.PlotWidget | None = None
-        self._curve: pg.PlotCurveItem | None = None
-        self._fill_curve: pg.PlotCurveItem | None = None
-        self._fill_item: pg.FillBetweenItem | None = None
-        self._endpoint_label: pg.TextItem | None = None
-        self._vline: pg.InfiniteLine | None = None
-        self._hover_label: pg.TextItem | None = None
-        self._proxy = None
-
-        # 缓存数据
-        self._dates: list[str] = []
-        self._values: list[float] = []
-        self._created = False
-
-        # 布局
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(0)
-
-    # ─── 公共接口 ────────────────────────────────────────
-
-    def draw(self, x: list[int], values: list[float], dates: list[str]) -> None:
-        """首次渲染或更新数据。
-
-        首次调用时创建 PlotWidget 及其子元素；
-        后续调用仅更新数据（不重建）。
-        """
-        self._dates = dates
-        self._values = values
-
-        if not self._created:
-            self._create(x, values)
-            self._created = True
-        else:
-            self._update_data(x, values)
-
-    def update_theme(self) -> None:
-        """主题切换后增量更新颜色，不重建。"""
-        if not self._created or self._plot_widget is None:
-            return
-
-        color = get_color(self._color_key)
-        chart_bg = get_color("CHART_BG")
-        label_color = get_color("CHART_AXIS")
-
-        # 背景
-        self._plot_widget.setBackground(chart_bg)
-
-        # 曲线颜色（setData 是 pyqtgraph 中更新 pen/symbol 的唯一方式）
-        if self._curve is not None and self._values:
-            _x = list(range(len(self._values)))
-            self._curve.setData(
-                _x, self._values,
-                pen=pg.mkPen(color=color, width=2.5, style=self._line_style),
-                symbol=self._symbol, symbolSize=6,
-                symbolBrush=color, symbolPen=color,
-            )
-
-        # 填充区域颜色
-        if self._fill_item is not None:
-            self._fill_item.setBrush(pg.mkBrush(color=color, alpha=50))
-
-        # 左轴标签与颜色
-        left_axis = self._plot_widget.getAxis("left")
-        left_axis.setLabel(self._label, color=color)
-        left_axis.setPen(pg.mkPen(color=color))
-
-        # 网格颜色
-        grid_color = get_color("CHART_GRID")
-        self._plot_widget.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
-        self._plot_widget.getAxis("left").setPen(pg.mkPen(color=grid_color))
-
-        # 端点标注颜色
-        if self._endpoint_label is not None and self._values:
-            self._endpoint_label.setText(
-                self._format_value(self._values[-1]), color=color
-            )
-
-        # hover 竖线与标签颜色
-        if self._vline is not None:
-            self._vline.setPen(
-                pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine)
-            )
-        if self._hover_label is not None:
-            self._hover_label.setColor(label_color)
-            self._hover_label.fill = pg.mkBrush(chart_bg)
-
-        # 强制重绘
-        self._plot_widget.update()
-
-    def clear_panel(self) -> None:
-        """销毁内部组件并重置状态。"""
-        if self._plot_widget is not None:
-            self._layout.removeWidget(self._plot_widget)
-            self._plot_widget.deleteLater()
-            self._plot_widget = None
-
-        self._curve = None
-        self._fill_curve = None
-        self._fill_item = None
-        self._endpoint_label = None
-        self._vline = None
-        self._hover_label = None
-        self._proxy = None
-        self._created = False
-        self._dates = []
-        self._values = []
-
-    @property
-    def plot_widget(self) -> pg.PlotWidget | None:
-        return self._plot_widget
-
-    @property
-    def values(self) -> list[float]:
-        return self._values
-
-    # ─── 内部方法 ────────────────────────────────────────
-
-    def _create(self, x: list[int], values: list[float]) -> None:
-        """从零创建 PlotWidget 及其子元素。"""
-        color = get_color(self._color_key)
-        chart_bg = get_color("CHART_BG")
-        label_color = get_color("CHART_AXIS")
-
-        # ── 左轴 ──
-        left_axis = KMBAxisItem(orientation="left")
-        left_axis.setLabel(self._label, color=color)
-        left_axis.setPen(pg.mkPen(color=color))
-
-        # ── PlotWidget ──
-        self._plot_widget = pg.PlotWidget(axisItems={"left": left_axis})
-        self._plot_widget.setBackground(chart_bg)
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.5)
-
-        if not self._show_x_axis:
-            self._plot_widget.getAxis("bottom").setStyle(showValues=False)
-
-        self._layout.addWidget(self._plot_widget)
-
-        # ── 曲线 ──
-        self._curve = pg.PlotCurveItem(
-            x, values,
-            pen=pg.mkPen(color=color, width=2.5, style=self._line_style),
-            symbol=self._symbol,
-            symbolSize=6,
-            symbolBrush=color,
-            symbolPen=color,
-            name=self._series_name if self._series_name else None,
-        )
-        self._plot_widget.addItem(self._curve)
-
-        # ── 填充区域 ──
-        self._fill_curve = pg.PlotCurveItem(x, values)
-        self._fill_item = pg.FillBetweenItem(
-            self._curve, self._fill_curve,
-            brush=pg.mkBrush(color=color, alpha=50),
-        )
-        self._plot_widget.addItem(self._fill_item)
-
-        # ── 端点数值标注 ──
-        self._endpoint_label = pg.TextItem(
-            text=self._format_value(values[-1]),
-            color=color,
-            anchor=(0, 0.5),
-        )
-        self._endpoint_label.setPos(x[-1], values[-1])
-        self._plot_widget.addItem(self._endpoint_label)
-
-        # ── hover 竖线 + 数值标签 ──
-        self._vline = pg.InfiniteLine(
-            angle=90, movable=False,
-            pen=pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine),
-        )
-        self._vline.setVisible(False)
-        self._plot_widget.addItem(self._vline)
-
-        self._hover_label = pg.TextItem(
-            text="", color=label_color, fill=chart_bg,
-        )
-        self._hover_label.setVisible(False)
-        self._plot_widget.addItem(self._hover_label)
-
-        # ── Y 轴自适应 ──
-        self._set_adaptive_ylim(self._plot_widget, values)
-
-        # ── 图例 ──
-        if self._series_name:
-            self._plot_widget.addLegend(
-                offset=(10, 10), labelTextColor=label_color,
-            )
-
-        # ── hover 信号绑定 ──
-        self._proxy = pg.SignalProxy(
-            self._plot_widget.scene().sigMouseMoved,
-            rateLimit=60,
-            slot=self._on_mouse_moved,
-        )
-
-    def _update_data(self, x: list[int], values: list[float]) -> None:
-        """原地更新曲线数据（不重建 PlotWidget / FillBetweenItem）。"""
-        if self._plot_widget is None:
-            return
-
-        # 更新曲线数据（FillBetweenItem 通过 sigPlotChanged 自动跟随）
-        if self._curve is not None:
-            self._curve.setData(x, values)
-        if self._fill_curve is not None:
-            self._fill_curve.setData(x, values)
-
-        # 更新端点数值标注
-        if self._endpoint_label is not None and values:
-            self._endpoint_label.setText(self._format_value(values[-1]))
-            self._endpoint_label.setPos(x[-1], values[-1])
-
-        # 更新 Y 轴范围
-        self._set_adaptive_ylim(self._plot_widget, values)
-
-        # 更新 X 轴标签（仅底部面板）
-        if self._show_x_axis:
-            axis = self._plot_widget.getAxis("bottom")
-            axis.setTicks([list(enumerate(self._dates))])
-
-    def _on_mouse_moved(self, evt) -> None:
-        """鼠标移动时显示最近数据点的竖线 + 数值标签。"""
-        if not self._dates or self._plot_widget is None:
-            return
-
-        pos = evt[0]
-        vb = self._plot_widget.plotItem.vb
-        if vb is None:
-            return
-
-        mouse_point = vb.mapSceneToView(pos)
-        mouse_x = mouse_point.x()
-        n = len(self._dates)
-
-        # 鼠标离开数据范围时隐藏
-        if mouse_x < -0.5 or mouse_x > n - 0.5:
-            if self._vline is not None:
-                self._vline.setVisible(False)
-            if self._hover_label is not None:
-                self._hover_label.setVisible(False)
-            return
-
-        idx = max(0, min(n - 1, round(mouse_x)))
-        color = get_color(self._color_key)
-
-        if self._vline is not None:
-            self._vline.setPos(idx)
-            self._vline.setVisible(True)
-        if self._hover_label is not None:
-            self._hover_label.setText(
-                f"{self._dates[idx]}  {self._format_value(self._values[idx])}",
-                color=color,
-            )
-            self._hover_label.setPos(idx, self._values[idx])
-            self._hover_label.setVisible(True)
-
-    @staticmethod
-    def _format_value(v: float) -> str:
-        """格式化图表数值为紧凑 K/M/B（与 Y 轴共用 format_compact，带 ¥ 前缀）。"""
-        return format_compact(v, prefix="¥")
-
-    @staticmethod
-    def _set_adaptive_ylim(plot_widget: pg.PlotWidget, values: list) -> None:
-        """自适应 Y 轴范围（底部留 10%，顶部留 8%）。"""
-        lo, hi = min(values), max(values)
-        rng = hi - lo
-        if rng == 0:
-            m = max(abs(lo) * 0.05, 1.0)
-            plot_widget.setYRange(lo - m, hi + m)
-        else:
-            plot_widget.setYRange(lo - rng * 0.10, hi + rng * 0.08)
-
-
-# ═══════════════════════════════════════════════════════════
-# 双曲线图容器
-# ═══════════════════════════════════════════════════════════
 
 class ChartWidget(QWidget):
-    """pyqtgraph 双曲线图 + PNG 导出。
+    """单坐标系双 Y 轴曲线图 + PNG 导出。
 
-    内部委托给两个 _ChartPanel 实例：
-    - 上图：仓库价值
-    - 下图：现金
+    仓库价值（左轴）与现金（右轴）合并进同一个 PlotWidget：主 ViewBox 承载
+    仓库序列，副 ViewBox（右轴）承载现金序列；副 ViewBox 经 setXLink +
+    linkToView 与主 ViewBox 共享 X 轴，两个 Y 轴各自按自身量纲自适应。
     """
+
+    # 系列配置（轴归属决定各子元素挂在哪个 ViewBox）
+    _LEFT_SERIES = dict(
+        label="仓库价值 (¥)",
+        color_key="CHART_WAREHOUSE",
+        style=Qt.PenStyle.SolidLine,
+        symbol="s",
+        name="仓库价值（总收益）",
+    )
+    _RIGHT_SERIES = dict(
+        label="现金 (¥)",
+        color_key="CHART_CASH",
+        style=Qt.PenStyle.DashLine,
+        symbol="o",
+        name="现金（子项）",
+    )
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
 
-        # 占位文字
+        # 占位文字（含稀疏提示 overlay，不进入 layout）
         self._placeholder_label: QLabel | None = None
 
-        # 两个图表面板（惰性创建）
-        self._top: _ChartPanel | None = None
-        self._bottom: _ChartPanel | None = None
+        # 子元素（惰性创建）
+        self._plot_widget: pg.PlotWidget | None = None
+        self._plot_item: pg.PlotItem | None = None
+        self._right_vb: pg.ViewBox | None = None
+        self._warehouse_curve: pg.PlotCurveItem | None = None
+        self._cash_curve: pg.PlotCurveItem | None = None
+        self._warehouse_fill: pg.FillBetweenItem | None = None
+        self._cash_fill: pg.FillBetweenItem | None = None
+        self._warehouse_endpoint: pg.TextItem | None = None
+        self._cash_endpoint: pg.TextItem | None = None
+        self._vline: pg.InfiniteLine | None = None
+        self._hover_labels: list[pg.TextItem] = []
+        self._proxy = None
+
+        # 缓存数据
+        self._dates: list[str] = []
+        self._warehouse_vals: list[float] = []
+        self._cash_vals: list[float] = []
+        self._created = False
 
         # 右键菜单
         self._menu: QMenu | None = None
 
+    # ─── 公共接口 ────────────────────────────────────────
+
     def draw(self, records: list) -> None:
-        """渲染或更新图表。记录 ≥ 2 → 双图模式，< 2 → 提示文字。"""
+        """渲染或更新图表。记录 ≥ 2 → 双 Y 轴曲线，< 2 → 提示文字。"""
         n = len(records)
 
         if n >= 2:
@@ -380,34 +119,12 @@ class ChartWidget(QWidget):
 
             self._clear_placeholder()
 
-            # 首次：创建两个面板
-            if self._top is None:
-                self._top = _ChartPanel(
-                    label="仓库价值 (¥)",
-                    color_key="CHART_WAREHOUSE",
-                    line_style=Qt.PenStyle.SolidLine,
-                    symbol="s",
-                    series_name="仓库价值（总收益）",
-                    show_x_axis=False,
-                )
-                self._bottom = _ChartPanel(
-                    label="现金 (¥)",
-                    color_key="CHART_CASH",
-                    line_style=Qt.PenStyle.DashLine,
-                    symbol="o",
-                    series_name="现金（子项）",
-                    show_x_axis=True,
-                )
-
-                self._layout.addWidget(self._top, 1)
-                self._layout.addWidget(self._bottom, 1)
-
-                # 右键菜单
-                self._setup_context_menu()
-
-            # 委托绘制
-            self._top.draw(x, warehouse_vals, dates)
-            self._bottom.draw(x, cash_vals, dates)
+            # 首次：创建 PlotWidget 及全部子元素
+            if not self._created:
+                self._create(x, warehouse_vals, cash_vals, dates)
+                self._created = True
+            else:
+                self._update_data(x, warehouse_vals, cash_vals, dates)
 
             # O-06：数据过少时叠加提示，避免误读为图表损坏
             if 2 <= n <= 3:
@@ -415,6 +132,287 @@ class ChartWidget(QWidget):
         else:
             self._clear_all()
             self._show_placeholder(n)
+
+    def apply_theme(self) -> None:
+        """主题切换后增量更新颜色；无需销毁重建。"""
+        if not self._created or self._plot_widget is None:
+            return
+
+        w_color = get_color(self._LEFT_SERIES["color_key"])
+        c_color = get_color(self._RIGHT_SERIES["color_key"])
+        chart_bg = get_color("CHART_BG")
+        label_color = get_color("CHART_AXIS")
+        grid_color = get_color("CHART_GRID")
+
+        # 背景
+        self._plot_widget.setBackground(chart_bg)
+
+        # 曲线颜色（setData 是 pyqtgraph 中更新 pen/symbol 的唯一方式）
+        if self._warehouse_curve is not None and self._warehouse_vals:
+            self._warehouse_curve.setData(
+                list(range(len(self._warehouse_vals))), self._warehouse_vals,
+                pen=pg.mkPen(color=w_color, width=2.5, style=self._LEFT_SERIES["style"]),
+                symbol=self._LEFT_SERIES["symbol"], symbolSize=6,
+                symbolBrush=w_color, symbolPen=w_color,
+            )
+        if self._cash_curve is not None and self._cash_vals:
+            self._cash_curve.setData(
+                list(range(len(self._cash_vals))), self._cash_vals,
+                pen=pg.mkPen(color=c_color, width=2.5, style=self._RIGHT_SERIES["style"]),
+                symbol=self._RIGHT_SERIES["symbol"], symbolSize=6,
+                symbolBrush=c_color, symbolPen=c_color,
+            )
+
+        # 填充区域颜色
+        if self._warehouse_fill is not None:
+            self._warehouse_fill.setBrush(pg.mkBrush(color=w_color, alpha=50))
+        if self._cash_fill is not None:
+            self._cash_fill.setBrush(pg.mkBrush(color=c_color, alpha=50))
+
+        # 轴标签与颜色
+        if self._plot_item is not None:
+            self._plot_item.getAxis("left").setLabel(
+                self._LEFT_SERIES["label"], color=w_color
+            )
+            self._plot_item.getAxis("left").setPen(pg.mkPen(color=w_color))
+            self._plot_item.getAxis("right").setLabel(
+                self._RIGHT_SERIES["label"], color=c_color
+            )
+            self._plot_item.getAxis("right").setPen(pg.mkPen(color=c_color))
+            self._plot_item.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
+
+        # 端点标注颜色
+        if self._warehouse_endpoint is not None and self._warehouse_vals:
+            self._warehouse_endpoint.setText(
+                self._format_value(self._warehouse_vals[-1]), color=w_color
+            )
+        if self._cash_endpoint is not None and self._cash_vals:
+            self._cash_endpoint.setText(
+                self._format_value(self._cash_vals[-1]), color=c_color
+            )
+
+        # hover 竖线与标签颜色
+        if self._vline is not None:
+            self._vline.setPen(
+                pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine)
+            )
+        for label, color in zip(self._hover_labels, (w_color, c_color)):
+            label.setColor(color)
+            label.fill = pg.mkBrush(chart_bg)
+
+        # 图例文字色
+        if self._plot_item is not None and self._plot_item.legend is not None:
+            self._plot_item.legend.setLabelTextColor(label_color)
+
+        # 强制重绘
+        self._plot_widget.update()
+
+    # ─── 内部方法 ────────────────────────────────────────
+
+    def _create(self, x, warehouse_vals, cash_vals, dates) -> None:
+        """从零创建 PlotWidget + 双 ViewBox + 全部子元素。"""
+        self._dates = dates
+        self._warehouse_vals = warehouse_vals
+        self._cash_vals = cash_vals
+
+        w_color = get_color(self._LEFT_SERIES["color_key"])
+        c_color = get_color(self._RIGHT_SERIES["color_key"])
+        chart_bg = get_color("CHART_BG")
+        label_color = get_color("CHART_AXIS")
+        grid_color = get_color("CHART_GRID")
+
+        # ── 左右轴 ──
+        left_axis = KMBAxisItem(orientation="left")
+        left_axis.setLabel(self._LEFT_SERIES["label"], color=w_color)
+        left_axis.setPen(pg.mkPen(color=w_color))
+        right_axis = KMBAxisItem(orientation="right")
+        right_axis.setLabel(self._RIGHT_SERIES["label"], color=c_color)
+        right_axis.setPen(pg.mkPen(color=c_color))
+
+        # ── PlotWidget ──
+        self._plot_widget = pg.PlotWidget(
+            axisItems={"left": left_axis, "right": right_axis}
+        )
+        self._plot_widget.setBackground(chart_bg)
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.5)
+        self._layout.addWidget(self._plot_widget, 1)
+
+        p1 = self._plot_widget.plotItem
+        p1.showAxis("right")
+        p1.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
+        self._plot_item = p1
+
+        # ── 副 ViewBox（现金）：共享 X，独立 Y ──
+        p2 = pg.ViewBox()
+        p1.scene().addItem(p2)
+        p1.getAxis("right").linkToView(p2)
+        p2.setXLink(p1)
+
+        def _sync() -> None:
+            # resize 时副 ViewBox 必须跟随主 ViewBox 几何，否则两线 x 错位（ADR-0002 坑位）
+            if p1.vb is None:
+                return
+            p2.setGeometry(p1.vb.sceneBoundingRect())
+            p2.linkedViewChanged(p1.vb, p2.XAxis)
+
+        p1.vb.sigResized.connect(_sync)
+        _sync()
+        self._right_vb = p2
+
+        # ── 仓库序列（主 ViewBox / 左轴）──
+        self._warehouse_curve = pg.PlotCurveItem(
+            x, warehouse_vals,
+            pen=pg.mkPen(color=w_color, width=2.5, style=self._LEFT_SERIES["style"]),
+            symbol=self._LEFT_SERIES["symbol"], symbolSize=6,
+            symbolBrush=w_color, symbolPen=w_color,
+        )
+        p1.addItem(self._warehouse_curve)
+        self._warehouse_fill = pg.FillBetweenItem(
+            self._warehouse_curve, pg.PlotCurveItem(x, warehouse_vals),
+            brush=pg.mkBrush(color=w_color, alpha=50),
+        )
+        p1.addItem(self._warehouse_fill)
+
+        self._warehouse_endpoint = pg.TextItem(
+            text=self._format_value(warehouse_vals[-1]),
+            color=w_color, anchor=(0, 0.5),
+        )
+        self._warehouse_endpoint.setPos(x[-1], warehouse_vals[-1])
+        p1.addItem(self._warehouse_endpoint)
+
+        # ── 现金序列（副 ViewBox / 右轴）──
+        self._cash_curve = pg.PlotCurveItem(
+            x, cash_vals,
+            pen=pg.mkPen(color=c_color, width=2.5, style=self._RIGHT_SERIES["style"]),
+            symbol=self._RIGHT_SERIES["symbol"], symbolSize=6,
+            symbolBrush=c_color, symbolPen=c_color,
+        )
+        p2.addItem(self._cash_curve)
+        self._cash_fill = pg.FillBetweenItem(
+            self._cash_curve, pg.PlotCurveItem(x, cash_vals),
+            brush=pg.mkBrush(color=c_color, alpha=50),
+        )
+        p2.addItem(self._cash_fill)
+
+        self._cash_endpoint = pg.TextItem(
+            text=self._format_value(cash_vals[-1]),
+            color=c_color, anchor=(0, 0.5),
+        )
+        self._cash_endpoint.setPos(x[-1], cash_vals[-1])
+        p2.addItem(self._cash_endpoint)
+
+        # ── Y 轴自适应（各自量纲）+ X 轴日期刻度 ──
+        p1.setYRange(*_adaptive_range(warehouse_vals))
+        p2.setYRange(*_adaptive_range(cash_vals))
+        p1.getAxis("bottom").setTicks([list(enumerate(dates))])
+
+        # ── 图例（副 ViewBox 项目不会自动注册到主 PlotItem 图例，需显式 addItem）──
+        legend = p1.addLegend(offset=(10, 10), labelTextColor=label_color)
+        legend.addItem(self._warehouse_curve, self._LEFT_SERIES["name"])
+        legend.addItem(self._cash_curve, self._RIGHT_SERIES["name"])
+
+        # ── hover 竖线 + 双数值标签（各自坐标系，随各自曲线）──
+        self._vline = pg.InfiniteLine(
+            angle=90, movable=False,
+            pen=pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine),
+        )
+        self._vline.setVisible(False)
+        p1.addItem(self._vline)
+
+        w_hover = pg.TextItem("", color=w_color, fill=chart_bg)
+        w_hover.setVisible(False)
+        p1.addItem(w_hover)
+        c_hover = pg.TextItem("", color=c_color, fill=chart_bg)
+        c_hover.setVisible(False)
+        p2.addItem(c_hover)
+        self._hover_labels = [w_hover, c_hover]
+
+        # ── 右键菜单 ──
+        self._setup_context_menu()
+
+        # ── hover 信号绑定 ──
+        self._proxy = pg.SignalProxy(
+            p1.scene().sigMouseMoved, rateLimit=60, slot=self._on_mouse_moved
+        )
+
+    def _update_data(self, x, warehouse_vals, cash_vals, dates) -> None:
+        """原地更新曲线数据（不重建 PlotWidget / 双 ViewBox）。"""
+        if self._plot_widget is None:
+            return
+        self._dates = dates
+        self._warehouse_vals = warehouse_vals
+        self._cash_vals = cash_vals
+
+        # 更新曲线数据（FillBetweenItem 通过 sigPlotChanged 自动跟随）
+        if self._warehouse_curve is not None:
+            self._warehouse_curve.setData(x, warehouse_vals)
+        if self._cash_curve is not None:
+            self._cash_curve.setData(x, cash_vals)
+
+        # 更新端点数值标注
+        if self._warehouse_endpoint is not None and warehouse_vals:
+            self._warehouse_endpoint.setText(self._format_value(warehouse_vals[-1]))
+            self._warehouse_endpoint.setPos(x[-1], warehouse_vals[-1])
+        if self._cash_endpoint is not None and cash_vals:
+            self._cash_endpoint.setText(self._format_value(cash_vals[-1]))
+            self._cash_endpoint.setPos(x[-1], cash_vals[-1])
+
+        # 更新 Y 轴范围（各自量纲）与 X 轴标签
+        if self._plot_item is not None:
+            self._plot_item.setYRange(*_adaptive_range(warehouse_vals))
+            self._plot_item.getAxis("bottom").setTicks([list(enumerate(dates))])
+        if self._right_vb is not None:
+            self._right_vb.setYRange(*_adaptive_range(cash_vals))
+
+    def _on_mouse_moved(self, evt) -> None:
+        """鼠标移动时显示最近数据点的竖线 + 双曲线数值标签。"""
+        if not self._dates or self._plot_item is None:
+            return
+
+        pos = evt[0]
+        vb = self._plot_item.vb
+        if vb is None:
+            return
+
+        mouse_x = vb.mapSceneToView(pos).x()
+        n = len(self._dates)
+
+        # 鼠标离开数据范围时隐藏
+        if mouse_x < -0.5 or mouse_x > n - 0.5:
+            if self._vline is not None:
+                self._vline.setVisible(False)
+            for label in self._hover_labels:
+                label.setVisible(False)
+            return
+
+        idx = max(0, min(n - 1, round(mouse_x)))
+        idx = min(idx, len(self._warehouse_vals) - 1, len(self._cash_vals) - 1)
+        w_color = get_color(self._LEFT_SERIES["color_key"])
+        c_color = get_color(self._RIGHT_SERIES["color_key"])
+
+        if self._vline is not None:
+            self._vline.setPos(idx)
+            self._vline.setVisible(True)
+
+        if len(self._hover_labels) >= 2:
+            self._hover_labels[0].setText(
+                f"{self._dates[idx]}  {self._format_value(self._warehouse_vals[idx])}",
+                color=w_color,
+            )
+            self._hover_labels[0].setPos(idx, self._warehouse_vals[idx])
+            self._hover_labels[0].setVisible(True)
+
+            self._hover_labels[1].setText(
+                f"{self._dates[idx]}  {self._format_value(self._cash_vals[idx])}",
+                color=c_color,
+            )
+            self._hover_labels[1].setPos(idx, self._cash_vals[idx])
+            self._hover_labels[1].setVisible(True)
+
+    @staticmethod
+    def _format_value(v: float) -> str:
+        """格式化图表数值为紧凑 K/M/B（与 Y 轴共用 format_compact，带 ¥ 前缀）。"""
+        return format_compact(v, prefix="¥")
 
     def _show_sparse_hint(self) -> None:
         """n=2~3 时在图表区域叠加半透明提示文字（不触碰曲线与交互）。
@@ -468,31 +466,29 @@ class ChartWidget(QWidget):
             self._placeholder_label = None
 
     def _setup_context_menu(self) -> None:
-        """为两个 PlotWidget 绑定右键菜单。"""
+        """为 PlotWidget 绑定右键菜单。"""
+        if self._plot_widget is None:
+            return
         self._menu = QMenu(self)
 
         export_action = QAction("💾 导出为 PNG", self)
         export_action.triggered.connect(self.export_png)
         self._menu.addAction(export_action)
 
-        for panel in (self._top, self._bottom):
-            if panel is None or panel.plot_widget is None:
-                continue
-            pw = panel.plot_widget
-            pw.setContextMenuPolicy(
-                Qt.ContextMenuPolicy.CustomContextMenu
-            )
-            pw.customContextMenuRequested.connect(
-                lambda pos, src=pw: self._show_context_menu(pos, src)
-            )
+        self._plot_widget.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self._plot_widget.customContextMenuRequested.connect(
+            self._show_context_menu
+        )
 
-    def _show_context_menu(self, pos: QPoint, source: QWidget) -> None:
-        if self._menu is not None:
-            self._menu.exec(source.mapToGlobal(pos))
+    def _show_context_menu(self, pos: QPoint) -> None:
+        if self._menu is not None and self._plot_widget is not None:
+            self._menu.exec(self._plot_widget.mapToGlobal(pos))
 
     def export_png(self) -> None:
         """导出当前图表为 PNG。"""
-        if self._top is None or self._top.plot_widget is None:
+        if self._plot_widget is None:
             QMessageBox.information(self, "提示", "暂无图表可导出")
             return
 
@@ -521,23 +517,24 @@ class ChartWidget(QWidget):
         """销毁图表及占位。"""
         self._clear_placeholder()
 
-        if self._top is not None:
-            self._layout.removeWidget(self._top)
-            self._top.clear_panel()
-            self._top.deleteLater()
-            self._top = None
+        if self._plot_widget is not None:
+            self._layout.removeWidget(self._plot_widget)
+            self._plot_widget.deleteLater()
+            self._plot_widget = None
 
-        if self._bottom is not None:
-            self._layout.removeWidget(self._bottom)
-            self._bottom.clear_panel()
-            self._bottom.deleteLater()
-            self._bottom = None
-
+        self._plot_item = None
+        self._right_vb = None
+        self._warehouse_curve = None
+        self._cash_curve = None
+        self._warehouse_fill = None
+        self._cash_fill = None
+        self._warehouse_endpoint = None
+        self._cash_endpoint = None
+        self._vline = None
+        self._hover_labels = []
+        self._proxy = None
+        self._created = False
+        self._dates = []
+        self._warehouse_vals = []
+        self._cash_vals = []
         self._menu = None
-
-    def apply_theme(self) -> None:
-        """主题切换后增量更新颜色；无需销毁重建。"""
-        if self._top is not None:
-            self._top.update_theme()
-        if self._bottom is not None:
-            self._bottom.update_theme()
