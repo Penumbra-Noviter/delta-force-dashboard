@@ -8,15 +8,21 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **204/204** ✅（D-02 后）；基线演进 103→204，各阶段计数见下方条目
+- **测试**：pytest **208/208** ✅（D-03 后）；基线演进 103→208，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D-03~D-07 深层化候选；D-01~D-02 ✅（2026-08-02，见 TO-TICKETS 归档表）
+- **活跃工单**：D-04~D-07 深层化候选；D-01~D-03 ✅（2026-08-02，见 TO-TICKETS 归档表）
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 重构 | D-03 序列化边界：data→dict[str, DayRecord] + serialize()（ADR-0001，`54a23d0`）
+- `ProfitCalculatorLogic.data` 改为 `dict[str, DayRecord]`；解析收敛 `__init__`（私有 `_parse_record`：兼容已解析 DayRecord dict + 加载时跳过损坏/非法条目，语义=旧 get_record 对非法条目返回 None）
+- 新增 `serialize()`：DayRecord→磁盘裸 dict，返回**新 dict**（消灭 logic 与磁盘共享别名）；`get_record` 退化一行 `self.data.get(date_str)`；`save_record` 内部存储 DayRecord 实例
+- MainWindow `save_today`/`_delete_record` 改走 `store.save(self.logic.serialize())`；测试内部形态断言 `logic.data[k]["cash"]` 迁移为 `logic.serialize()[k]["cash"]`
+- 测试：+4（加载时过滤 / serialize round-trip / serialize 新 dict 别名消灭 / 构造函数兼容 DayRecord dict）；pytest 208/208 ✅（204+4）；CODE_WIKI 方法表/data 规则/测试表同步
 
 ### 2026-08-02 | 重构 | D-02 原子写 seam：json_file.py + SettingsStore
 - `json_file.py`：`atomic_write_json`（.tmp→os.replace，失败清理并抛 OSError）+ `try_load_json`（容错读，缺失/解析失败返回 None，形状校验交调用方）；**CSV 不进 seam**（导出格式非持久化状态）；DataStore 保留其更丰富的写路径（备份+恢复），未改用 seam
