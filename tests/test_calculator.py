@@ -4,7 +4,8 @@ Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计�
 
 import pytest
 
-from calculator import DayRecord, ProfitCalculatorLogic, RateSignal, PnLSignal
+from calculator import DayRecord, ProfitCalculatorLogic
+from signals import PnLSignal, RateSignal
 
 
 # ── DayRecord ────────────────────────────────────────
@@ -69,6 +70,16 @@ def test_init_filters_invalid_entries():
     assert sorted(logic.data) == ["2026-07-20"]
     assert logic.get_record("2026-07-20") is not None
     assert logic.get_record("2026-07-21") is None
+
+
+def test_init_skipped_record_logs_warning(caplog):
+    """加载时跳过的损坏/非法条目记录 warning，含日期（O-01：不允许静默）。"""
+    with caplog.at_level("WARNING"):
+        ProfitCalculatorLogic({"2026-07-21": "not_a_dict"})
+    messages = [rec.message for rec in caplog.records]
+    assert any(
+        "跳过损坏/非法记录" in m and "2026-07-21" in m for m in messages
+    )
 
 
 def test_serialize_round_trip():

@@ -8,15 +8,22 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **217/217** ✅（D-07 后）；基线演进 103→217，各阶段计数见下方条目
+- **测试**：pytest **221/221** ✅（D-08 评审修正后）；基线演进 103→221，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D 系列深层化候选全 ✅（D-01~D-07，2026-08-02，见 TO-TICKETS 归档表）；当前无活跃工单
+- **活跃工单**：D 系列全 ✅（D-01~D-08，2026-08-02，见 TO-TICKETS 归档表）；当前无活跃工单
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 修复+文档 | D-08 D 系列评审修正：signals 叶子收敛 + 告警可观测性 + 文档漂移
+- **① 层反转修复（唯一设计分叉）**：`RateSignal`/`PnLSignal` 自 `calculator.py` 抽至新零依赖叶子 `signals.py`；`theme.py`/`table_widget.py`/`main_window.py`/`calculator.py` 改从叶子导入——`theme.py` 不再反向依赖业务层，保住 D-01 的 `signal_color` 收敛（评审：theme.py 依赖图「无外部依赖」陈）。
+- **③ 读取告警异常详情恢复**：`json_file.try_load_json` 加可选 `on_error: Callable[[Exception], None]` 回调（seam 的自然错误通知口）；`SettingsStore.load` 经回调恢复 D-02 前逐字文案「设置文件读取失败（使用默认设置）: %s, e」。
+- **⑤ 跳过记录可观测**：`__init__` 对每条丢弃记录 `logger.warning("跳过损坏/非法记录（%s）", date_str)`（O-01 不允许静默）；ADR-0001 后果段 + CODE_WIKI §4.7 明示磁盘侧自愈清除（下次保存不再写回）。
+- **④/② 文档漂移修正**：PROJECT_REFERENCE 「D-01~D-03/208 项」→「D-01~D-07/221 项」；CODE_WIKI §5.3 依赖表（theme/input_panel/main_window/calculator 行 + 新增 signals 行）、§5.2 依赖图、§4.6 函数表补 signal_color/get_color/set_theme、§3 文件树、§2.1 分层图、新增 §4.13 signals.py；README 计数 217→221。
+- 测试：+4（try_load_json on_error 2 / SettingsStore 异常详情 1 / 加载跳过记录 warning 1）；pytest 221/221 ✅（217+4）；test_calculator 73、test_settings_store 18。
 
 ### 2026-08-02 | 重构 | D-05 现金⊆仓库不变式单一所有者：is_cash_under_warehouse 纯函数
 - `ProfitCalculatorLogic.is_cash_under_warehouse(cash, warehouse) -> bool`（True=不变式成立）；告警（save_record）/ 拦截（save_today）/ 红框（input_panel）三处字面量 `cash > warehouse` 改调用，语义零变化

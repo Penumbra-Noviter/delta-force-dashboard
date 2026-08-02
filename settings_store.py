@@ -30,17 +30,22 @@ class SettingsStore:
         self.settings_file = settings_file
 
     def load(self) -> dict[str, Any]:
-        """容错读取设置；任何异常都回退默认 {}（不抛给 UI 层）。"""
-        data = try_load_json(self.settings_file)
+        """容错读取设置；任何异常都回退默认 {}（不抛给 UI 层）。
+
+        文件缺失（首次运行）静默返回默认；解析/IO 失败经 on_error 回调记录
+        带异常详情的 warning（D-02 前逐字文案「…（使用默认设置）: %s」）。
+        """
+        data = try_load_json(self.settings_file, on_error=self._on_read_error)
         if data is None:
-            # 文件缺失是首次运行的正常状态，静默返回默认；存在但解析失败才告警
-            if self.settings_file.exists():
-                logger.warning("设置文件读取失败（使用默认设置）")
             return {}
         if not isinstance(data, dict):
             logger.warning("设置文件顶层非 dict（使用默认设置）")
             return {}
         return data
+
+    def _on_read_error(self, e: Exception) -> None:
+        """try_load_json 解析/IO 失败回调：恢复 D-02 前的逐字告警（含异常详情）。"""
+        logger.warning("设置文件读取失败（使用默认设置）: %s", e)
 
     def save(self, settings: dict[str, Any]) -> None:
         """原子写入设置；失败仅记录 warning，不抛出。"""

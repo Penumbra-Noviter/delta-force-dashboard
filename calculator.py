@@ -9,37 +9,19 @@ import io
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from enum import Enum
 from typing import Optional
 
 from config import DATE_FORMAT, WEEK_DAYS
 from formatting import format_money, format_short_date
+from signals import PnLSignal, RateSignal
 
 __all__ = [
     "DayRecord",
     "ProfitCalculatorLogic",
-    "RateSignal",
-    "PnLSignal",
 ]
 
 
 logger = logging.getLogger(__name__)
-
-
-class RateSignal(Enum):
-    """收益率信号枚举——UI 层根据信号映射颜色。"""
-    POSITIVE = "positive"
-    NEGATIVE = "negative"
-    NEUTRAL = "neutral"
-    NONE = "none"
-
-
-class PnLSignal(Enum):
-    """盈亏信号枚举——UI 层根据信号映射颜色。"""
-    盈 = "profit"
-    亏 = "loss"
-    平 = "neutral"
-    无 = "none"
 
 
 @dataclass(frozen=True)
@@ -68,6 +50,10 @@ class ProfitCalculatorLogic:
             record = self._parse_record(date_str, raw)
             if record is not None:
                 self.data[date_str] = record
+            else:
+                # 丢弃的条目不再随 serialize() 写回——下次保存会从磁盘清除（自愈），
+                # 记 warning 使该行为可观测（O-01：不允许静默）。
+                logger.warning("跳过损坏/非法记录（%s）", date_str)
 
     @staticmethod
     def _parse_record(date_str: str, raw: object) -> DayRecord | None:

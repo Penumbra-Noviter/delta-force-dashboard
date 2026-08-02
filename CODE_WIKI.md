@@ -17,8 +17,8 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（217 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）全部完成 |
+| 测试框架 | pytest（221 项） |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）全部完成 |
 
 ---
 
@@ -54,8 +54,11 @@
 │  ┌──────────────┐  ┌───────────────────────────────────┐ │
 │  │  config.py   │  │ app/theme.py — 主题色板 + QSS    │ │
 │  │  路径/日期/  │  │ THEMES/get_color 定义于此（T-02） │ │
-│  │  保留条数    │  │                                    │ │
+│  │  保留条数    │  │ signal_color：信号→主题色（D-01） │ │
 │  └──────────────┘  └───────────────────────────────────┘ │
+│  ┌───────────────────────────────────────────────────┐ │
+│  │ signals.py — 信号枚举叶子（零依赖）               │ │
+│  └───────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -86,6 +89,7 @@ Profit Calculator/
 │   ├── chart_widget.py      ← pyqtgraph 双曲线图 + PNG 导出 + 稀疏数据提示
 │   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
+├── signals.py               ← [领域信号] RateSignal + PnLSignal 共享叶子（零依赖，D-01 收敛点）
 ├── config.py                ← [基础配置] 路径、日期格式、字体、THEMES 色板
 ├── data_store.py            ← [持久化] DataStore — JSON 原子写入 + 滚动备份
 ├── json_file.py             ← [持久化 seam] JSON 原子写 + 容错读（D-02）
@@ -93,12 +97,12 @@ Profit Calculator/
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 72 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07）
+│   ├── test_calculator.py   ← 73 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
 │   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← 21 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
 │   ├── test_table_theme.py  ← 4 个测试（C1 主题色实时解析 + D-01 零差值）
-│   ├── test_settings_store.py ← 15 个测试（D-02 json_file seam + SettingsStore 容错）
+│   ├── test_settings_store.py ← 18 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← 7 个测试（O-22 数据目录迁移 + mkdir 顺序回归）
 │   └── test_ui_smoke.py     ← 22 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
@@ -290,13 +294,16 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（~371 行）
+### 4.6 `app/theme.py` — 主题系统（~391 行）
 
-主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用。
+主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
 | 函数 | 说明 |
 |------|------|
 | `generate_qss(theme_name)` | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
+| `get_theme()` / `set_theme(name)` | 读取 / 切换当前主题（"light" \| "dark"） |
+| `get_color(key)` | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**） |
+| `signal_color(signal)` | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
 
@@ -316,7 +323,7 @@ pyqtgraph 双曲线图组件。
 
 | 方法 | 参数 | 返回 | 说明 |
 |------|------|------|------|
-| `__init__` | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目，ADR-0001） |
+| `__init__` | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目并记 warning，ADR-0001——下次保存不再写回，自愈清除） |
 | `get_record` | `date_str: str` | `DayRecord \| None` | 一行查询；不存在返回 None（非法条目已由加载时解析过滤） |
 | `save_record` | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例） |
 | `serialize` | — | `dict` | 转磁盘持久化形态裸 dict（`{日期: {cash, warehouse}}`）；返回**新 dict**，与内部 data 断共享（ADR-0001） |
@@ -336,6 +343,8 @@ pyqtgraph 双曲线图组件。
 
 **关键业务规则**：
 - `data` 为 `dict[str, DayRecord]`（ADR-0001）；磁盘持久化走 `serialize()` 单向导出（返回新 dict，消灭 logic 与磁盘共享别名）；MainWindow 不直接触碰内部 data 形态
+- 领域信号枚举 `RateSignal`/`PnLSignal` 定义于 `signals.py`（零依赖叶子）；业务层只返回语义信号，颜色映射留在 UI 层
+- 加载时过滤的损坏/非法条目不再随 `serialize()` 写回——下一次保存会静默清除磁盘中的损坏数据（自愈）；记 warning 使行为可观测（O-01）
 - 总收益 = 仓库价值（现金是仓库的组成部分）；不变式判定收敛于 `is_cash_under_warehouse`（D-05，告警/拦截/红框共用）
 - 收益率 = `(今日warehouse - 前日warehouse) / 前日warehouse × 100%`，精度 1 位小数
 - 盈亏标签：盈（绿底）/ 亏（红底）/ —（灰底，无前日数据或持平）
@@ -402,28 +411,39 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.11 `json_file.py` — JSON 原子写 seam（D-02，~40 行）
+### 4.11 `json_file.py` — JSON 原子写 seam（D-02，~52 行）
 
 | 函数 | 说明 |
 |------|------|
 | `atomic_write_json(path, data)` | 原子写入：先写 `.tmp` 再 `os.replace`；失败清理临时文件并抛出 OSError，由调用方决定告警/降级 |
-| `try_load_json(path)` | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None |
+| `try_load_json(path, on_error=None)` | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None；解析/IO 失败时若提供 `on_error`，以实际异常为参数调用（供调用方恢复带异常详情的告警） |
 
 **范围**：通用 JSON 持久化 seam（当前消费方为 `SettingsStore`）。`DataStore` 保留其更丰富的写路径（滚动备份 + 损坏恢复），未改用本 seam；**CSV 不走本 seam**（CSV 是导出格式而非持久化状态，D-02 拍板）。
 
 ---
 
-### 4.12 `settings_store.py` — 设置持久化（D-02，~45 行）
+### 4.12 `settings_store.py` — 设置持久化（D-02，~55 行）
 
 #### 类：`SettingsStore`
 
 | 方法 | 说明 |
 |------|------|
 | `__init__(settings_file=SETTINGS_FILE)` | 设置文件路径 |
-| `load()` | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning + `{}`；顶层非 dict → warning + `{}` |
+| `load()` | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning（含异常详情，D-02 前逐字文案）+ `{}`；顶层非 dict → warning + `{}` |
 | `save(settings)` | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题） |
 
 **职责边界**：MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
+
+---
+
+### 4.13 `signals.py` — 领域信号枚举（~32 行）
+
+| 枚举 | 说明 |
+|------|------|
+| `RateSignal` | 收益率信号：`POSITIVE`/`NEGATIVE`/`NEUTRAL`/`NONE`；由 `format_rate`/`format_signed_money`/`format_summary` 返回，`theme.signal_color` 据此映射主题色（D-01） |
+| `PnLSignal` | 盈亏信号：`盈`/`亏`/`平`/`无`；由 `get_pnl_label` 返回，`table_widget._PNL_TO_KEY` 据此映射盈亏标签颜色 |
+
+**定位**：零依赖底部叶子（仅标准库），任何层可安全导入——解决 D-01 后 `theme.py` 反向依赖 `calculator` 的层反转（D 系列评审修正）；颜色值不在此定义，永远留在 UI 层。
 
 ---
 
@@ -446,11 +466,12 @@ main.py
         ├── app/input_panel.py ──┐
         ├── app/table_widget.py  ├── formatting.py
         ├── app/chart_widget.py  │
-        ├── app/theme.py          （无外部依赖）
+        ├── app/theme.py ────────┼── signals.py
         ├── data_store.py ───────┼── config.py
         ├── settings_store.py ───┼── json_file.py, config.py
         ├── json_file.py          （无外部依赖）
-        ├── calculator.py ───────┼── config.py, formatting.py
+        ├── calculator.py ───────┼── config.py, formatting.py, signals.py
+        ├── signals.py            （无外部依赖，共享叶子）
         └── config.py
 ```
 
@@ -459,15 +480,16 @@ main.py
 | 模块 | 导入来源 |
 |------|----------|
 | `main.py` | `app.main_window`, `config`, `PySide6`（QtCore/QtGui/QtNetwork/QtWidgets） |
-| `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `settings_store`, `formatting`, `calculator`, `PySide6` |
-| `app/input_panel.py` | `app.theme`, `formatting`, `PySide6` |
-| `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `PySide6` |
+| `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `settings_store`, `formatting`, `calculator`, `signals`, `PySide6` |
+| `app/input_panel.py` | `app.theme`, `formatting`, `calculator`, `PySide6` |
+| `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `signals`, `PySide6` |
 | `app/chart_widget.py` | `app.theme`, `numpy`, `pyqtgraph`, `PySide6` |
-| `app/theme.py` | 无外部依赖（仅标准库） |
-| `calculator.py` | `config`, `formatting` |
+| `app/theme.py` | `signals`（`RateSignal`，零依赖叶子） |
+| `calculator.py` | `config`, `formatting`, `signals` |
 | `data_store.py` | `config` |
 | `settings_store.py` | `json_file`, `config` |
 | `json_file.py` | 无外部依赖（仅标准库） |
+| `signals.py` | 无外部依赖（仅标准库） |
 | `formatting.py` | 无外部依赖（仅标准库） |
 
 ---
@@ -517,10 +539,10 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 72 | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07） |
+| `tests/test_calculator.py` | 73 | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
-| `tests/test_settings_store.py` | 15 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02） |
+| `tests/test_settings_store.py` | 18 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
 
 **运行方式**：在项目根目录执行 `pytest`
 

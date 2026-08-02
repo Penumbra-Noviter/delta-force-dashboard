@@ -71,6 +71,24 @@ def test_try_load_non_dict_returns_value(tmp_path):
     assert try_load_json(path) == []
 
 
+def test_try_load_corrupt_calls_on_error(tmp_path):
+    """解析失败 → on_error 以实际异常为参数被调用，仍返回 None。"""
+    path = tmp_path / "s.json"
+    path.write_text("{ not json", encoding="utf-8")
+    seen = []
+    result = try_load_json(path, on_error=seen.append)
+    assert result is None
+    assert len(seen) == 1
+    assert isinstance(seen[0], (json.JSONDecodeError, OSError))
+
+
+def test_try_load_missing_does_not_call_on_error(tmp_path):
+    """文件缺失是正常状态 → on_error 不被调用。"""
+    seen = []
+    assert try_load_json(tmp_path / "nope.json", on_error=seen.append) is None
+    assert seen == []
+
+
 # ── SettingsStore.load ─────────────────────────────────
 
 def test_load_missing_returns_empty_no_warning(tmp_path, caplog):
@@ -94,6 +112,20 @@ def test_load_corrupt_logs_warning(tmp_path, caplog):
         result = SettingsStore(path).load()
     assert result == {}
     assert any("设置文件读取失败" in rec.message for rec in caplog.records)
+
+
+def test_load_corrupt_warning_includes_exception(tmp_path, caplog):
+    """读取失败 warning 恢复 D-02 前逐字文案：带异常详情（: %s）。"""
+    path = tmp_path / "settings.json"
+    path.write_text("{ not valid json !!!", encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        SettingsStore(path).load()
+    messages = [rec.message for rec in caplog.records]
+    assert any(
+        m.startswith("设置文件读取失败（使用默认设置）:")
+        and len(m) > len("设置文件读取失败（使用默认设置）:")
+        for m in messages
+    )
 
 
 def test_load_top_level_list_returns_default(tmp_path, caplog):

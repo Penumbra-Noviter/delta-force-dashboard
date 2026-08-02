@@ -44,8 +44,9 @@ from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
-from calculator import DayRecord, ProfitCalculatorLogic, RateSignal
+from calculator import DayRecord, ProfitCalculatorLogic
 from settings_store import SettingsStore
+from signals import RateSignal
 
 logger = logging.getLogger(__name__)
 

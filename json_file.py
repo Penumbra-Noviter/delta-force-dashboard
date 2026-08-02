@@ -14,7 +14,7 @@ __all__ = ["atomic_write_json", "try_load_json"]
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
@@ -32,15 +32,21 @@ def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
         raise
 
 
-def try_load_json(path: Path) -> Any | None:
+def try_load_json(
+    path: Path, on_error: Callable[[Exception], None] | None = None
+) -> Any | None:
     """容错读取 JSON 文件。
 
     返回解析后的值（形状校验交由调用方）；文件缺失或解析失败返回 None。
+    文件缺失是正常状态，不触发 on_error；解析/IO 失败时若提供 on_error，
+    以实际异常为参数调用它（供调用方恢复带异常详情的告警，D-02 评审修正）。
     """
     if not path.exists():
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        if on_error is not None:
+            on_error(e)
         return None

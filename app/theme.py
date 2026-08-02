@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from calculator import RateSignal
+from signals import RateSignal
 
 __all__ = [
     "THEMES",

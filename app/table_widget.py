@@ -24,7 +24,8 @@ from PySide6.QtWidgets import (
 
 from app.theme import get_color, signal_color
 from formatting import format_money, format_short_date
-from calculator import DayRecord, ProfitCalculatorLogic, PnLSignal
+from calculator import DayRecord, ProfitCalculatorLogic
+from signals import PnLSignal
 
 # ── 盈亏信号 → 主题颜色键映射 ────────────────────────
 # 收益率信号（RateSignal）→ 颜色映射已收敛到 app.theme.signal_color；
