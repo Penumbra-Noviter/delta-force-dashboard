@@ -1,6 +1,6 @@
 # To-Tickets — 收益计算器架构优化工单
 
-> **来源**：2026-07-30 Python Architecture Review（T 系列）+ 2026-07-31 `/improve-codebase-architecture`（C 系列）+ 2026-08-01 `收益计算器-优化建议清单.md` 评审（O 系列）+ 2026-08-02 `收益计算器项目经验复盘.md` 复盘反思（F 系列）+ 2026-08-02 用户需求「双曲线合并到同一坐标系」（G 系列，O-C2 原型验证拍板）  
+> **来源**：2026-07-30 Python Architecture Review（T 系列）+ 2026-07-31 `/improve-codebase-architecture`（C 系列）+ 2026-08-01 `收益计算器-优化建议清单.md` 评审（O 系列）+ 2026-08-02 `收益计算器项目经验复盘.md` 复盘反思（F 系列）+ 2026-08-02 用户需求「双曲线合并到同一坐标系」（G 系列，O-C2 原型验证拍板）+ 2026-08-03 用户需求「记录天数上限 7→30 + 多视图切换」（J 系列，Grilling Q1–Q11 收敛，规格见 `CONSENSUS.md` §7）  
 > **规则**：本文件是**仓库内唯一的待办事实来源**。活跃表只保留「未完成」工单；每完成一项 → 移入「已完成归档」并记日期 → 同步 `DEV_LOG.md` → 与本提交一起 commit。
 >
 > **维护节奏**（绑定到已有流程节点，不新增习惯）：
@@ -12,17 +12,14 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-02）：无待办。F-01 / F-02 均已完成（2026-08-02，归档见下；来源：`收益计算器项目经验复盘.md` 五、复盘反思）。
+> 活跃表（2026-08-03）：J 系列 — 记录保留 30 + 多视图 7/30 切换（规格见 `CONSENSUS.md` §7，Grilling Q1–Q11 收敛）。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| — | — | — | ✅ 活跃表为空 | — |
+| J-01 | 保留上限 7→30：`config` 新增 `RETENTION_LIMIT=30` + `rotate_weekly` 改引用它 + `format_summary`/`format_saved_indicator` 文案联动（N 不写死 7） | 功能（数据模型） | 📝 已录入 | ⚪ Speculative |
+| J-02 | 视图切换 7/30：`TableWidget` 加按钮组（7/30）+ `view_changed(int)` 信号 + 分栏均分 `mid=ceil(n/2)`；`MainWindow` 持 `_view_n`（启动默认 7）、`_get_records`/`_update_summary` 改走 `_view_n`；`chart` 随 records 自适应 | 功能（UI） | 📝 已录入 | ⚪ Speculative |
 
-### F 系列候选说明（拍板：2026-08-02 均采纳并完成）
-
-- **F-01**（复盘 3.6 + 五-1）：实测 `CODE_WIKI` §7 测试表各文件用例数之和 **214 ≠ 实际 pytest 收集 221**，且漏 `test_migration.py`——手工表格已再次漂移。方案落地：`scripts/doc_sync.py`（stdlib，秒级）从代码生成三类机械标记——① §7 测试数（解析 `pytest --collect-only -q`）；② §4 各模块标题 `（~N 行）`（AST 数非空行）；③ §4 公开方法表（AST 提取签名）；`--check` 模式比对现文、不一致 exit 1。`scripts/install-hooks.bat` 装 `.git/hooks/pre-commit` 跑 `--check` 拦截未同步提交（`.git/hooks` 不入库，需安装脚本）。**边界（规模悖论）**：只自动「数字/签名类」机械标记，不生成叙述性文字；工具脚本加 1 个冒烟测试即可，不堆数量。✅ **已实现（2026-08-02）**。
-  - 安装脚本附带修复：`install-hooks.bat:12` `echo` 括号未转义（`^(...^)`）导致 `if` 块提前闭合、成功路径也被 `exit /b 1`；行尾统一 CRLF。详见 DEV_LOG 2026-08-02「修复」条目。
-- **F-02**（复盘 五-4）：O-22 复制非移动的源清理时间点模糊（E-04 以「用户确认后删除」收口，本机残留已清）。方案：`migrate_legacy_data` 成功迁移后写 `.migrated` 标记到 `DATA_DIR`（幂等）；启动时若标记存在且 legacy `data.json` 仍在，打 info 日志「旧数据源可手动清理：`APP_DIR`」；CODE_WIKI 记策略「源清理时间点 = 目标数据确认健康之后，用户确认后手动执行」。**安全原则**：脚本绝不自动删源，删除必须是用户确认的手动动作。✅ **已实现（2026-08-02）**。
+> **依赖链**：J-01（保留上限冻结）→ J-02（UI 联动依赖视图条数逻辑）。两段接入点都在 `MainWindow`（`_get_records`/`_update_summary` 当前硬编码 `WEEK_DAYS`）：J-01 是 calculator/config 纯逻辑层，J-02 把接入点参数化 + 加切换控件。
 
 ---
 

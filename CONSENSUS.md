@@ -211,4 +211,100 @@ Profit Calculator/
 
 ---
 
+## 七、多视图（记录保留 30 + 视图切换 7/30）共识 — to-spec ✅
+
+> **立项日期**：2026-08-03  
+> **来源**：用户需求「记录天数上限从 7 扩到 30」+ Grilling 决策 11 问收敛 + throwaway 原型 `MultiViewModel`（分支 `prototype/multiview`，commit `f39c66f`，验证过数据流不断裂）
+> **状态**：规格评审阶段 → 拆 TO-TICKETS
+
+### 7.1 需求目标
+
+把「保留最近 7 条录入」提升为「**保留 30 条 + 视图窗口 7/30 可切换**」。存储与视图解耦，30 是被"隐藏累积"的全量存储，视图 7/30 只是从存量里筛出来看的窗口，切回 7 不丢数据。
+
+### 7.2 决策记录（Grilling Q1–Q11 收敛）
+
+| # | 决策点 | 选择 | 理由 |
+|---|--------|------|------|
+| Q1 | 度量口径 | **记录条数**（延续 O-17） | 不推翻两个月前拍的"按录入条数"方向；录入未录的日历天不挤掉记录 |
+| Q2 | 保留上限单位 | **30 条** | 与 Q1 同种子语义，最自然，"最多 30 条账" |
+| Q3 | 触发时机 | 每次 `save_today()` 后 `rotate` 删最旧 | 现状不变，只抬常量 7→30，数据流零重构 |
+| Q4 | 用户意图 | **加 7/30 视图切换** | O-C2 原意；纯后台扩容无感知 |
+| Q5 | 切换形态 | **存储恒定 30、视图解耦** | `MultiViewModel` 验证的推荐形态；切回 7 不丢数据 |
+| Q6 | 控件 + 布局 | **按钮组** + 7/30 都双栏 | 用户偏好按钮组；QTableWidget |
+| Q7 | 30 条分栏 | **均分** `mid=ceil(n/2)` | 7→4+3 现状不变，30→15+15，双栏均衡 |
+| Q8 | 切换控件层级 | 进 `TableWidget` 内部 + `view_changed(int)` 信号 | 表格是视图窗口主人，`MainWindow` 只订阅；深模块 |
+| Q9 | 联动范围 | **表格+曲线图+汇总 全联动** | 同源自 `visible()`，避免"表格30/图表7"断链 |
+| Q10 | 切换粒度 | **全局单一开关** | 一个按钮组驱动三处同变，数据流一致 |
+| Q11 | 保留边界 | 满 30 不删、第 31 条才删最旧（`excess=len-30`） | "最多30条"语义，与现状 `rotate_weekly(days=7)` 行为一致 |
+
+补充（Q9 衍生、无须上桌）：`summary()` 语义不变，仍 =「窗口末日 warehouse − 窗口首日 warehouse」，≥2 条才有意义；30 窗口下同样取窗口两端。
+
+### 7.3 数据模型变更
+
+核心：**把「保留 Retention」与「视图 View」解耦为两个常量**。现状 `recent_records(days)` / `rotate_weekly(days)` / `summary(days)` **已按 `days` 参数化**（默认 `WEEK_DAYS=7`，`config.py`）；真正的改动是——`rotate_weekly` 的保留上限改走独立常量 `RETENTION_LIMIT=30`，视图展示沿用逐处传入的 `days`（按钮组切 7/30 时由 `MainWindow` 回传）。对齐原型 `MultiViewModel` 的 `RETENTION_LIMIT` / `view_days` 解耦思路。
+
+```python
+# config.py
+WEEK_DAYS = 7          # 视图默认窗口（沿用，启动默认 7）
+RETENTION_LIMIT = 30   # 新增：保留上限（用于 rotate_weekly，与视图解耦）
+
+# calculator.py — 语义对照
+recent_records(days)   # 已参数化：按 N 条取视图（按钮组切 7/30 时传对应 N）
+rotate_weekly()        # 改调 RETENTION_LIMIT=30（不再用 WEEK_DAYS）
+    → docstring 与「最近N条」文案联动 30
+summary(days)          # 已参数化：汇总跟随视图条数（MainWindow 传入当前 view_n）
+format_summary(count, total, days)
+format_saved_indicator(keep_days=RETENTION_LIMIT)   # 清理文案「已保留最近30条」
+```
+
+### 7.4 UI 变更
+
+`calculator` 已参数化，**真正的联动改动点在 `MainWindow`**（`_get_records` / `_update_summary` 硬编码 `WEEK_DAYS`），表格加切换控件。
+
+```python
+# app/table_widget.py
+class TableWidget:
+    view_changed = Signal(int)     # 新增，emit 当前视图条数（7 / 30）
+    # __init__ 加按钮组（7/30，QButtonGroup）+ 持有 self._view_days；构造时 emit 当前视图
+    # draw(records, today, view_n):  分栏 mid = ceil(n/2)（均分）
+
+# app/main_window.py
+self._view_n = WEEK_DAYS                      # 当前视图条数，启动默认 7（不持久化）
+table.view_changed.connect(self._on_view_changed)
+def _on_view_changed(self, n: int) -> None:
+    self._view_n = n
+    self.refresh_display()
+def _get_records(self) -> list:
+    return self.logic.recent_records(self._view_n)      # 取代硬编码 WEEK_DAYS
+def _update_summary(self) -> None:
+    count, total = self.logic.summary(self._view_n)      # 取代硬编码 WEEK_DAYS
+    text, signal = format_summary(count, total, self._view_n)
+
+# app/chart_widget.py
+# draw(records, ...) 随传入 records 长度自适应；30 条时 X 轴密集，不改图表结构
+```
+
+文案联动：`format_summary(days)` / `format_saved_indicator(keep_days)` 的「最近N条」前缀与清理提示，N 随 `_view_n` / `RETENTION_LIMIT` 走（不再写死 7）。
+
+### 7.5 范围边界（非目标）
+
+- **不**改"每次启动默认 7"，切换只在会话内存生效，不落档（不持久化到 settings.json）
+- **不**加入 `days`（日历天数）口径——Q1 否掉
+- **不**做 90 视图——本工单锁定 7/30
+- **不**改双栏结构为单栏/多栏——Q7 均分保证双栏均衡
+
+### 7.6 影响文件
+
+`calculator.py` / `app/table_widget.py` / `app/main_window.py` / `app/chart_widget.py` / `tests/` / `CODE_WIKI.md` / `PROJECT_REFERENCE.md` / `README.md` / 新增 ADR
+
+### 7.7 验收标准
+
+- [ ] pytest 全绿，新增 `visible(n)` + retention 边界（len>30 删最旧）+ 分栏均分 + 联动烟测
+- [ ] GUI：按钮组 7/30 切换，切 30 表格 15+15、曲线图 30 条、汇总"最近30条总盈亏"
+- [ ] 切回 7 不丢数据（数据仍在 30 内）
+- [ ] 满 30 条不删、录第 31 条才删最旧
+- [ ] 启动默认 7
+
+---
+
 *本文档与 PROJECT_REFERENCE.md 配合使用。*
