@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（204 项） |
+| 测试框架 | pytest（217 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）全部完成 |
 
 ---
@@ -93,7 +93,7 @@ Profit Calculator/
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 65 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03）
+│   ├── test_calculator.py   ← 72 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07）
 │   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← 21 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -302,7 +302,7 @@ pyqtgraph 双曲线图组件。
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（~140 行）
+### 4.7 `calculator.py` — 业务逻辑（~350 行）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -311,7 +311,6 @@ pyqtgraph 双曲线图组件。
 | `cash` | float | 当前现金 |
 | `warehouse` | float | 仓库价值（含现金） |
 | `date` | str | 日期 YYYY-MM-DD |
-| `total` | property → float | 总收益 = warehouse（现金是仓库的组成部分） |
 
 #### 类：`ProfitCalculatorLogic`
 
@@ -326,6 +325,9 @@ pyqtgraph 双曲线图组件。
 | `calculate_rate` | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
 | `format_rate` | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
 | `format_signed_money` | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
+| `is_cash_under_warehouse` | `cash, warehouse` | `bool` | 现金⊆仓库不变式判定（唯一所有者 D-05，告警/拦截/红框三处共用） |
+| `format_summary` | `count, total, days=7` | `(str, str)` | 汇总标签文本纯函数（D-07）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
+| `format_saved_indicator` | `save_date, warehouse, today, deleted, keep_days=7` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07） |
 | `get_pnl_label` | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
 | `delete_record` | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
 | `rotate_weekly` | `days=7` | `list[str]` | 保留最近 days 条实际录入记录，超过上限删除最旧；返回被删除日期列表（升序，O-14） |
@@ -334,7 +336,7 @@ pyqtgraph 双曲线图组件。
 
 **关键业务规则**：
 - `data` 为 `dict[str, DayRecord]`（ADR-0001）；磁盘持久化走 `serialize()` 单向导出（返回新 dict，消灭 logic 与磁盘共享别名）；MainWindow 不直接触碰内部 data 形态
-- `total` = `warehouse`（非 `warehouse + cash`）
+- 总收益 = 仓库价值（现金是仓库的组成部分）；不变式判定收敛于 `is_cash_under_warehouse`（D-05，告警/拦截/红框共用）
 - 收益率 = `(今日warehouse - 前日warehouse) / 前日warehouse × 100%`，精度 1 位小数
 - 盈亏标签：盈（绿底）/ 亏（红底）/ —（灰底，无前日数据或持平）
 - 较前日差值 / 总盈亏展示统一走 `format_signed_money`：正数 `+¥…`、负数 `¥-…`、零 `¥0.00`（无 + 前缀）、无前值 `—`（D-01）
@@ -515,7 +517,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 65 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01） |
+| `tests/test_calculator.py` | 72 | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07） |
 | `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | 15 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02） |
@@ -602,7 +604,7 @@ python -m PyInstaller 收益计算器.spec --noconfirm
 ## 十、常见注意事项
 
 1. **主题切换**：运行时必须用 `get_color(key)` 而非模块级常量，因为常量在 `import` 时固定为 light 主题
-2. **DayRecord.total**：`total` = `warehouse`（不是 `warehouse + cash`），现金是仓库的组成部分
+2. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用，D-05）；总收益 = 仓库价值（已含现金），非 `warehouse + cash`
 3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，按「录入条数」超过上限时从最旧开始删除；表格/图表/汇总（`recent_records`/`summary`）同以最近 7 条实际录入记录为基准，而非最近 7 个日历天
 4. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入
 5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，仅 `setData()` 更新，避免重建

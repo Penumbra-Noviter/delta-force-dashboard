@@ -8,15 +8,29 @@
 
 ## 滚动摘要（2026-08-01）
 
-- **测试**：pytest **210/210** ✅（D-04 后）；基线演进 103→210，各阶段计数见下方条目
+- **测试**：pytest **217/217** ✅（D-07 后）；基线演进 103→217，各阶段计数见下方条目
 - **打包**：PyInstaller **onedir**（O-20）+ UPX（O-21）：dist 117M→64M。构建命令须显式 `--upx-dir D:/Desktop/tools/UPX`（PyInstaller **不读** `UPX_DIR` 环境变量）
 - **数据**：运行态统一到 `DATA_DIR = Path.home()/"收益计算器"`（O-22）；旧 `APP_DIR`（exe 目录）仅作迁移源；迁移复制非移动、目标已有 data.json 跳过、失败仅 warning
-- **活跃工单**：D-05~D-07 深层化候选；D-01~D-04 ✅（2026-08-02，见 TO-TICKETS 归档表）
+- **活跃工单**：D 系列深层化候选全 ✅（D-01~D-07，2026-08-02，见 TO-TICKETS 归档表）；当前无活跃工单
 - **持久避坑**：① 绝不在模块顶层调 `get_color()`（C1，AST 回归测试防复发）；② Qt6/MSVC DLL 为 **CFG 构建，UPX 自动跳过**（强压损坏），实际压缩 8 个 Qt *.pyd；③ 测试 `DataStore` 必须显式传 `backup_file=tmp_path/...`（防污染真实备份，O-08/O-09 教训）；④ 构建 warn 文件仅剩 Windows 无关的 POSIX 模块 + 可选 scipy 缺失，无实质风险（历次构建一致）
 
 ---
 
 ## 日志正文
+
+### 2026-08-02 | 重构 | D-05 现金⊆仓库不变式单一所有者：is_cash_under_warehouse 纯函数
+- `ProfitCalculatorLogic.is_cash_under_warehouse(cash, warehouse) -> bool`（True=不变式成立）；告警（save_record）/ 拦截（save_today）/ 红框（input_panel）三处字面量 `cash > warehouse` 改调用，语义零变化
+- 测试：+3（成立 / 相等边界 / 违反）；pytest 213/213 ✅
+
+### 2026-08-02 | 重构 | D-06 删浅表面：DayRecord.total 删除
+- 删 `DayRecord.total` property（生产零引用真死代码）；test_calculator 4 个专属测试删除 + 1 处冗余断言删除 + 3 处断言改 `.warehouse`
+- 文档：CODE_WIKI 属性表/关键规则/注意事项、PROJECT_REFERENCE 坑点条目改注「现金⊆仓库不变式」语义
+- 测试：-4；pytest 209/209 ✅
+
+### 2026-08-02 | 重构 | D-07 展示渲染移出编排器：format_summary + format_saved_indicator 纯函数
+- `ProfitCalculatorLogic.format_summary(count, total, days=7) -> (str, RateSignal)`：数据不足/仅 1 条→NONE（灰字弱化），≥2 条走 format_signed_money；`format_saved_indicator(save_date, warehouse, today, deleted) -> str`：今日/已更新 + 轮转清理提示（O-14/O-17 文案）
+- `_update_summary` 只留信号→颜色映射与样式落地（颜色映射留 UI，依赖 D-01 信号 seam）；save_today 指示器改调用纯函数
+- 测试：+8（format_summary 5 + format_saved_indicator 3）；pytest 217/217 ✅
 
 ### 2026-08-02 | 测试重构 | D-04 被测试的路径=真实路径：QTest 打事件链路（`cfb15e1`）
 - 校验/联动断言不再把 `refresh_validity()` 当测试后门：conftest 新增 `type_and_settle` fixture（QTest `keyClicks` 键入 → 150ms 去抖 → `validity_changed` → save_btn 真实链路）；test_input_panel 校验/不变式 5 用例 + test_ui_smoke `test_input_validation_save_btn` 全改走它

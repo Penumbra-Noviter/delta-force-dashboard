@@ -76,7 +76,7 @@ rate = (today.warehouse - prev_day.warehouse) / prev_day.warehouse * 100
 1. **主题切换**：运行时切换主题必须调用 `get_color(key)` 而非直接引用模块级常量——常量在 import 时固定为 light 主题。
 2. **单实例保证**：`main.py` 通过 QLocalServer/QLocalSocket 防止多开；崩溃后残留 socket 会自动清理，无需手动删除。
 3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 每次 `save_today()` 后执行，按「录入条数」超过上限时从最旧开始删；表格/图表/汇总同以最近 7 条实际录入记录为基准（`recent_records`/`summary`），而非最近 7 个日历天。
-4. **DayRecord.total**：`total` 直接返回 `warehouse`（不是 warehouse + cash）。现金是 warehouse 的组成部分。
+4. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用）；总收益 = 仓库价值（已含现金），非 warehouse + cash。
 5. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入。
 6. **增量 vs 全量图更新**：`_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅 `setData()` 不重建组件；填充边界曲线也持久化，避免重建开销。
 
