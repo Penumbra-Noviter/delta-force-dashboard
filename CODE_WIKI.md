@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列全部完成）  
 > 生成日期：2026-07-29  
-> 测试状态：187 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 测试状态：204 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（187 项） |
+| 测试框架 | pytest（204 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）全部完成 |
 
 ---
@@ -88,15 +88,19 @@ Profit Calculator/
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
 ├── config.py                ← [基础配置] 路径、日期格式、字体、THEMES 色板
 ├── data_store.py            ← [持久化] DataStore — JSON 原子写入 + 滚动备份
+├── json_file.py             ← [持久化 seam] JSON 原子写 + 容错读（D-02）
+├── settings_store.py        ← [持久化] SettingsStore — 设置容错读 + 原子写（D-02）
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← 57 个测试（DayRecord + 业务逻辑 + CSV 导出）
+│   ├── test_calculator.py   ← 61 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01）
 │   ├── test_data_store.py   ← 18 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← 58 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← 18 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式）
-│   ├── test_table_theme.py  ← 3 个测试（C1 主题色实时解析）
-│   └── test_ui_smoke.py     ← 26 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_table_theme.py  ← 4 个测试（C1 主题色实时解析 + D-01 零差值）
+│   ├── test_settings_store.py ← 15 个测试（D-02 json_file seam + SettingsStore 容错）
+│   ├── test_migration.py    ← 7 个测试（O-22 数据目录迁移 + mkdir 顺序回归）
+│   └── test_ui_smoke.py     ← 23 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -149,7 +153,7 @@ Profit Calculator/
 | `_delete_record(date_str)` | 确认对话框 → 删除数据 → 持久化 → 刷新 |
 | `_toggle_theme()` | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
 | `_toggle_pin()` | 切换窗口置顶状态 |
-| `_save_settings()` / `_load_settings()` | 设置持久化（geometry/theme/pinned），失败记日志（O-01） |
+| `_save_settings()` | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02） |
 
 #### 信号连接
 
@@ -394,6 +398,31 @@ pyqtgraph 双曲线图组件。
 
 ---
 
+### 4.11 `json_file.py` — JSON 原子写 seam（D-02，~40 行）
+
+| 函数 | 说明 |
+|------|------|
+| `atomic_write_json(path, data)` | 原子写入：先写 `.tmp` 再 `os.replace`；失败清理临时文件并抛出 OSError，由调用方决定告警/降级 |
+| `try_load_json(path)` | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None |
+
+**范围**：通用 JSON 持久化 seam（当前消费方为 `SettingsStore`）。`DataStore` 保留其更丰富的写路径（滚动备份 + 损坏恢复），未改用本 seam；**CSV 不走本 seam**（CSV 是导出格式而非持久化状态，D-02 拍板）。
+
+---
+
+### 4.12 `settings_store.py` — 设置持久化（D-02，~45 行）
+
+#### 类：`SettingsStore`
+
+| 方法 | 说明 |
+|------|------|
+| `__init__(settings_file=SETTINGS_FILE)` | 设置文件路径 |
+| `load()` | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning + `{}`；顶层非 dict → warning + `{}` |
+| `save(settings)` | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题） |
+
+**职责边界**：MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
+
+---
+
 ## 五、依赖关系
 
 ### 5.1 外部依赖
@@ -415,6 +444,8 @@ main.py
         ├── app/chart_widget.py  │
         ├── app/theme.py          （无外部依赖）
         ├── data_store.py ───────┼── config.py
+        ├── settings_store.py ───┼── json_file.py, config.py
+        ├── json_file.py          （无外部依赖）
         ├── calculator.py ───────┼── config.py, formatting.py
         └── config.py
 ```
@@ -424,13 +455,15 @@ main.py
 | 模块 | 导入来源 |
 |------|----------|
 | `main.py` | `app.main_window`, `config`, `PySide6`（QtCore/QtGui/QtNetwork/QtWidgets） |
-| `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `formatting`, `calculator`, `PySide6` |
+| `app/main_window.py` | `app.input_panel`, `app.table_widget`, `app.chart_widget`, `app.theme`, `config`, `data_store`, `settings_store`, `formatting`, `calculator`, `PySide6` |
 | `app/input_panel.py` | `app.theme`, `formatting`, `PySide6` |
 | `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `PySide6` |
 | `app/chart_widget.py` | `app.theme`, `numpy`, `pyqtgraph`, `PySide6` |
 | `app/theme.py` | 无外部依赖（仅标准库） |
 | `calculator.py` | `config`, `formatting` |
 | `data_store.py` | `config` |
+| `settings_store.py` | `json_file`, `config` |
+| `json_file.py` | 无外部依赖（仅标准库） |
 | `formatting.py` | 无外部依赖（仅标准库） |
 
 ---
@@ -480,9 +513,10 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | 57 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08） |
+| `tests/test_calculator.py` | 61 | DayRecord 属性、冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01） |
 | `tests/test_data_store.py` | 18 | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | 58 | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
+| `tests/test_settings_store.py` | 15 | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02） |
 
 **运行方式**：在项目根目录执行 `pytest`
 
@@ -493,7 +527,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | 26 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、损坏设置日志、保存失败日志、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）、settings 顶层 dict 校验（O-09） |
+| `tests/test_ui_smoke.py` | 23 | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动、失焦格式化、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
 | `tests/test_input_panel.py` | 18 | InputPanel getter 语义 / raw getter / refresh_validity 公开 seam / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | 3 | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 |
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 __all__ = ["MainWindow"]
 
-import json
 import logging
 import platform
 from datetime import datetime
@@ -46,6 +45,7 @@ from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+from settings_store import SettingsStore
 
 logger = logging.getLogger(__name__)
 
@@ -63,14 +63,16 @@ class MainWindow(QMainWindow):
     """收益计算器主窗口。"""
 
     def __init__(self, store: DataStore | None = None,
-                 logic: ProfitCalculatorLogic | None = None) -> None:
+                 logic: ProfitCalculatorLogic | None = None,
+                 settings_store: SettingsStore | None = None) -> None:
         super().__init__()
 
         self.store = store or DataStore()
         self.logic = logic or ProfitCalculatorLogic(self.store.load())
+        self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self.today = datetime.now().strftime(DATE_FORMAT)
         self._pinned = False
-        self._settings = self._load_settings()
+        self._settings = self.settings_store.load()
         self._theme = self._settings.get("theme", "light")
         set_theme(self._theme)
 
@@ -135,31 +137,19 @@ class MainWindow(QMainWindow):
     # 设置持久化
     # ═══════════════════════════════════════════════════════
 
-    @staticmethod
-    def _load_settings() -> dict:
-        try:
-            if SETTINGS_FILE.exists():
-                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-                logger.warning("设置文件顶层非 dict（使用默认设置）")
-        except (json.JSONDecodeError, OSError) as e:
-            logger.warning("设置文件读取失败（使用默认设置）: %s", e)
-        return {}
-
     def _save_settings(self) -> None:
+        """编码当前窗口状态并委托 SettingsStore 原子落盘（D-02）。
+
+        MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
+        self.settings_store（容错读 + 原子写）。
+        """
         geo_bytes = self.saveGeometry()
         settings = {
             "geometry": bytes(geo_bytes).hex(),
             "pinned": self._pinned,
             "theme": self._theme,
         }
-        try:
-            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
-        except OSError as e:
-            logger.warning("设置文件写入失败: %s", e)
+        self.settings_store.save(settings)
 
     def closeEvent(self, event) -> None:
         # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
