@@ -35,3 +35,23 @@ def settings_guard(tmp_path):
     mw.SETTINGS_FILE = tmp_path / "settings.json"
     yield
     mw.SETTINGS_FILE = orig
+
+
+@pytest.fixture
+def type_and_settle(qapp):
+    """QTest 键入 + 等待去抖定时器，驱动真实事件链路（D-04）。
+
+    D-04 原则：被测试的路径=真实路径。校验/联动类用例不再直调
+    `refresh_validity()`（那是同步 seam，不是测试后门），改用 QTest
+    `keyClicks` 键入文本，触发 textChanged→150ms 去抖→validity_changed
+    →save_btn 的完整真实链路；`qWait(settle_ms)` 让去抖定时器触发。
+    """
+    from PySide6.QtTest import QTest
+
+    def _type_and_settle(widget, text, settle_ms=200):
+        widget.setFocus()
+        widget.clear()
+        QTest.keyClicks(widget, text)
+        QTest.qWait(settle_ms)
+
+    return _type_and_settle

@@ -5,14 +5,16 @@ verify_all.py 原第 1~3、12 节为纯逻辑叶子测试，已被 tests/test_ca
 tests/test_formatting.py、tests/test_data_store.py 覆盖，不在此迁移。
 本文件承接原第 4~11、13~14 节 UI 烟测（verify_all 共 14 节）：
 - 启动/渲染、保存、编辑、删除（mock 确认框）、主题切换、窗口置顶、
-  设置持久化、几何恢复、输入校验联动、失焦格式化、快捷键绑定。
+  设置持久化、几何恢复、输入校验联动、快捷键绑定。
 - 所有 MainWindow 构造注入临时 store/logic，不触碰真实 data.json / settings.json
   （参照 tests/test_input_panel.py 的 main_window + settings_guard 模式）。
 
 迁移原则（C5）：C4 已造真 seam，测试尽可能走公开 API 与公开信号
 （fill_values / set_edit_mode / delete_requested / theme_btn.click 等），
-不再调用私有 _start_edit；仅校验非法输入（fill_values 只接受数值）与
-失焦格式化开关等无公开 seam 处仍直取输入框。
+不再调用私有 _start_edit；仅校验非法输入（fill_values 只接受数值）等
+无公开 seam 处仍直取输入框。
+- 失焦格式化 / 聚焦反格式化 / 失焦立即校验已随 D-04 收敛到
+  tests/test_input_panel.py 的 shown_panel 真实焦点链路。
 """
 
 from __future__ import annotations
@@ -25,8 +27,8 @@ from datetime import datetime, timedelta
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QFocusEvent, QKeySequence
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from calculator import ProfitCalculatorLogic
@@ -370,59 +372,37 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
 # ── 13. 金额输入校验联动 ─────────────────────────────────
 
 
-def test_input_validation_save_btn(sample_window):
+def test_input_validation_save_btn(sample_window, type_and_settle):
     """save_btn 随两个字段合法性联动启停。
 
-    输入校验走 150ms 去抖 QTimer（异步），测试用 C4 seam
-    `refresh_validity()` 立即同步重校验，断言结果确定。
+    D-04：校验断言走真实事件链路（QTest 键入 → 150ms 去抖 → validity_changed
+    → save_btn），不再用 `refresh_validity()` 同步后门。
     """
     ip = sample_window.input_panel
 
     # 初始空 → 禁用
-    ip.refresh_validity()
     assert not ip.save_btn.isEnabled()
 
     # 填一个字段 → 仍禁用
-    ip.cash_entry.setText("100000")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "100000")
     assert not ip.save_btn.isEnabled()
 
     # 填两个字段 → 启用
-    ip.warehouse_entry.setText("200000")
-    ip.refresh_validity()
+    type_and_settle(ip.warehouse_entry, "200000")
     assert ip.save_btn.isEnabled()
 
     # 改现金为非法 → 禁用
-    ip.cash_entry.setText("abc")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "abc")
     assert not ip.save_btn.isEnabled()
 
     # 恢复合法 → 启用
-    ip.cash_entry.setText("100000")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "100000")
     assert ip.save_btn.isEnabled()
 
     # 清空两字段 → 禁用
-    ip.cash_entry.setText("")
-    ip.warehouse_entry.setText("")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "")
+    type_and_settle(ip.warehouse_entry, "")
     assert not ip.save_btn.isEnabled()
-
-
-# ── 14. 失焦格式化 ───────────────────────────────────────
-
-
-def test_money_edit_focus_out_formatting(sample_window):
-    """输入框失焦时格式化为 ¥ 千分位。"""
-    cash = sample_window.input_panel.cash_entry
-
-    cash._formatting = False
-    cash.setText("123456")
-    assert cash.text() == "123456"
-
-    # 触发真实 focusOutEvent（offscreen 下无法靠窗口焦点，直接派发事件）
-    cash.focusOutEvent(QFocusEvent(QEvent.Type.FocusOut))
-    assert cash.text() == "¥123,456.00"
 
 
 # ── 14. 键盘快捷键 ───────────────────────────────────────

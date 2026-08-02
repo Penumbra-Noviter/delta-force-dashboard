@@ -41,6 +41,22 @@ def main_window(qapp, settings_guard, tmp_path):
     win.close()
 
 
+@pytest.fixture
+def shown_panel(qapp):
+    """显示的 InputPanel（D-04 焦点事件链路）。
+
+    offscreen 下 setFocus 的焦点事件只对可见窗口派发，聚焦反格式化 /
+    失焦立即校验等用例需窗口处于可见状态。
+    """
+    from PySide6.QtTest import QTest
+
+    ip = InputPanel()
+    ip.show()
+    QTest.qWait(30)
+    yield ip
+    ip.close()
+
+
 # ── InputPanel getter 语义（C4 seam 契约）────────────────
 
 
@@ -83,59 +99,63 @@ def test_get_raw_getters(qapp):
     assert ip.get_warehouse_raw() == "2M"
 
 
-def test_refresh_validity(qapp):
+def test_validation_via_real_event_chain(qapp, type_and_settle):
+    """校验属性经真实事件链路更新：键入 → 去抖 → validity_changed（D-04）。
+
+    原 test_refresh_validity 直调 refresh_validity() 同步后门；D-04 改为
+    QTest 键入 + 等待去抖定时器，走 textChanged→去抖→signal 的真实路径。
+    """
     ip = InputPanel()
-    ip.cash_entry.setText("100")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "100")
     assert ip.cash_entry.property("validity") == "valid"
-    ip.cash_entry.setText("abc")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "abc")
     assert ip.cash_entry.property("validity") == "invalid"
 
-def test_invariant_warning_border_on_cash_over_warehouse(qapp):
+
+def test_invariant_warning_border_on_cash_over_warehouse(qapp, type_and_settle):
     """现金 > 仓库 → 两个输入框进入 warning 态（越界红边，O-08）。"""
     ip = InputPanel()
-    ip.cash_entry.setText("200")
-    ip.warehouse_entry.setText("100")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "200")
+    type_and_settle(ip.warehouse_entry, "100")
     assert ip.cash_entry.property("validity") == "warning"
     assert ip.warehouse_entry.property("validity") == "warning"
 
 
-def test_invariant_warning_cleared_when_balanced(qapp):
+def test_invariant_warning_cleared_when_balanced(qapp, type_and_settle):
     """现金降到 ≤ 仓库后恢复各自自然校验态。"""
     ip = InputPanel()
-    ip.cash_entry.setText("200")
-    ip.warehouse_entry.setText("100")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "200")
+    type_and_settle(ip.warehouse_entry, "100")
     assert ip.cash_entry.property("validity") == "warning"
 
-    ip.warehouse_entry.setText("200")
-    ip.refresh_validity()
+    type_and_settle(ip.warehouse_entry, "200")
     assert ip.cash_entry.property("validity") == "valid"
     assert ip.warehouse_entry.property("validity") == "valid"
 
 
-def test_invariant_warning_boundary_equal_not_triggered(qapp):
+def test_invariant_warning_boundary_equal_not_triggered(qapp, type_and_settle):
     """现金 == 仓库（边界）不触发警告。"""
     ip = InputPanel()
-    ip.cash_entry.setText("100")
-    ip.warehouse_entry.setText("100")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "100")
+    type_and_settle(ip.warehouse_entry, "100")
     assert ip.cash_entry.property("validity") == "valid"
     assert ip.warehouse_entry.property("validity") == "valid"
 
 
-def test_invariant_warning_not_triggered_with_empty_field(qapp):
+def test_invariant_warning_not_triggered_with_empty_field(qapp, type_and_settle):
     """仓库为空时现金值不触发警告（无可比较对象）。"""
     ip = InputPanel()
-    ip.cash_entry.setText("200")
-    ip.refresh_validity()
+    type_and_settle(ip.cash_entry, "200")
     assert ip.cash_entry.property("validity") == "valid"
 
 
 def test_money_line_edit_public_refresh_validity(qapp):
-    """MoneyLineEdit.refresh_validity() 公开 seam：委托 _update_validity()。"""
+    """MoneyLineEdit.refresh_validity() 公开 seam：委托 _update_validity()。
+
+    D-04：这是唯一保留的同步 seam 契约测试——seam 供主窗口 Esc 清空等
+    程序化改动后同步重校验（main_window._clear_focused_input）；其余行为
+    用例全部走真实事件链路（type_and_settle），不再把 seam 当测试后门。
+    """
     from app.input_panel import MoneyLineEdit
 
     edit = MoneyLineEdit()
@@ -150,6 +170,60 @@ def test_money_line_edit_public_refresh_validity(qapp):
     edit.setText("")
     edit.refresh_validity()
     assert edit.property("validity") == "normal"
+
+
+def test_focus_in_unformat_guardrail(shown_panel):
+    """聚焦反格式化护栏：格式化文本在聚焦瞬间恢复为纯数字并全选。
+
+    D-04 真实焦点链路：setFocus → Qt 派发 FocusIn → focusInEvent 反格式化，
+    便于用户聚焦后直接改数字（含全选覆盖）。
+    """
+    ip = shown_panel
+    cash = ip.cash_entry
+
+    ip.warehouse_entry.setFocus()  # 让现金框先处于非聚焦态
+    cash._formatting = False
+    cash.setText("¥123,456.00")
+    cash.setFocus()  # 真实 FocusIn → 反格式化 + 全选
+    assert cash.text() == "123456"
+    assert cash.selectedText() == "123456"
+
+
+def test_focus_out_immediate_validation(shown_panel):
+    """失焦立即校验：非法文本在失焦瞬间完成校验，不等 150ms 去抖。
+
+    D-04 真实焦点链路：focusOutEvent 停掉去抖定时器并同步重校验，
+    保证用户移开焦点时红边/按钮状态已就位（不残留等待窗口）。
+    """
+    from PySide6.QtTest import QTest
+
+    ip = shown_panel
+    cash = ip.cash_entry
+
+    cash.setFocus()
+    cash.clear()
+    QTest.keyClicks(cash, "abc")
+    assert cash.property("validity") == "normal"  # 去抖未到，属性未更新
+
+    ip.warehouse_entry.setFocus()  # 焦点移出 → focusOutEvent 立即校验
+    assert cash.property("validity") == "invalid"
+
+
+def test_focus_out_formatting(shown_panel):
+    """失焦格式化：纯数字在失焦瞬间格式化为 ¥ 千分位（真实焦点链路）。
+
+    原 test_ui_smoke 的同名用例直派 focusOutEvent；D-04 收敛到真实
+    焦点路径（焦点从现金框移出 → Qt 派发 FocusOut → focusOutEvent）。
+    """
+    ip = shown_panel
+    cash = ip.cash_entry
+
+    cash.setFocus()
+    cash.setText("123456")
+    assert cash.text() == "123456"
+
+    ip.warehouse_entry.setFocus()  # 焦点移出 → focusOutEvent 格式化
+    assert cash.text() == "¥123,456.00"
 
 
 def test_input_panel_does_not_call_private_update_validity(qapp):
