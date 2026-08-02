@@ -32,8 +32,8 @@
 
 | Ticket | 标题 | 类型 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| J-01 | 保留上限 7→30：`config` 新增 `RETENTION_LIMIT=30` + `rotate_weekly` 改引用它 + `format_summary`/`format_saved_indicator` 文案联动（N 不写死 7） | 功能（数据模型） | 2026-08-03 |  |
-| J-02 | 视图切换 7/30：`TableWidget` 按钮组（7/30）+ `view_changed(int)` 信号 + 分栏均分 `mid=ceil(n/2)`；`MainWindow` 持 `_view_n`（默认 7）、`_get_records`/`_update_summary` 走 `_view_n`；`chart` 随 records 自适应 | 功能（UI） | 2026-08-03 |  |
+| J-01 | 保留上限 7→30：`config` 新增 `RETENTION_LIMIT=30` + `rotate_weekly` 改引用它 + `format_summary`/`format_saved_indicator` 文案联动（N 不写死 7） | 功能（数据模型） | 2026-08-03 | `569b97f` |
+| J-02 | 视图切换 7/30：`TableWidget` 按钮组（7/30）+ `view_changed(int)` 信号 + 分栏均分 `mid=ceil(n/2)`；`MainWindow` 持 `_view_n`（默认 7）、`_get_records`/`_update_summary` 走 `_view_n`；`chart` 随 records 自适应 | 功能（UI） | 2026-08-03 | `569b97f` |
 
 ### H 系列（2026-08-03，图表样式对齐 + 布局）
 
