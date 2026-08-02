@@ -7,6 +7,10 @@ __pycache__/
 .Python
 *.so
 
+# ── Testing ─────────────────────────────────────────
+# pytest 缓存（pytest 自带 .gitignore 自忽略，此处显式声明更稳定可移植）
+.pytest_cache/
+
 # ── Virtual environments ───────────────────────────
 venv/
 .venv/
@@ -25,7 +29,8 @@ dist/
 # ── Runtime data ────────────────────────────────────
 data.json
 # 运行态设置（窗口几何/主题/置顶），O-18 起与 data.json 一致不入库
-settings.json
+# 限定根目录，避免误吞子目录（如 .claude/settings.json）
+/settings.json
 
 # ── IDE / Editor ────────────────────────────────────
 .idea/
@@ -36,6 +41,7 @@ settings.json
 
 # ── Agent tooling (local memory, not project code) ─
 .serena/
+.claude/
 
 # ── OS ──────────────────────────────────────────────
 Thumbs.db
@@ -48,6 +54,9 @@ Desktop.ini
 
 # Build outputs
 收益计算器.exe
+
+# 架构评审陈旧产物（报告输出至 D:\Desktop\To-do，仓库内不入库）
+python-arch-review-*.html
 
 # Runtime log (O-01: profit_calculator.log 文件日志)
 profit_calculator.log
