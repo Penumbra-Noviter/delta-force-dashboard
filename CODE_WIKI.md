@@ -1,8 +1,8 @@
 # 收益计算器 (Profit Calculator) — Code Wiki
 
-> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维全部完成）  
-> 生成日期：2026-08-02  
-> 测试状态：229 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列全部完成）  
+> 生成日期：2026-08-03  
+> 测试状态：237 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 

@@ -10,6 +10,7 @@
 
 - **J 系列**：记录保留上限 7→30（`RETENTION_LIMIT`）+ 视图 7/30 可切换（`TableWidget` 按钮组 + `view_changed` 信号），存储与视图解耦、切回 7 不丢数据；ADR-0003 落档，详见日志正文
 - **打包**：主分支重新打包（J-01/J-02 后），`dist/收益计算器/` 64M；**未烟测**（用户指示本次不启动 exe 验证，详见日志正文）
+- **打包**：洁癖收尾补布局修复版（`e261685`）重新打包 + GitHub release 资产替换为 `default.zip`（烟测通过，详见日志正文）
 - **测试**：pytest **237/237** ✅（2026-08-03 J 系列视图切换 UI 用例 +3、summary/format_summary 参数化纯函数 +2）
 - **图表**：样式对齐原型评审修正版（0559537）——删填充区域、hover 改「系列短名+值、按所属 ViewBox 顶部堆叠定位」；布局把曲线图置底固定高度、表格改弹性区，为后续 7/30 天记录预留高度（用户预告将记录天数设为 7/30 天）
 - **布局**：图表卡片 `setMaximumHeight(220)` 封顶（PlotWidget sizeHint 480 吃掉纵向空间），880 窗口下表格 107→367px（详见日志正文）
@@ -18,6 +19,14 @@
 ---
 
 ## 日志正文
+
+### 2026-08-03 | 打包 | 洁癖收尾：布局修复版重新打包 + release 更新（烟测通过）
+- 背景：`e261685`（图表卡片封顶 220px，880 窗口表格 107→367px）在 `92acd44` 打包**之后**提交，`dist/` 与 GitHub release 均落后一个提交；洁癖收尾核对发布面时发现并补齐
+- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/收益计算器/` **64M**（exe 6.56MB + `_internal/`）；唯一 warn 仍为 `pyqtgraph.opengl` 可选子模块未收集（历次一致）
+- 烟测：exe 启动 8s 进程存活后终止 ✅（pid 14812；`.migrated` 15:38 重写证明启动路径完整、日志无异常）；pytest 237/237 ✅
+- release：更新 GitHub release（tag `default`）资产——旧 `default.rar`（37.9M，H-01/G-01 版，落后布局修复）删除，上传 `default.zip`（布局修复版，64M→zip）。**压缩格式 rar→zip**：本机无 rar/WinRAR，README 已提前改「压缩包」通用措辞，zip 为 Windows 原生可解压
+- 清场（用户确认）：删 throwaway 分支 `prototype/chart-merge`（`0559537`）/`prototype/multiview`（`f39c66f`）；清 `build/`（21M）/`__pycache__`/`.pytest_cache`；`.claude/settings.local.json` 删一次性调试授权残留（.shots / download_finesse_cdn.py / /tmp 脚手架等），保留 pytest / doc_sync / pre-commit / install-hooks 可复用条目
 
 ### 2026-08-03 | 调整 | 图表卡片封顶高度，给表格让出纵向空间
 - 问题：图表卡片无上限，PlotWidget 默认 sizeHint **480px** 生效 → 图表卡片 502px，880 窗口下表格只剩 ~107px
