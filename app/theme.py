@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from signals import RateSignal
+from signals import PnLSignal, RateSignal
 
 __all__ = [
     "THEMES",
@@ -134,19 +134,28 @@ def get_color(key: str) -> str:
 
 
 # ── 信号 → 主题色映射 ───────────────────────────────
-# 业务层只返回语义信号（RateSignal），这里完成「信号 → 主题键」映射；
+# 业务层只返回语义信号（RateSignal / PnLSignal），这里完成「信号 → 主题键」映射；
 # 具体色值在调用 get_color() 时实时解析，避免 import 期冻结（C1）。
-_SIGNAL_TO_KEY = {
+_SIGNAL_TO_KEY: dict[RateSignal | PnLSignal, str] = {
     RateSignal.POSITIVE: "FG_POS",
+    PnLSignal.盈: "FG_POS",
     RateSignal.NEGATIVE: "FG_NEG",
+    PnLSignal.亏: "FG_NEG",
     RateSignal.NEUTRAL: "FG_MUTED",
+    PnLSignal.平: "FG_MUTED",
     RateSignal.NONE: "FG_MUTED",
+    PnLSignal.无: "FG_MUTED",
 }
 
 
-def signal_color(signal: RateSignal) -> str:
-    """收益率信号 → 当前主题颜色（渲染时实时解析，C1 防冻结）。"""
-    return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
+def signal_color(signal: RateSignal | PnLSignal) -> str:
+    """信号 → 当前主题颜色（统一入口，两种信号类型共用）。
+
+    收益率信号与盈亏标签的信号→颜色映射在同一张表，新增信号类型
+    只需在 _SIGNAL_TO_KEY 加一项。
+    """
+    key = _SIGNAL_TO_KEY.get(signal, "FG_MUTED")
+    return get_color(key)
 
 
 def generate_qss(theme_name: str) -> str:
