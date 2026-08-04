@@ -71,6 +71,16 @@ class MoneyLineEdit(QLineEdit):
             self._set_validity_state("invalid")
         self.validity_changed.emit(valid and text != "")
 
+    def set_value(self, text: str) -> None:
+        """程序化设值，跳过格式化重入保护。
+
+        调用方（InputPanel.set_edit_mode / fill_values）通过此方法设文本，
+        不再直接修改 _formatting 私有属性。
+        """
+        self._formatting = True
+        self.setText(text)
+        self._formatting = False
+
     def refresh_validity(self) -> None:
         """立即同步重校验当前文本（外部改动后调用）。
 
@@ -268,13 +278,8 @@ class InputPanel(QWidget):
         self._editing_date = date_str
 
         # 直接填数字，不触发格式化
-        self.cash_entry._formatting = True
-        self.cash_entry.setText(f"{cash:.2f}")
-        self.cash_entry._formatting = False
-
-        self.warehouse_entry._formatting = True
-        self.warehouse_entry.setText(f"{warehouse:.2f}")
-        self.warehouse_entry._formatting = False
+        self.cash_entry.set_value(f"{cash:.2f}")
+        self.warehouse_entry.set_value(f"{warehouse:.2f}")
 
         self.save_btn.setText(f"更新数据（{format_short_date(date_str)}）")
         edit_color = get_color("BTN_BG")
@@ -375,13 +380,8 @@ class InputPanel(QWidget):
 
     def fill_values(self, cash: float, warehouse: float) -> None:
         """填入指定金额并选中现金框，便于微调。不触发焦点格式化。"""
-        self.cash_entry._formatting = True
-        self.cash_entry.setText(format_input_value(cash))
-        self.cash_entry._formatting = False
-
-        self.warehouse_entry._formatting = True
-        self.warehouse_entry.setText(format_input_value(warehouse))
-        self.warehouse_entry._formatting = False
+        self.cash_entry.set_value(format_input_value(cash))
+        self.warehouse_entry.set_value(format_input_value(warehouse))
 
         self._update_save_btn_state()
         self.cash_entry.setFocus()
