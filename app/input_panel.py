@@ -172,7 +172,7 @@ class InputPanel(QWidget):
         cash_row = QHBoxLayout()
         cash_row.setSpacing(10)
         self._cash_label = QLabel("当前现金")
-        self._cash_label.setFixedWidth(120)
+        self._cash_label.setFixedWidth(140)
         self._cash_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
@@ -185,7 +185,7 @@ class InputPanel(QWidget):
         warehouse_row = QHBoxLayout()
         warehouse_row.setSpacing(10)
         self._warehouse_label = QLabel("仓库价值（含现金）")
-        self._warehouse_label.setFixedWidth(120)
+        self._warehouse_label.setFixedWidth(140)
         self._warehouse_label.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )

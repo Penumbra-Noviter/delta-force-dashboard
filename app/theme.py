@@ -23,94 +23,101 @@ __all__ = [
 # 语义色保留绿涨红跌（国际惯例），青色主色与语义色明确区分
 THEMES = {
     "light": {
-        "BG": "#faf9f6",            # 暖纸白，替代纯白降低刺眼感
-        "FG_LABEL": "#4a5568",       # 软石板灰，对比度 6.8:1
-        "FG_MUTED": "#718096",       # slate-500，对比度 4.6:1（达 WCAG AA）
-        "FG_POS": "#16a34a",         # 绿涨（green-600）
-        "FG_NEG": "#dc2626",         # 红跌（red-600）
-        "FG_TODAY": "#0d9488",       # 今日用主色青
-        "BTN_BG": "#0d9488",         # teal-600 主色
-        "BTN_BG_HOVER": "#0f766e",   # teal-700 悬停加深
-        "BTN_FG": "#ffffff",
-        "BORDER_DEFAULT": "#d6d3cc",  # 暖灰边框
-        "BORDER_VALID": "#16a34a",
-        "BORDER_INVALID": "#dc2626",
-        "BORDER_WARNING": "#d97706",  # 越界警告边框（amber-600，O-08）
-        "SEPARATOR": "#e7e5e0",      # 暖浅灰分隔线
-        "PLACEHOLDER": "#9ca3af",   # gray-400，占位文字豁免 AA
-        "MUTED_BG": "#f4f2ed",      # 暖静音底
-        "PIN_OFF_BG": "#f4f2ed",
-        "PIN_ON_BG": "#0d9488",
-        "CHART_CASH": "#0d9488",     # 青色（与主色一致）
-        "CHART_WAREHOUSE": "#d97706",# 琥珀金（amber-600，更沉稳）
-        "CHART_TOTAL": "#16a34a",
-        "CHART_GRID": "#e7e5e0",
-        "CHART_BG": "#fdfcf9",       # 图表区微暖底
-        "CHART_AXIS": "#6b7280",
-        "CHART_TEXT": "#374151",
-        "TABLE_TEXT": "#3d4453",
-        "TABLE_TEXT_BOLD": "#1a202c",
+        # ── Sage Ledger（Set 1：forest green on sage paper）──
+        # 亮色基调：暖灰绿纸底 + 森林绿主色，语义色脱离绿色域
+        "BG": "#eef0ec",             # sage 暖纸，替代纯白
+        "FG_LABEL": "#3c4a43",       # ink-2 正文
+        "FG_MUTED": "#6d7d74",       # ink-3 次级（WCAG AA 4.5:1）
+        "FG_POS": "#2C7A8C",         # 蓝绿涨（迁移语义色，避免与森林绿 accent 冲突）
+        "FG_NEG": "#C0453C",         # 深红跌
+        "FG_TODAY": "#2F6B4F",       # 森林绿主色（今日高亮）
+        "BTN_BG": "#2F6B4F",         # 森林绿主按钮
+        "BTN_BG_HOVER": "#3C8A63",   # 悬停提亮
+        "BTN_FG": "#ffffff",         # 按钮文字
+        "BORDER_DEFAULT": "rgba(20,32,26,.07)",  # 半透明 hairline
+        "BORDER_VALID": "#2C7A8C",
+        "BORDER_INVALID": "#C0453C",
+        "BORDER_WARNING": "#B77A16",  # amber 警告
+        "SEPARATOR": "#d6d3cc",       # 暖灰分隔线
+        "PLACEHOLDER": "#6d7d74",
+        "MUTED_BG": "#f3f5f1",        # panel-2 次级底
+        "PIN_OFF_BG": "#f3f5f1",
+        "PIN_ON_BG": "#2F6B4F",
+        "CHART_CASH": "#C08A3E",      # 金色（accent-2 现金线）
+        "CHART_WAREHOUSE": "#2F6B4F", # 森林绿（accent 仓库线）
+        "CHART_TOTAL": "#2C7A8C",
+        "CHART_GRID": "#e2e4df",
+        "CHART_BG": "#f5f4f0",
+        "CHART_AXIS": "#6d7d74",
+        "CHART_TEXT": "#3c4a43",
+        "TABLE_TEXT": "#3c4a43",
+        "TABLE_TEXT_BOLD": "#14201a",   # ink-1 强调
         "TABLE_ROW_EVEN_BG": "#ffffff",
-        "TABLE_ROW_ODD_BG": "#f6f5f1",
-        "TABLE_ROW_HOVER_BG": "#f4f2ed",
-        "TABLE_ROW_TODAY_BG": "#e6f7f5",  # 今日行浅青底
-        "TABLE_HEADER_BG": "#f4f2ed",
-        "TABLE_HEADER_FG": "#3d4453",
+        "TABLE_ROW_ODD_BG": "#f3f5f1",
+        "TABLE_ROW_HOVER_BG": "#e8ece4",
+        "TABLE_ROW_TODAY_BG": "#e6f0e8",  # 今日行浅青绿底
+        "TABLE_HEADER_BG": "#f3f5f1",
+        "TABLE_HEADER_FG": "#6d7d74",
         "CARD_BG": "#ffffff",
-        "CARD_BORDER": "#e7e5e0",
+        "CARD_BORDER": "rgba(20,32,26,.07)",
         "INPUT_BG": "#ffffff",
-        "INPUT_FG": "#1a202c",
+        "INPUT_FG": "#14201a",
+        "PANEL_2": "#f3f5f1",
         # 操作按钮语义色
         "DANGER_BG": "#fef2f2",
-        "DANGER_FG": "#dc2626",
+        "DANGER_FG": "#C0453C",
         "DANGER_BORDER": "#fecaca",
-        "DANGER_HOVER_BG": "#dc2626",
+        "DANGER_HOVER_BG": "#C0453C",
     },
     "dark": {
-        "BG": "#0a0a0d",             # 极暗炭灰底（接近纯黑但保留灰调，非死黑）
-        "FG_LABEL": "#c4c4cc",       # 中冷灰，正文
-        "FG_MUTED": "#7a7a84",       # 低对比灰，次级文字（参考图 #A0A0A5）
-        "FG_POS": "#10B981",         # 薄荷绿涨（柔和不刺眼）
-        "FG_NEG": "#EF4444",         # 玫瑰红跌（柔和不刺眼）
-        "FG_TODAY": "#FF8C00",       # 电光琥珀橙（参考图主色）
-        "BTN_BG": "#FF8C00",         # 琥珀橙主按钮
-        "BTN_BG_HOVER": "#FFA940",   # 悬停提亮
-        "BTN_FG": "#0a0a0d",         # 深底文字（橙色上显深字）
-        "BORDER_DEFAULT": "#121217", # 与卡片底同色，肉眼不可见的边框
-        "BORDER_VALID": "#10B981",
-        "BORDER_INVALID": "#EF4444",
-        "BORDER_WARNING": "#FF8C00",
-        "SEPARATOR": "#0d0d11",      # 比基底亮半阶，表格网格线极淡
-        "PLACEHOLDER": "#5a5a64",
-        "MUTED_BG": "#131318",       # 次级按钮底，比基底亮一阶
-        "PIN_OFF_BG": "#131318",
-        "PIN_ON_BG": "#FF8C00",      # 琥珀橙钉选
-        "CHART_CASH": "#FFA940",     # 暖琥珀虚线（现金）
-        "CHART_WAREHOUSE": "#FF8C00",# 电光橙实线（仓库价值）
-        "CHART_TOTAL": "#10B981",
-        "CHART_GRID": "#0d0d11",     # 极暗网格，几乎不可见
-        "CHART_BG": "#0a0a0d",       # 图表区与基底一致
-        "CHART_AXIS": "#7a7a84",
-        "CHART_TEXT": "#c4c4cc",
-        "TABLE_TEXT": "#c4c4cc",
-        "TABLE_TEXT_BOLD": "#e8e8ee",# 近白强调
-        "TABLE_ROW_EVEN_BG": "#0a0a0d",
-        "TABLE_ROW_ODD_BG": "#0f0f14",
-        "TABLE_ROW_HOVER_BG": "#17171e",
-        "TABLE_ROW_TODAY_BG": "#1a1410",  # 今日行暗暖橙底
-        "TABLE_HEADER_BG": "#131318",
-        "TABLE_HEADER_FG": "#7a7a84",
-        "CARD_BG": "#121217",        # 卡片比基底亮一阶，靠色差而非边框区隔
-        "CARD_BORDER": "#121217",    # 与卡片底同色，边框彻底隐形
-        "INPUT_BG": "#14141a",       # 输入框比卡片微亮
-        "INPUT_FG": "#c4c4cc",
+        # ── Midnight & Amber（Set 11：amber on midnight）──
+        # 暗色基调：午夜蓝底 + 琥珀橙主色，适合金融工具夜间使用
+        "BG": "#08090f",             # 午夜蓝底（非纯黑）
+        "FG_LABEL": "#a8adbd",       # ink-2 正文
+        "FG_MUTED": "#848aa0",       # ink-3 次级（WCAG AA 4.5:1 对 panel-2）
+        "FG_POS": "#3FCB86",         # 薄荷绿涨
+        "FG_NEG": "#FF5F56",         # 珊瑚红跌
+        "FG_TODAY": "#E8A33D",       # 琥珀橙（主色/今日高亮）
+        "BTN_BG": "#E8A33D",         # 琥珀主按钮
+        "BTN_BG_HOVER": "#F0B555",   # 悬停提亮
+        "BTN_FG": "#141008",         # 深底文字（琥珀色上显深字，AA）
+        "BORDER_DEFAULT": "rgba(255,255,255,.07)",  # 半透明白 hairline
+        "BORDER_VALID": "#3FCB86",
+        "BORDER_INVALID": "#FF5F56",
+        "BORDER_WARNING": "#E8A33D",
+        "SEPARATOR": "rgba(255,255,255,.06)",
+        "PLACEHOLDER": "#848aa0",
+        "MUTED_BG": "#1a1d27",       # panel-2
+        "PIN_OFF_BG": "#1a1d27",
+        "PIN_ON_BG": "#E8A33D",
+        "CHART_CASH": "#7B8CFF",     # 紫蓝色（accent-2 现金线）
+        "CHART_WAREHOUSE": "#E8A33D",# 琥珀橙（accent 仓库线）
+        "CHART_TOTAL": "#3FCB86",
+        "CHART_GRID": "rgba(255,255,255,.05)",
+        "CHART_BG": "#0c0e16",
+        "CHART_AXIS": "#848aa0",
+        "CHART_TEXT": "#a8adbd",
+        "TABLE_TEXT": "#a8adbd",
+        "TABLE_TEXT_BOLD": "#eceef5",  # ink-1
+        "TABLE_ROW_EVEN_BG": "#12141c",
+        "TABLE_ROW_ODD_BG": "#1a1d27",
+        "TABLE_ROW_HOVER_BG": "#222536",
+        "TABLE_ROW_TODAY_BG": "#1e1a14",  # 今日行暗暖橙底
+        "TABLE_HEADER_BG": "#1a1d27",
+        "TABLE_HEADER_FG": "#848aa0",
+        "CARD_BG": "#12141c",
+        "CARD_BORDER": "rgba(255,255,255,.07)",
+        "INPUT_BG": "#1a1d27",
+        "INPUT_FG": "#eceef5",
+        "PANEL_2": "#1a1d27",
         # 操作按钮语义色
         "DANGER_BG": "#1f1418",
-        "DANGER_FG": "#EF4444",
+        "DANGER_FG": "#FF5F56",
         "DANGER_BORDER": "#2d1a20",
-        "DANGER_HOVER_BG": "#dc3838",
+        "DANGER_HOVER_BG": "#FF5F56",
     },
 }
+
 
 # ── 当前主题名称（运行时由 UI 切换） ─────────────────
 _current_theme = "light"
@@ -184,8 +191,9 @@ def button_style(role: str) -> str:
             f"QPushButton#saveBtn {{"
             f"background-color: {bg};"
             f"color: {fg};"
-            f"padding: 8px 28px;"
-            f"font-weight: bold;"
+            f"padding: 10px 32px;"
+            f"font-weight: 600;"
+            f"border-radius: 8px;"
             f"}}"
             f"QPushButton#saveBtn:hover {{"
             f"background-color: {hover_bg};"
@@ -201,8 +209,8 @@ def button_style(role: str) -> str:
             f"background-color: {bg};"
             f"color: {fg};"
             f"border: 1px solid {border};"
-            f"border-radius: 5px;"
-            f"padding: 6px 14px;"
+            f"border-radius: 8px;"
+            f"padding: 8px 18px;"
             f"font-size: 11px;"
             f"font-weight: bold;"
             f"}}"
@@ -267,7 +275,7 @@ QLabel {{
 QLabel#titleLabel {{
     color: {table_text_bold};
     font-size: 18px;
-    font-weight: bold;
+    font-weight: 700;
 }}
 QLabel#dateLabel {{
     color: {fg_muted};
@@ -284,7 +292,11 @@ QLabel#savedIndicator {{
 QLabel#todayStatusLabel {{
     color: {fg_today};
     font-size: 10px;
-    font-weight: bold;
+    font-weight: 600;
+}}
+QLabel#summaryLabel, QLabel#cashSummaryLabel {{
+    font-size: 14px;
+    font-weight: 600;
 }}
 
 /* ═══════════════════════════════════════════
@@ -294,14 +306,15 @@ QLineEdit {{
     background-color: {input_bg};
     color: {input_fg};
     border: 1px solid {border_def};
-    border-radius: 4px;
-    padding: 4px 8px;
+    border-radius: 8px;
+    padding: 6px 12px;
     font-size: 13px;
     selection-background-color: {btn_bg};
     selection-color: {btn_fg};
 }}
 QLineEdit:focus {{
-    border-color: {btn_bg};
+    border: 2px solid {btn_bg};
+    padding: 5px 11px;
 }}
 QLineEdit[validity="valid"] {{
     border-color: {border_valid};
@@ -321,22 +334,25 @@ QLineEdit::placeholder {{
    ═══════════════════════════════════════════ */
 QPushButton {{
     border: none;
-    border-radius: 5px;
+    border-radius: 8px;
     padding: 6px 20px;
     font-size: 12px;
+    font-weight: 500;
 }}
 QPushButton#saveBtn {{
     background-color: {btn_bg};
     color: {btn_fg};
-    padding: 8px 28px;
-    font-weight: bold;
+    padding: 10px 32px;
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 8px;
 }}
 QPushButton#saveBtn:hover {{
     background-color: {btn_hover};
 }}
 QPushButton#saveBtn:pressed {{
     background-color: {btn_hover};
-    padding: 9px 28px 7px 28px;
+    padding: 11px 32px 9px 32px;
 }}
 QPushButton#saveBtn:disabled {{
     background-color: {muted_bg};
@@ -345,7 +361,8 @@ QPushButton#saveBtn:disabled {{
 QPushButton#cancelEditBtn {{
     background-color: {muted_bg};
     color: {fg_label};
-    padding: 8px 16px;
+    padding: 10px 20px;
+    border-radius: 8px;
 }}
 QPushButton#cancelEditBtn:hover {{
     background-color: {separator};
@@ -353,8 +370,9 @@ QPushButton#cancelEditBtn:hover {{
 QPushButton#reuseBtn {{
     background-color: {muted_bg};
     color: {fg_label};
-    padding: 6px 14px;
+    padding: 8px 16px;
     font-size: 11px;
+    border-radius: 8px;
 }}
 QPushButton#reuseBtn:hover {{
     background-color: {separator};
@@ -363,8 +381,9 @@ QPushButton#reuseBtn:hover {{
 QPushButton#themeBtn, QPushButton#pinBtn, QPushButton#exportBtn {{
     background-color: {muted_bg};
     color: {fg_muted};
-    padding: 4px 10px;
+    padding: 6px 14px;
     font-size: 10px;
+    border-radius: 8px;
 }}
 QPushButton#themeBtn:hover, QPushButton#pinBtn:hover, QPushButton#exportBtn:hover {{
     background-color: {separator};
@@ -383,10 +402,12 @@ QTableWidget {{
     color: {table_text};
     gridline-color: {separator};
     border: none;
+    border-radius: 8px;
     font-size: 11px;
 }}
 QTableWidget::item {{
-    padding: 6px 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid {separator};
 }}
 QTableWidget::item:hover {{
     background-color: {t.get("TABLE_ROW_HOVER_BG", muted_bg)};
@@ -398,10 +419,10 @@ QTableWidget::item:selected {{
 QHeaderView::section {{
     background-color: {table_header_bg};
     color: {table_header_fg};
-    padding: 6px 4px;
+    padding: 8px 6px;
     border: none;
     border-bottom: 1px solid {separator};
-    font-weight: bold;
+    font-weight: 600;
     font-size: 11px;
 }}
 
@@ -411,10 +432,7 @@ QHeaderView::section {{
 QFrame#cardFrame {{
     background-color: {card_bg};
     border: 1px solid {card_border};
-    border-radius: 6px;
-}}
-QFrame#cardBorder {{
-    background-color: {card_border};
+    border-radius: 12px;
 }}
 
 /* ═══════════════════════════════════════════
@@ -431,12 +449,12 @@ QStatusBar {{
    ═══════════════════════════════════════════ */
 QScrollBar:vertical {{
     background: {muted_bg};
-    width: 8px;
-    border-radius: 4px;
+    width: 4px;
+    border-radius: 2px;
 }}
 QScrollBar::handle:vertical {{
     background: {separator};
-    border-radius: 4px;
+    border-radius: 2px;
     min-height: 20px;
 }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -450,7 +468,7 @@ QToolTip {{
     background-color: {input_bg};
     color: {input_fg};
     border: 1px solid {border_def};
-    border-radius: 4px;
-    padding: 4px;
+    border-radius: 8px;
+    padding: 6px 10px;
 }}
 """

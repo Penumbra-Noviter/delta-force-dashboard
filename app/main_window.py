@@ -13,11 +13,12 @@ import platform
 from datetime import datetime
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -183,7 +184,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(32, 20, 32, 12)
+        root_layout.setContentsMargins(32, 24, 32, 16)
         root_layout.setSpacing(0)
 
         # ── 标题栏 ──
@@ -294,10 +295,18 @@ class MainWindow(QMainWindow):
         self._update_theme_btn_text()
 
     def _build_card(self) -> QFrame:
-        """构建带边框的卡片 QFrame。"""
+        """构建带阴影的卡片 QFrame（12px 圆角 + 微阴影）。"""
         card = QFrame()
         card.setObjectName("cardFrame")
         card.setFrameShape(QFrame.Shape.StyledPanel)
+
+        # 微阴影（QGraphicsDropShadowEffect，QSS 不支持 box-shadow）
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(12)
+        shadow.setOffset(0, 2)
+        shadow.setColor(QColor(0, 0, 0, 20))
+        card.setGraphicsEffect(shadow)
+
         return card
 
     def _update_theme_btn_text(self) -> None:

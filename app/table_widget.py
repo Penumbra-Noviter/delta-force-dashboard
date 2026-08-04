@@ -74,10 +74,10 @@ class PnLBadge(QWidget):
             f"""
             background-color: {bg_color};
             color: {fg_color};
-            border-radius: 9px;
-            padding: 2px 10px;
+            border-radius: 12px;
+            padding: 3px 12px;
             font-size: 10px;
-            font-weight: bold;
+            font-weight: 600;
         """
         )
         layout.addWidget(self._label)
@@ -271,16 +271,16 @@ class _DaySubTable(QTableWidget):
         danger_hover = get_color("DANGER_HOVER_BG")
 
         edit_btn = QPushButton("编辑")
-        edit_btn.setFixedHeight(22)
+        edit_btn.setFixedHeight(24)
         edit_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {muted_bg};
                 color: {btn_fg};
                 border: 1px solid {get_color("BORDER_DEFAULT")};
-                border-radius: 4px;
-                padding: 1px 8px;
+                border-radius: 6px;
+                padding: 2px 10px;
                 font-size: 10px;
-                font-weight: bold;
+                font-weight: 600;
             }}
             QPushButton:hover {{
                 background-color: {btn_fg};
@@ -294,16 +294,16 @@ class _DaySubTable(QTableWidget):
         layout.addWidget(edit_btn)
 
         delete_btn = QPushButton("删除")
-        delete_btn.setFixedHeight(22)
+        delete_btn.setFixedHeight(24)
         delete_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {danger_bg};
                 color: {danger_fg};
                 border: 1px solid {danger_border};
-                border-radius: 4px;
-                padding: 1px 8px;
+                border-radius: 6px;
+                padding: 2px 10px;
                 font-size: 10px;
-                font-weight: bold;
+                font-weight: 600;
             }}
             QPushButton:hover {{
                 background-color: {danger_hover};
@@ -355,20 +355,23 @@ class TableWidget(QWidget):
         self._view_bar = QWidget()
         view_layout = QHBoxLayout(self._view_bar)
         view_layout.setContentsMargins(0, 0, 0, 0)
-        view_layout.setSpacing(8)
+        view_layout.setSpacing(6)
         view_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self._btn_group = QButtonGroup(self)
-        self._view_buttons: list[QRadioButton] = []
+        self._view_buttons: list[QPushButton] = []
         for days in VIEW_DAYS:
-            btn = QRadioButton(f"{days} 天")
+            btn = QPushButton(f"{days} 天")
             btn.setProperty("days", days)
+            btn.setCheckable(True)
             btn.setChecked(days == default_view)
+            btn.setFixedHeight(28)
             self._btn_group.addButton(btn)
             self._view_buttons.append(btn)
             btn.toggled.connect(self._on_view_toggled)
             view_layout.addWidget(btn)
         self._layout.addWidget(self._view_bar)
+        self._update_view_btn_styles()
 
         # 双栏主体
         self._body = QWidget()
@@ -418,6 +421,8 @@ class TableWidget(QWidget):
             records: [(date_str, DayRecord), ...] 有数据的日期列表
             today: 今日日期字符串 YYYY-MM-DD
         """
+        # 主题切换后刷新视图按钮样式
+        self._update_view_btn_styles()
         n = len(records)
         # 均分：mid=ceil(n/2)（Q7：7→4+3、30→15+15，双栏均衡）
         mid = ceil(n / 2)
@@ -449,8 +454,8 @@ class TableWidget(QWidget):
     def _on_view_toggled(self) -> None:
         """按钮组切换：更新当前视图条数并 emit view_changed(int)。
 
-        QRadioButton 互斥保证同一时刻仅一个 checked；取选中按钮的 days 属性，
-        非选中（关）状态的红利 toggle 忽略。
+        QPushButton checkable 互斥保证同一时刻仅一个 checked；取选中按钮的 days 属性，
+        非选中状态的红利 toggle 忽略。
         """
         checked = self._btn_group.checkedButton()
         if checked is None:
@@ -458,4 +463,42 @@ class TableWidget(QWidget):
         current_days = int(checked.property("days"))
         if current_days != self._view_days:
             self._view_days = current_days
+            self._update_view_btn_styles()
             self.view_changed.emit(current_days)
+
+    def _update_view_btn_styles(self) -> None:
+        """更新视图切换按钮的 pill 选中/未选中样式。"""
+        btn_bg = get_color("BTN_BG")
+        btn_fg = get_color("BTN_FG")
+        muted_bg = get_color("MUTED_BG")
+        fg_muted = get_color("FG_MUTED")
+        border_def = get_color("BORDER_DEFAULT")
+        for btn in self._view_buttons:
+            if btn.isChecked():
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {btn_bg};
+                        color: {btn_fg};
+                        border: none;
+                        border-radius: 14px;
+                        padding: 4px 16px;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }}
+                """)
+            else:
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {muted_bg};
+                        color: {fg_muted};
+                        border: 1px solid {border_def};
+                        border-radius: 14px;
+                        padding: 4px 16px;
+                        font-size: 11px;
+                        font-weight: 500;
+                    }}
+                    QPushButton:hover {{
+                        background-color: {get_color("SEPARATOR")};
+                        color: {get_color("TABLE_TEXT_BOLD")};
+                    }}
+                """)
