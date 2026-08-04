@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from config import RETENTION_LIMIT, WEEK_DAYS
+from config import RETENTION_LIMIT, _WEEK_DAYS as WEEK_DAYS
 from formatting import format_money, format_short_date
 from signals import PnLSignal, RateSignal
 

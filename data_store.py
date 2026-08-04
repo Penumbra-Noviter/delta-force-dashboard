@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from config import BACKUP_FILE, DATA_FILE
+from config import DATA_FILE, _BACKUP_FILE as BACKUP_FILE
 from json_file import atomic_write_json
 
 __all__ = [

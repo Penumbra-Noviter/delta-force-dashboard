@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from config import DATE_FORMAT, RETENTION_LIMIT, WEEK_DAYS
+from config import DATE_FORMAT, RETENTION_LIMIT, _WEEK_DAYS as WEEK_DAYS
 from formatting import format_money
-from presentation import format_rate
 
 __all__ = [
     "DayRecord",
@@ -291,7 +290,14 @@ class ProfitCalculatorLogic:
                 else format_money(record.warehouse - prev_warehouse)
             )
             rate = self.calculate_rate(prev_warehouse, record.warehouse)
-            rate_text, _ = format_rate(rate)
+            if rate is None:
+                rate_text = "—"
+            elif rate > 0:
+                rate_text = f"+{rate:.1f}%"
+            elif rate < 0:
+                rate_text = f"{rate:.1f}%"
+            else:
+                rate_text = "0.0%"
             writer.writerow(
                 [
                     date_str,

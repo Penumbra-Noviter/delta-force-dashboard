@@ -341,7 +341,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~255 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~261 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -402,7 +402,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~29 行<!--/AUTO-->）
+### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~38 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|

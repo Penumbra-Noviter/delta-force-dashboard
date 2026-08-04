@@ -18,8 +18,8 @@ from PySide6.QtGui import QIcon
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
-from app.main_window import MainWindow
-from config import APP_DIR, DATA_DIR, LOG_FILE
+from app import MainWindow
+from config import DATA_DIR, _APP_DIR as APP_DIR, _LOG_FILE as LOG_FILE
 from data_store import log_legacy_cleanup_hint, migrate_legacy_data
 
 # 单实例锁名称（全局唯一）
