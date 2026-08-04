@@ -101,7 +101,7 @@ Profit Calculator/
 │   └── install-hooks.bat    ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
+│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->96<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -139,7 +139,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~531 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~507 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -177,7 +177,7 @@ Profit Calculator/
 
 ---
 
-### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~354 行<!--/AUTO-->）
+### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~359 行<!--/AUTO-->）
 
 #### 类：`MoneyLineEdit(QLineEdit)`
 
@@ -323,7 +323,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~362 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~370 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -338,7 +338,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~334 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~357 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -583,7 +583,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->96<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |

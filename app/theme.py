@@ -15,6 +15,7 @@ __all__ = [
     "get_theme",
     "set_theme",
     "signal_color",
+    "summary_style",
 ]
 
 # ── 主题色板 ──────────────────────────────────────────
@@ -147,6 +148,16 @@ _SIGNAL_TO_KEY = {
 def signal_color(signal: RateSignal) -> str:
     """收益率信号 → 当前主题颜色（渲染时实时解析，C1 防冻结）。"""
     return get_color(_SIGNAL_TO_KEY.get(signal, "FG_MUTED"))
+
+
+def summary_style(signal: RateSignal) -> str:
+    """汇总标签样式：根据信号返回 QSS 样式字符串（颜色+字号+粗细）。
+
+    数据不足/仅 1 条 → 灰字小号；否则 → 信号色常规字号。
+    """
+    if signal is RateSignal.NONE:
+        return f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
+    return f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
 
 
 def generate_qss(theme_name: str) -> str:

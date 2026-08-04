@@ -814,3 +814,68 @@ def test_export_csv_format_money_unified():
     assert lines[1] == '2026-07-20,"¥1,000.00","¥1,234.56",—,—'
     # 差值 0.30 而非 0.30000000000000004 类 float 伪影（无逗号 → 不引号）
     assert lines[2] == '2026-07-21,"¥1,000.00","¥1,234.86",¥0.30,+0.0%'
+
+
+# ── ProfitCalculatorLogic.reuse_candidate ──────────────
+
+def test_reuse_candidate_today_exists():
+    """今日已有记录 → 返回 (today, record, False)。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 100.0, "warehouse": 200.0}})
+    result = logic.reuse_candidate("2026-07-20")
+    assert result is not None
+    date_str, record, is_today_fallback = result
+    assert date_str == "2026-07-20"
+    assert record.warehouse == 200.0
+    assert is_today_fallback is False
+
+
+def test_reuse_candidate_yesterday_exists():
+    """今日无记录但昨日有 → 返回 (yesterday, record, False)。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-19": {"cash": 100.0, "warehouse": 200.0},
+        }
+    )
+    result = logic.reuse_candidate("2026-07-20")
+    assert result is not None
+    date_str, record, is_today_fallback = result
+    assert date_str == "2026-07-19"
+    assert record.warehouse == 200.0
+    assert is_today_fallback is False
+
+
+def test_reuse_candidate_fallback_to_older():
+    """今日无记录且昨日也无 → 返回最近一条记录，is_today_fallback=True。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-17": {"cash": 100.0, "warehouse": 200.0},
+        }
+    )
+    result = logic.reuse_candidate("2026-07-20")
+    assert result is not None
+    date_str, record, is_today_fallback = result
+    assert date_str == "2026-07-17"
+    assert record.warehouse == 200.0
+    assert is_today_fallback is True
+
+
+def test_reuse_candidate_no_data():
+    """完全无数据 → None。"""
+    logic = ProfitCalculatorLogic({})
+    result = logic.reuse_candidate("2026-07-20")
+    assert result is None
+
+
+def test_reuse_candidate_today_overrides_older():
+    """今日有记录时优先返回今日，不返回昨日数据。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-19": {"cash": 50.0, "warehouse": 100.0},
+            "2026-07-20": {"cash": 100.0, "warehouse": 200.0},
+        }
+    )
+    result = logic.reuse_candidate("2026-07-20")
+    assert result is not None
+    date_str, _, is_today_fallback = result
+    assert date_str == "2026-07-20"
+    assert is_today_fallback is False

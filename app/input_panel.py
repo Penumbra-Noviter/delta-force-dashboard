@@ -359,6 +359,12 @@ class InputPanel(QWidget):
 
     # ── 指示器 ──
 
+    def set_reuse_hint(self, msg: str, cash: float, warehouse: float) -> None:
+        """复用提示：填入金额、设置指示器文字、进入复用模式。"""
+        self.fill_values(cash, warehouse)
+        self.set_saved_indicator(f"已复用 {msg}，请微调后保存")
+        self.set_reuse_mode()
+
     def set_saved_indicator(self, text: str) -> None:
         self.saved_indicator.setText(text)
 

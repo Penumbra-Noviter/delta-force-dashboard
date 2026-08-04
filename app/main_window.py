@@ -40,6 +40,7 @@ from app.theme import (
     get_color,
     set_theme,
     signal_color,
+    summary_style,
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
@@ -405,6 +406,11 @@ class MainWindow(QMainWindow):
         self._view_n = n
         self.refresh_display()
 
+    @property
+    def view_n(self) -> int:
+        """当前视图条数（只读）。"""
+        return self._view_n
+
     # ═══════════════════════════════════════════════════════
     # 保存
     # ═══════════════════════════════════════════════════════
@@ -495,25 +501,13 @@ class MainWindow(QMainWindow):
 
     def _reuse_last_record(self) -> None:
         """复用最近一条历史记录填入输入框，便于微调后保存。"""
-        result = self.logic.last_record_before(self.today)
+        result = self.logic.reuse_candidate(self.today)
         if result is None:
-            # 今日之前无数据，退而取今日本身（极少见）
-            today_record = self.logic.get_record(self.today)
-            if today_record is None:
-                self.input_panel.set_saved_indicator("暂无可复用的历史数据")
-                return
-            self.input_panel.fill_values(today_record.cash, today_record.warehouse)
-            self.input_panel.set_saved_indicator(
-                f"已复用今日数据，请微调后保存"
-            )
-            self.input_panel.set_reuse_mode()
+            self.input_panel.set_saved_indicator("暂无可复用的历史数据")
             return
-        date_str, record = result
-        self.input_panel.fill_values(record.cash, record.warehouse)
-        self.input_panel.set_saved_indicator(
-            f"已复用 {format_short_date(date_str)} 数据，请微调后保存"
-        )
-        self.input_panel.set_reuse_mode()
+        date_str, record, is_today_fallback = result
+        msg = "今日数据" if is_today_fallback else f"{date_str} 的数据"
+        self.input_panel.set_reuse_hint(msg, record.cash, record.warehouse)
 
     def _cancel_reuse(self) -> None:
         """取消复用：清空输入框，恢复按钮为「复用昨日」。"""
@@ -601,28 +595,11 @@ class MainWindow(QMainWindow):
         count, total = self.logic.summary(self._view_n)
         text, signal = ProfitCalculatorLogic.format_summary(count, total, self._view_n)
         self._summary_label.setText(text)
-        if signal is RateSignal.NONE:
-            # 数据不足 / 仅 1 条记录：弱化提示（灰字小号）
-            style = (
-                f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
-            )
-        else:
-            style = (
-                f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
-            )
-        self._summary_label.setStyleSheet(style)
+        self._summary_label.setStyleSheet(summary_style(signal))
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
         cash_text, cash_signal = ProfitCalculatorLogic.format_cash_summary(
             cash_count, cash_delta, self._view_n
         )
         self._cash_summary_label.setText(cash_text)
-        if cash_signal is RateSignal.NONE:
-            cash_style = (
-                f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
-            )
-        else:
-            cash_style = (
-                f"color: {signal_color(cash_signal)}; font-size: 13px; font-weight: bold;"
-            )
-        self._cash_summary_label.setStyleSheet(cash_style)
+        self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
