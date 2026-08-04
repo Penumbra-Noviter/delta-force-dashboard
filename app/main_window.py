@@ -33,7 +33,7 @@ from config import (
     DATE_FORMAT,
     RETENTION_LIMIT,
     SETTINGS_FILE,
-    WEEK_DAYS,
+    VIEW_DAYS,
 )
 from app.theme import (
     generate_qss,
@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self.today = datetime.now().strftime(DATE_FORMAT)
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
-        self._view_n = WEEK_DAYS
+        self._view_n = VIEW_DAYS[0]
         self._pinned = False
         self._settings = self.settings_store.load()
         self._theme = self._settings.get("theme", "light")
@@ -392,7 +392,7 @@ class MainWindow(QMainWindow):
     def _get_records(self) -> list:
         """返回最近 self._view_n 条实际录入的 (date_str, DayRecord) 列表。
 
-        J 系列：视图条数由按钮组驱动（默认 WEEK_DAYS=7），取代硬编码 WEEK_DAYS；
+        J 系列：视图条数由按钮组驱动（默认 VIEW_DAYS[0]=7），取代硬编码 7；
         存储保留上限（RETENTION_LIMIT=30）与视图解耦，这里只筛窗口。
         """
         return self.logic.recent_records(self._view_n)

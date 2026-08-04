@@ -8,13 +8,25 @@
 
 ## 滚动摘要（2026-08-04）
 
-- **打包**：K 系列主分支重新打包（`3efc77c`），`dist/收益计算器/` **64M**；**烟测通过**（exe 启动 8s 进程存活后终止，pid 17536；`.migrated` 10:20 重写证明启动路径完整、日志无异常）
-- **K 系列**：保存保留两位小数（`save_record` 存储前 `round` 银行家舍入，磁盘与视图金额一致）+ 汇总条并排双标签——新增 `cash_summary`/`format_cash_summary` 纯函数 + `_cash_summary_label`（最近 7/30 条现金总变化，随视图联动），详见日志正文
-- **测试**：pytest **253/253** ✅（K 系列 +16：rounding 回归 3 + cash_summary 行为 6 + format_cash_summary 6 + UI 双标签联动 1；237+16）
+- **架构评审第二轮**：8 候选全实施完毕（#1 展示文本簇→presentation.py / #2 MainWindow 变薄 / #3 原子写合一 / #4 VIEW_DAYS 单源化 / #5 信号→颜色收敛 / #6 汇总四合一 / #7 MoneyLineEdit.set_value / #8 图表几何抽纯函数），详见日志正文
+- **测试**：pytest **259/259** ✅（候选 1+6: -27 移 + 23 新 = 249；候选 3: 不变；候选 2: +5 reuse_candidate 测试；候选 4: 不变；候选 5: 不变；候选 7: 不变；候选 8: +5 adaptive_range 测试；249+5+5=259）
 
 ---
 
 ## 日志正文
+
+### 2026-08-04 | 实现 | 第二轮架构评审 8 候选全实施（Grilling → subagent fan-out → 合并）
+- 来源：`D:\Desktop\To-do\architecture-review-20260804-1110.html`（架构评审报告第二轮，8 候选）
+- 流程：Grilling 三问（Q1-Q3）→ 用户拍板 → parallel subagent worktree 实施 → 合并 → code-review → 文档同步
+- 候选 1+6（`3964d83`）：展示文本簇拆出 `presentation.py`（根层，5 公开函数）+ `format_window_text` 参数化替代 format_summary/format_cash_summary（#6 四合一）。`calculator.py` 协议面 17→11 方法，`summary`/`cash_summary` 改为 `_window_delta` 薄包装。
+- 候选 3（`3964d83`）：`DataStore._atomic_write` 委托 `json_file.atomic_write_json`，原子写 seam 唯一实现，测试面收敛。
+- 候选 4（`d1e39cf`）：`VIEW_DAYS` 移入 `config.py`，`WEEK_DAYS` 保留语义独立性，注释说明数值巧合。
+- 候选 5（`7ea4a26`）：`_PNL_TO_KEY` 合并进 `_SIGNAL_TO_KEY`，`signal_color(RateSignal | PnLSignal)` 单入口，`table_widget.py` 删 18 行自建映射。
+- 候选 2（`3368a2c`）：`reuse_candidate` 纯方法下沉 calculator（返回三元组含 is_today_fallback），`summary_style` 封装进 theme，`view_n` 只读 property，`set_reuse_hint` 合并三步委托。`_update_summary` 样式去重，`_reuse_last_record` 缩小。
+- 候选 7（`4275479`）：`MoneyLineEdit.set_value(text)` 公开方法，`_formatting` 重入保护内聚，`InputPanel` 调用方改走公开协议。
+- 候选 8（`4f76876`）：`_adaptive_range` → `adaptive_range` 公开纯函数，`ChartState`/`ChartSeries` frozen dataclass，`state` property 只读快照，烟测改走 `chart.state` 公开 API，新增 `test_chart_geometry.py`（5 测试）。
+- 测试：259/259 ✅（249+5+5，doc_sync 通过）
+- 文档：TO-TICKETS 归档 8 候选 + DEV_LOG 同步；code-review 通过（Standards 0 硬违反，Spec 2 项需注意）
 
 ### 2026-08-04 | 打包 | K 系列重新打包（3efc77c）+ 烟测通过
 - 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更

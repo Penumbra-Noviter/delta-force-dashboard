@@ -12,7 +12,7 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-04）：J 系列已全部完成归档（见下）；当前无待办工单。
+> 活跃表（2026-08-04）：第二轮架构评审 8 个候选已全部完成归档（见下）；当前无待办工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
@@ -41,6 +41,19 @@
 |--------|------|------|----------|------|
 | K-01 | 数据保存保留两位小数：`save_record` 存储前 `round(cash/warehouse, 2)`（银行家舍入），不变式告警用舍入后值 | 功能（数据精度） | 2026-08-04 | `3efc77c` |
 | K-02 | 汇总条并排双标签：`cash_summary`/`format_cash_summary` 纯函数 + `_cash_summary_label`（最近 7/30 条现金总变化，随视图联动） | 功能（UI） | 2026-08-04 | `3efc77c` |
+
+### 第二轮架构评审（2026-08-04，8 候选全实施）
+
+| 候选 | 标题 | 类型 | 强度 | 完成日期 | 提交 |
+|------|------|------|------|----------|------|
+| 1 | 展示文本簇拆出 `presentation.py`（format_* 纯函数） | 重构（深模块） | 🟢 Strong | 2026-08-04 | `3964d83` |
+| 6 | 汇总四合一参数化 — `format_window_text` 替代 format_summary + format_cash_summary | 重构（去重） | 🟢 Strong | 2026-08-04 | `3964d83` |
+| 3 | 原子写协议合一 — DataStore 委托 `json_file.atomic_write_json` | 重构（去重） | 🟢 Strong | 2026-08-04 | `3964d83` |
+| 2 | MainWindow 编排器变薄 — `reuse_candidate` 下沉 + `summary_style` 进 theme + `view_n` property | 重构（编排器） | 🟡 Worth exploring | 2026-08-04 | `3368a2c` |
+| 4 | VIEW_DAYS 单源化 — 常规定义移入 `config.py` | 重构（常量） | 🟡 Worth exploring | 2026-08-04 | `d1e39cf` |
+| 5 | 信号→颜色映射收敛进 theme — `signal_color` 统一入口 | 重构（收敛） | 🟡 Worth exploring | 2026-08-04 | `7ea4a26` |
+| 7 | MoneyLineEdit 补 `set_value` 公开方法 — `_formatting` 泄漏消除 | 重构（seam） | 🟡 Worth exploring | 2026-08-04 | `4275479` |
+| 8 | 图表几何抽纯函数 — `adaptive_range` 公开 + `ChartState` 只读状态 | 重构（可测试性） | 🟡 Worth exploring | 2026-08-04 | `4f76876` |
 
 ### H 系列（2026-08-03，图表样式对齐 + 布局）
 
