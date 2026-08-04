@@ -34,22 +34,6 @@ from PySide6.QtWidgets import (
 from app.theme import get_color, signal_color
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
-from signals import PnLSignal
-
-# ── 盈亏信号 → 主题颜色键映射 ────────────────────────
-# 收益率信号（RateSignal）→ 颜色映射已收敛到 app.theme.signal_color；
-# 这里仅保留盈亏标签专属的 PnLSignal 映射。
-_PNL_TO_KEY = {
-    PnLSignal.盈: "FG_POS",
-    PnLSignal.亏: "FG_NEG",
-    PnLSignal.平: "FG_MUTED",
-    PnLSignal.无: "FG_MUTED",
-}
-
-
-def _pnl_color(signal: PnLSignal) -> str:
-    """盈亏信号 → 当前主题颜色（渲染时解析）。"""
-    return get_color(_PNL_TO_KEY.get(signal, "FG_MUTED"))
 
 
 # 标题基础样式：颜色随主题实时解析，不在此冻结
@@ -248,7 +232,7 @@ class _DaySubTable(QTableWidget):
             pnl_text, pnl_signal = ProfitCalculatorLogic.get_pnl_label(
                 prev_warehouse, record.warehouse
             )
-            pnl_bg = _pnl_color(pnl_signal)
+            pnl_bg = signal_color(pnl_signal)
             if pnl_text == "—":
                 badge_text = "—"
             else:
