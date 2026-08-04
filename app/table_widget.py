@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import get_color, signal_color
+from config import VIEW_DAYS
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
 from signals import PnLSignal
@@ -68,8 +69,6 @@ COL_RATE = 4
 COL_PNL = 5
 COL_ACTIONS = 6
 
-# 可切换的视图窗口（J 系列）：与存储保留上限 RETENTION_LIMIT 解耦的展示口径。
-VIEW_DAYS = (7, 30)
 
 
 class PnLBadge(QWidget):

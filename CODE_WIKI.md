@@ -217,7 +217,7 @@ Profit Calculator/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~402 行<!--/AUTO-->）
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~401 行<!--/AUTO-->）
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -382,7 +382,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~24 行<!--/AUTO-->）
+### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~29 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
