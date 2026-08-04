@@ -16,8 +16,9 @@
 
 from __future__ import annotations
 
-__all__ = ["ChartWidget"]
+__all__ = ["ChartWidget", "ChartSeries", "ChartState", "adaptive_range"]
 
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import pyqtgraph as pg
@@ -43,8 +44,32 @@ class KMBAxisItem(pg.AxisItem):
         return [format_compact(v) for v in values]
 
 
-def _adaptive_range(values: list[float]) -> tuple[float, float]:
-    """自适应 Y 轴范围（底部留 10%，顶部留 8%）。"""
+@dataclass(frozen=True)
+class ChartSeries:
+    """图表中一条序列的只读状态。"""
+    name: str
+    data_points: int
+    y_range: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class ChartState:
+    """图表渲染层只读状态快照。
+
+    测试断言 chart.state 而非私有字段，渲染层内部重构不影响测试。
+    """
+    series: list[ChartSeries] = field(default_factory=list)
+    axis_count: int = 0
+
+
+def adaptive_range(values: list[float]) -> tuple[float, float]:
+    """计算自适应 Y 轴范围（纯函数，可直接单测）。
+
+    返回 (ymin, ymax)，保证数据点在轴范围内有适当边距。
+    空列表返回 (0.0, 1.0)。
+    """
+    if not values:
+        return 0.0, 1.0
     lo, hi = min(values), max(values)
     rng = hi - lo
     if rng == 0:
@@ -137,6 +162,29 @@ class ChartWidget(QWidget):
         else:
             self._clear_all()
             self._show_placeholder(n)
+
+    @property
+    def state(self) -> ChartState:
+        """图表当前渲染状态（只读）。"""
+        series = []
+        if self._warehouse_curve is not None:
+            x, y = self._warehouse_curve.getData()
+            series.append(ChartSeries(
+                name="warehouse",
+                data_points=len(x) if x is not None else 0,
+                y_range=(min(y), max(y)) if y is not None and len(y) > 0 else (0, 0),
+            ))
+        if self._cash_curve is not None:
+            x, y = self._cash_curve.getData()
+            series.append(ChartSeries(
+                name="cash",
+                data_points=len(x) if x is not None else 0,
+                y_range=(min(y), max(y)) if y is not None and len(y) > 0 else (0, 0),
+            ))
+        return ChartState(
+            series=series,
+            axis_count=2,  # 双 Y 轴，ADR-0002
+        )
 
     def apply_theme(self) -> None:
         """主题切换后增量更新颜色；无需销毁重建。"""
@@ -297,8 +345,8 @@ class ChartWidget(QWidget):
         p2.addItem(self._cash_endpoint)
 
         # ── Y 轴自适应（各自量纲）+ X 轴日期刻度 ──
-        p1.setYRange(*_adaptive_range(warehouse_vals))
-        p2.setYRange(*_adaptive_range(cash_vals))
+        p1.setYRange(*adaptive_range(warehouse_vals))
+        p2.setYRange(*adaptive_range(cash_vals))
         p1.getAxis("bottom").setTicks([list(enumerate(dates))])
 
         # ── 图例（副 ViewBox 项目不会自动注册到主 PlotItem 图例，需显式 addItem）──
@@ -356,10 +404,10 @@ class ChartWidget(QWidget):
 
         # 更新 Y 轴范围（各自量纲）与 X 轴标签
         if self._plot_item is not None:
-            self._plot_item.setYRange(*_adaptive_range(warehouse_vals))
+            self._plot_item.setYRange(*adaptive_range(warehouse_vals))
             self._plot_item.getAxis("bottom").setTicks([list(enumerate(dates))])
         if self._right_vb is not None:
-            self._right_vb.setYRange(*_adaptive_range(cash_vals))
+            self._right_vb.setYRange(*adaptive_range(cash_vals))
 
     def _on_mouse_moved(self, evt) -> None:
         """鼠标移动时显示竖线 + 每系列一个彩色数值标签。

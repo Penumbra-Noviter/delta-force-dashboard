@@ -109,6 +109,7 @@ Profit Calculator/
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->27<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->5<!--/AUTO--> 个测试（adaptive_range 纯函数 + 空列表/负值/全同值边界）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -265,11 +266,11 @@ MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均�
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~457 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~498 行<!--/AUTO-->）
 
-#### 函数：`_adaptive_range(values)`
+#### 函数：`adaptive_range(values)`
 
-自适应 Y 轴范围（底部留 10%，顶部留 8%）；仓库/现金两轴各自量纲独立调用。
+自适应 Y 轴范围（底部留 10%，顶部留 8%）；仓库/现金两轴各自量纲独立调用。空列表返回 `(0.0, 1.0)`。
 
 #### 类：`KMBAxisItem(pg.AxisItem)`
 
@@ -587,6 +588,7 @@ main.py
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
+| `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->5<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
 
 **运行方式**：在项目根目录执行 `pytest`
 
