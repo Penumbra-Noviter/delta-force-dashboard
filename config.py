@@ -29,3 +29,9 @@ WEEK_DAYS = 7          # 视图默认窗口（沿用，启动默认 7）
 # J 系列（多视图）：保留上限与视图解耦。rotate_weekly 用此常量决定
 # 「最多保留 N 条录入」；视图 7/30 切换只从存量里筛窗口（CONSENSUS §7）。
 RETENTION_LIMIT = 30
+
+# 可切换的视图窗口选项（J 系列，Consensus §7）
+# 第一项是启动默认窗口，与 WEEK_DAYS 数值巧合但语义独立；
+# 第二项恰好等于 RETENTION_LIMIT，但此处是展示窗口的最大值，
+# 修改 RETENTION_LIMIT 不需要同步修改此常量。
+VIEW_DAYS: tuple[int, int] = (WEEK_DAYS, 30)
