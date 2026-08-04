@@ -196,6 +196,34 @@ class ProfitCalculatorLogic:
         """
         return self._window_delta(days, "cash")
 
+    def reuse_candidate(self, today: str) -> tuple[str, DayRecord, bool] | None:
+        """查找今日可复用的候选记录。
+
+        返回 (date_str, record, is_today_fallback) 三元组：
+        - 今日已有记录 → 返回今日记录，is_today_fallback=False
+        - 今日无记录但昨日有 → 返回昨日记录，is_today_fallback=False
+        - 今日无记录且昨日也无 → 返回最近一条记录，is_today_fallback=True
+        - 完全无数据 → None
+        """
+        today_record = self.get_record(today)
+        if today_record is not None:
+            return (today, today_record, False)
+
+        result = self.last_record_before(today)
+        if result is None:
+            return None
+
+        date_str, record = result
+        try:
+            yesterday = (
+                datetime.strptime(today, DATE_FORMAT) - timedelta(days=1)
+            ).strftime(DATE_FORMAT)
+            is_today_fallback = date_str != yesterday
+        except ValueError:
+            is_today_fallback = True
+
+        return (date_str, record, is_today_fallback)
+
     def delete_record(self, date_str: str) -> bool:
         """删除某日记录；不存在时返回 False。"""
         if date_str in self.data:
