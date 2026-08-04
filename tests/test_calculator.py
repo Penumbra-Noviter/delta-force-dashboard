@@ -5,7 +5,6 @@ Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计�
 import pytest
 
 from calculator import DayRecord, ProfitCalculatorLogic
-from signals import PnLSignal, RateSignal
 
 
 # ── DayRecord ────────────────────────────────────────
@@ -321,58 +320,6 @@ def test_calculate_rate_large():
     assert abs(rate - 50.0) < 0.001
 
 
-# ── ProfitCalculatorLogic.format_rate ────────────────
-
-def test_format_rate_positive():
-    text, signal = ProfitCalculatorLogic.format_rate(5.0)
-    assert text == "+5.0%"
-    assert signal == RateSignal.POSITIVE
-
-
-def test_format_rate_negative():
-    text, signal = ProfitCalculatorLogic.format_rate(-3.2)
-    assert text == "-3.2%"
-    assert signal == RateSignal.NEGATIVE
-
-
-def test_format_rate_zero():
-    text, signal = ProfitCalculatorLogic.format_rate(0.0)
-    assert text == "0.0%"
-    assert signal == RateSignal.NEUTRAL
-
-
-def test_format_rate_none():
-    text, signal = ProfitCalculatorLogic.format_rate(None)
-    assert text == "—"
-    assert signal == RateSignal.NONE
-
-# ── ProfitCalculatorLogic.format_signed_money ──────────
-
-def test_format_signed_money_positive():
-    text, signal = ProfitCalculatorLogic.format_signed_money(300.0)
-    assert text == "+¥300.00"
-    assert signal == RateSignal.POSITIVE
-
-
-def test_format_signed_money_negative():
-    text, signal = ProfitCalculatorLogic.format_signed_money(-30.0)
-    assert text == "¥-30.00"
-    assert signal == RateSignal.NEGATIVE
-
-
-def test_format_signed_money_zero_has_no_prefix():
-    """零值无 + 前缀（表格较前日列 +¥0.00 → ¥0.00，D-01）。"""
-    text, signal = ProfitCalculatorLogic.format_signed_money(0.0)
-    assert text == "¥0.00"
-    assert signal == RateSignal.NEUTRAL
-
-
-def test_format_signed_money_none():
-    text, signal = ProfitCalculatorLogic.format_signed_money(None)
-    assert text == "—"
-    assert signal == RateSignal.NONE
-
-
 # ── ProfitCalculatorLogic.is_cash_under_warehouse ───
 
 def test_is_cash_under_warehouse_true():
@@ -388,95 +335,6 @@ def test_is_cash_under_warehouse_equal_boundary():
 def test_is_cash_under_warehouse_false():
     """现金大于仓库：不变式违反。"""
     assert not ProfitCalculatorLogic.is_cash_under_warehouse(600.0, 500.0)
-
-
-# ── ProfitCalculatorLogic.format_summary ─────────────
-
-def test_format_summary_empty():
-    """无记录（count 0）：数据不足提示，信号 NONE（灰字弱化）。"""
-    text, signal = ProfitCalculatorLogic.format_summary(0, None)
-    assert text == "最近7条总盈亏：数据不足"
-    assert signal == RateSignal.NONE
-
-
-def test_format_summary_single_record_no_plus_prefix():
-    """仅 1 条记录：仓库值非趋势，不加 + 前缀，信号 NONE。"""
-    text, signal = ProfitCalculatorLogic.format_summary(1, 500.0)
-    assert text == "最近7条总盈亏：¥500.00（仅 1 条记录）"
-    assert signal == RateSignal.NONE
-
-
-def test_format_summary_positive():
-    text, signal = ProfitCalculatorLogic.format_summary(2, 300.0)
-    assert text == "最近7条总盈亏：+¥300.00"
-    assert signal == RateSignal.POSITIVE
-
-
-def test_format_summary_negative():
-    text, signal = ProfitCalculatorLogic.format_summary(2, -30.0)
-    assert text == "最近7条总盈亏：¥-30.00"
-    assert signal == RateSignal.NEGATIVE
-
-
-def test_format_summary_zero():
-    text, signal = ProfitCalculatorLogic.format_summary(2, 0.0)
-    assert text == "最近7条总盈亏：¥0.00"
-    assert signal == RateSignal.NEUTRAL
-
-
-# ── ProfitCalculatorLogic.format_saved_indicator ─────
-
-def test_format_saved_indicator_today():
-    """保存今日：今日文案 + 仓库总收益。"""
-    text = ProfitCalculatorLogic.format_saved_indicator(
-        "2026-08-02", 460900000.0, "2026-08-02", []
-    )
-    assert text == "✓ 今日已保存 — 仓库总收益 ¥460.9M"
-
-
-def test_format_saved_indicator_historical_date():
-    """编辑历史日期：短日期「已更新」文案。"""
-    text = ProfitCalculatorLogic.format_saved_indicator(
-        "2026-07-20", 419900000.0, "2026-08-02", []
-    )
-    assert text == "✓ 07-20 已更新 — 仓库总收益 ¥419.9M"
-
-
-def test_format_saved_indicator_with_rotation_hint():
-    """触发轮转删除：追加清理提示（O-14/O-17 文案）。"""
-    text = ProfitCalculatorLogic.format_saved_indicator(
-        "2026-08-02", 460900000.0, "2026-08-02", ["2026-07-10"]
-    )
-    assert text == (
-        "✓ 今日已保存 — 仓库总收益 ¥460.9M"
-        "（已保留最近 30 条记录，自动清理 1 条较早记录）"
-    )
-
-
-# ── ProfitCalculatorLogic.get_pnl_label ──────────────
-
-def test_pnl_label_profit():
-    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 420.0)
-    assert label == "盈"
-    assert signal == PnLSignal.盈
-
-
-def test_pnl_label_loss():
-    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 380.0)
-    assert label == "亏"
-    assert signal == PnLSignal.亏
-
-
-def test_pnl_label_no_change():
-    label, signal = ProfitCalculatorLogic.get_pnl_label(400.0, 400.0)
-    assert label == "—"
-    assert signal == PnLSignal.平
-
-
-def test_pnl_label_no_prev():
-    label, signal = ProfitCalculatorLogic.get_pnl_label(None, 420.0)
-    assert label == "—"
-    assert signal == PnLSignal.无
 
 
 # ── ProfitCalculatorLogic.delete_record ────────────
@@ -607,12 +465,6 @@ def test_summary_caps_to_recent_days():
     assert total == 0.0  # 07-11~07-17 仓库值恒为 200，07-01 不在最近 7 条内
 
 
-def test_format_summary_days_parameterized():
-    """J 系列：format_summary 的「最近N条」前缀随 days 参数走（N 不写死 7）。"""
-    text, signal = ProfitCalculatorLogic.format_summary(2, 300.0, days=30)
-    assert text == "最近30条总盈亏：+¥300.00"
-    assert signal == RateSignal.POSITIVE
-
 
 def test_summary_days_parameterized_window():
     """J 系列：summary(days) 的窗口随参数收窄/放宽（视图 7/30 同源统计）。"""
@@ -692,45 +544,6 @@ def test_cash_summary_caps_to_recent_days():
     count, total = logic.cash_summary()
     assert count == 7
     assert total == 6.0  # 07-11~07-17 现金 111→117（差 6），07-01 不在最近 7 条内
-
-
-def test_format_cash_summary_empty():
-    """无记录（count 0）：数据不足提示，信号 NONE。"""
-    text, signal = ProfitCalculatorLogic.format_cash_summary(0, None)
-    assert text == "最近7条现金总变化：数据不足"
-    assert signal == RateSignal.NONE
-
-
-def test_format_cash_summary_single_record_no_plus_prefix():
-    """仅 1 条记录：现金值非趋势，不加 + 前缀，信号 NONE。"""
-    text, signal = ProfitCalculatorLogic.format_cash_summary(1, 300.0)
-    assert text == "最近7条现金总变化：¥300.00（仅 1 条记录）"
-    assert signal == RateSignal.NONE
-
-
-def test_format_cash_summary_positive():
-    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 150.0)
-    assert text == "最近7条现金总变化：+¥150.00"
-    assert signal == RateSignal.POSITIVE
-
-
-def test_format_cash_summary_negative():
-    text, signal = ProfitCalculatorLogic.format_cash_summary(2, -200.0)
-    assert text == "最近7条现金总变化：¥-200.00"
-    assert signal == RateSignal.NEGATIVE
-
-
-def test_format_cash_summary_zero():
-    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 0.0)
-    assert text == "最近7条现金总变化：¥0.00"
-    assert signal == RateSignal.NEUTRAL
-
-
-def test_format_cash_summary_days_parameterized():
-    """J 系列：format_cash_summary 的「最近N条」前缀随 days 参数走。"""
-    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 150.0, days=30)
-    assert text == "最近30条现金总变化：+¥150.00"
-    assert signal == RateSignal.POSITIVE
 
 
 def test_export_csv_empty():

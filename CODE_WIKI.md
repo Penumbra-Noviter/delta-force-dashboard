@@ -101,7 +101,9 @@ Profit Calculator/
 │   └── install-hooks.bat    ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
+│   ├── test_calculator.py
+│   ├── test_presentation.py ← <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> 个测试（展示文本生成：format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label）
+   ← <!--AUTO:tests:tests/test_calculator.py-->64<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -139,7 +141,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~531 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~532 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -217,7 +219,7 @@ Profit Calculator/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~402 行<!--/AUTO-->）
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~403 行<!--/AUTO-->）
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -338,7 +340,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~334 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~232 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -359,18 +361,33 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.last_record_before-->`last_record_before`<!--/AUTO--> | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.recent_records-->`recent_records`<!--/AUTO--> | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.calculate_rate-->`calculate_rate`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `float \| None` | 计算收益率百分比，前值 None 或为零返回 None |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_rate-->`format_rate`<!--/AUTO--> | `rate: float \| None` | `(str, str)` | 格式化收益率显示文本和颜色 |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_signed_money-->`format_signed_money`<!--/AUTO--> | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.is_cash_under_warehouse-->`is_cash_under_warehouse`<!--/AUTO--> | `cash, warehouse` | `bool` | 现金⊆仓库不变式判定（唯一所有者 D-05，告警/拦截/红框三处共用） |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_summary-->`format_summary`<!--/AUTO--> | `count, total, days=7` | `(str, str)` | 汇总标签文本纯函数（D-07）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.cash_summary-->`cash_summary`<!--/AUTO--> | `days=7` | `(int, float \| None)` | 最近 days 条记录现金总变化（最新−最旧现金，与 summary 同窗口语义，随视图 7/30 联动） |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_cash_summary-->`format_cash_summary`<!--/AUTO--> | `count, total_delta, days=7` | `(str, str)` | 现金汇总标签文本纯函数（镜像 format_summary）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_saved_indicator-->`format_saved_indicator`<!--/AUTO--> | `save_date, warehouse, today, deleted, keep_days=30` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07/J 系列） |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.get_pnl_label-->`get_pnl_label`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.delete_record-->`delete_record`<!--/AUTO--> | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.rotate_weekly-->`rotate_weekly`<!--/AUTO--> | `days=30` | `list[str]` | 保留最近 days 条实际录入记录（默认 RETENTION_LIMIT=30，J 系列：满上限不删、第 31 条才删最旧），超过上限删除最旧；返回被删除日期列表（升序，O-14） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.summary-->`summary`<!--/AUTO--> | `days=7` | `(int, float \| None)` | 最近 days 条记录总盈亏（最新−最旧，录入条数语义） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.export_csv-->`export_csv`<!--/AUTO--> | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
+
+
+### 4.8  — 展示文本生成（<!--AUTO:lines:presentation.py-->~110 行<!--/AUTO-->）
+
+领域值 → 展示文本 + 语义信号纯函数（架构评审候选 1/6，与  解耦）。
+
+| 方法 | 参数 | 返回 | 说明 |
+|------|------|------|------|
+
+
+### 4.8 `presentation.py` — 展示文本生成（<!--AUTO:lines:presentation.py-->~110 行<!--/AUTO-->）
+
+领域值 → 展示文本 + 语义信号纯函数（架构评审候选 1/6，与 `calculator.py` 解耦）。
+
+| 方法 | 参数 | 返回 | 说明 |
+|------|------|------|------|
+| <!--AUTO:sig:presentation.py:format_rate-->`format_rate`<!--/AUTO--> | `rate: float | None` | `(str, RateSignal)` | 格式化收益率显示文本和颜色 |
+| <!--AUTO:sig:presentation.py:format_signed_money-->`format_signed_money`<!--/AUTO--> | `value: float | None` | `(str, RateSignal)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥...`、负数 `¥-...`、零 `¥0.00` 无前缀、None `---`（D-01） |
+| <!--AUTO:sig:presentation.py:format_window_text-->`format_window_text`<!--/AUTO--> | `count, total, label, days=7` | `(str, RateSignal)` | 汇总标签文本纯函数（参数化版 #6：替代 format_summary + format_cash_summary）：数据不足/仅 1 条→NONE，>=2 条走 format_signed_money |
+| <!--AUTO:sig:presentation.py:format_saved_indicator-->`format_saved_indicator`<!--/AUTO--> | `save_date, warehouse, today, deleted, keep_days=30` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07/J 系列） |
+| <!--AUTO:sig:presentation.py:get_pnl_label-->`get_pnl_label`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `(str, PnLSignal)` | 判断盈亏标签和颜色 |
 
 **关键业务规则**：
 - `data` 为 `dict[str, DayRecord]`（ADR-0001）；磁盘持久化走 `serialize()` 单向导出（返回新 dict，消灭 logic 与磁盘共享别名）；MainWindow 不直接触碰内部 data 形态
@@ -402,7 +419,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~159 行<!--/AUTO-->）
+### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~153 行<!--/AUTO-->）
 
 #### 类：`DataStore`
 
@@ -529,7 +546,8 @@ main.py
 | `app/table_widget.py` | `app.theme`, `formatting`, `calculator`, `signals`, `PySide6` |
 | `app/chart_widget.py` | `app.theme`, `formatting`, `pyqtgraph`, `PySide6` |
 | `app/theme.py` | `signals`（`RateSignal`，零依赖叶子） |
-| `calculator.py` | `config`, `formatting`, `signals` |
+| `calculator.py` | `config`, `formatting` |
+| `presentation.py` | `config`, `formatting`, `signals` |
 | `data_store.py` | `config` |
 | `settings_store.py` | `json_file`, `config` |
 | `json_file.py` | 无外部依赖（仅标准库） |
@@ -583,7 +601,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->64<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |

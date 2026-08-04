@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from config import BACKUP_FILE, DATA_FILE
+from json_file import atomic_write_json
 
 __all__ = [
     "DataStore",
@@ -158,15 +159,8 @@ class DataStore:
         return data
 
     def _atomic_write(self, data: dict[str, Any], target: Path) -> None:
-        tmp = target.with_suffix(target.suffix + ".tmp")
-        try:
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            tmp.replace(target)
-        except OSError:
-            if tmp.exists():
-                tmp.unlink(missing_ok=True)
-            raise
+        """内部原子写入：委托 json_file.atomic_write_json（#3 原子写协议合一）。"""
+        atomic_write_json(target, data)
 
     def _rotate_backups(self) -> None:
         """滚动备份：bak.2->bak.3, bak.1->bak.2, 当前->bak.1，同时保留 bak。"""

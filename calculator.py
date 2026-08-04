@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from config import DATE_FORMAT, RETENTION_LIMIT, WEEK_DAYS
-from formatting import format_money, format_short_date
-from signals import PnLSignal, RateSignal
+from formatting import format_money
+from presentation import format_rate
 
 __all__ = [
     "DayRecord",
@@ -159,67 +159,34 @@ class ProfitCalculatorLogic:
             return None
         return (current_warehouse - prev_warehouse) / prev_warehouse * 100
 
-    @staticmethod
-    def format_rate(rate: float | None) -> tuple[str, RateSignal]:
+    def _window_delta(self, days: int, attr: str) -> tuple[int, float | None]:
+        """内部 helper：按字段名计算最近 days 条记录的窗口变化量。
+
+        summary（warehouse）与 cash_summary（cash）的共享实现（#6 参数化）。
         """
-        根据收益率返回 (格式化字符串, 信号) 二元组。
-        UI 层应将信号映射为当前主题颜色。
+        records = self.recent_records(days)
+        if not records:
+            return 0, None
+        if len(records) == 1:
+            return 1, getattr(records[0][1], attr)
+        return len(records), getattr(records[-1][1], attr) - getattr(records[0][1], attr)
+
+    def summary(self, days: int = WEEK_DAYS) -> tuple[int, float | None]:
+        """计算最近 days 条实际录入记录的总盈亏（仓库值变化）。
+
+        与 recent_records / rotate_weekly 一致，以「录入条数」而非日历天数为基准。
+
+        返回 (记录数, 总盈亏金额)：
+        - 记录数 >= 2：总盈亏 = 最新记录仓库值 − 最旧记录仓库值；
+        - 记录数 == 1：总盈亏为该条仓库值（无对比对象，供视图提示「仅 1 条记录」）；
+        - 记录数 == 0：总盈亏为 None。
         """
-        if rate is None:
-            return "—", RateSignal.NONE
-        if rate > 0:
-            return f"+{rate:.1f}%", RateSignal.POSITIVE
-        if rate < 0:
-            return f"{rate:.1f}%", RateSignal.NEGATIVE
-        return "0.0%", RateSignal.NEUTRAL
-
-    @staticmethod
-    def format_signed_money(value: float | None) -> tuple[str, RateSignal]:
-        """根据带符号金额返回 (格式化字符串, 信号) 二元组。
-
-        带符号金额（较前日差值、总盈亏）的统一展示入口：
-        - None → "—"（NONE）
-        - 正数 → "+¥…"（POSITIVE）
-        - 负数 → "¥-…"（NEGATIVE，format_money 自带负号）
-        - 零 → "¥0.00"（NEUTRAL，无 + 前缀）
-
-        UI 层应将信号映射为当前主题颜色（见 app.theme.signal_color）。
-        """
-        if value is None:
-            return "—", RateSignal.NONE
-        if value > 0:
-            return f"+{format_money(value)}", RateSignal.POSITIVE
-        if value < 0:
-            return format_money(value), RateSignal.NEGATIVE
-        return format_money(0.0), RateSignal.NEUTRAL
-
-    @staticmethod
-    def format_summary(
-        count: int, total: float | None, days: int = WEEK_DAYS
-    ) -> tuple[str, RateSignal]:
-        """汇总标签展示文本的纯函数：按记录数与总盈亏返回 (文本, 信号)。
-
-        与 summary() 语义对齐（录入条数基准）：
-        - count == 0（total 为 None）：`最近N条总盈亏：数据不足`，信号 NONE；
-        - count == 1：`最近N条总盈亏：¥X（仅 1 条记录）`，信号 NONE
-          （仓库值非趋势，不加 + 前缀）；
-        - count >= 2：复用 format_signed_money（带符号、趋势信号）。
-
-        UI 层把信号映射为当前主题颜色（app.theme.signal_color），
-        弱化/常规字号等纯样式留 UI（D-07）。
-        """
-        prefix = f"最近{days}条总盈亏："
-        if total is None:
-            return f"{prefix}数据不足", RateSignal.NONE
-        if count == 1:
-            return f"{prefix}{format_money(total)}（仅 1 条记录）", RateSignal.NONE
-        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total)
-        return f"{prefix}{total_text}", total_signal
+        return self._window_delta(days, "warehouse")
 
     def cash_summary(self, days: int = WEEK_DAYS) -> tuple[int, float | None]:
         """计算最近 days 条实际录入记录的现金总变化。
 
-        与 summary() 完全镜像、基于记录现金（cash）而非仓库值（warehouse）：
+        与 summary() 镜像、基于记录现金（cash）而非仓库值（warehouse）：
         反映窗口内「可支配现金」的净增减。
 
         返回 (记录数, 现金变化金额)：
@@ -227,79 +194,7 @@ class ProfitCalculatorLogic:
         - 记录数 == 1：现金变化为该条现金值（无对比对象，供视图提示「仅 1 条记录」）；
         - 记录数 == 0：现金变化为 None。
         """
-        records = self.recent_records(days)
-        if not records:
-            return 0, None
-        if len(records) == 1:
-            return 1, records[0][1].cash
-        return len(records), records[-1][1].cash - records[0][1].cash
-
-    @staticmethod
-    def format_cash_summary(
-        count: int, total_delta: float | None, days: int = WEEK_DAYS
-    ) -> tuple[str, RateSignal]:
-        """现金汇总标签展示文本的纯函数：按记录数与现金变化返回 (文本, 信号)。
-
-        与 format_summary() 完全镜像（录入条数基准；D-07 文本/样式分离）：
-        - count == 0（total_delta 为 None）：`最近N条现金总变化：数据不足`，信号 NONE；
-        - count == 1：`最近N条现金总变化：¥X（仅 1 条记录）`，信号 NONE
-          （现金值非趋势，不加 + 前缀）；
-        - count >= 2：复用 format_signed_money（带符号、趋势信号）。
-
-        UI 层把信号映射为当前主题颜色（app.theme.signal_color）。
-        """
-        prefix = f"最近{days}条现金总变化："
-        if total_delta is None:
-            return f"{prefix}数据不足", RateSignal.NONE
-        if count == 1:
-            return f"{prefix}{format_money(total_delta)}（仅 1 条记录）", RateSignal.NONE
-        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total_delta)
-        return f"{prefix}{total_text}", total_signal
-
-    @staticmethod
-    def format_saved_indicator(
-        save_date: str,
-        warehouse: float,
-        today: str,
-        deleted: list[str],
-        keep_days: int = RETENTION_LIMIT,
-    ) -> str:
-        """保存成功状态栏文本的纯函数（今日/历史日期 + 轮转清理提示）。
-
-        - 保存日期为今日 → `✓ 今日已保存 — 仓库总收益 ¥X`；
-        - 历史日期（编辑）→ `✓ MM-DD 已更新 — 仓库总收益 ¥X`；
-        - 触发轮转删除（deleted 非空）追加「已保留最近 N 条记录，
-          自动清理 M 条较早记录」（O-14/O-17 文案）。
-        """
-        if save_date == today:
-            indicator = f"✓ 今日已保存 — 仓库总收益 {format_money(warehouse)}"
-        else:
-            indicator = (
-                f"✓ {format_short_date(save_date)} 已更新 — "
-                f"仓库总收益 {format_money(warehouse)}"
-            )
-        if deleted:
-            indicator += (
-                f"（已保留最近 {keep_days} 条记录，"
-                f"自动清理 {len(deleted)} 条较早记录）"
-            )
-        return indicator
-
-    @staticmethod
-    def get_pnl_label(
-        prev_warehouse: float | None, current_warehouse: float
-    ) -> tuple[str, PnLSignal]:
-        """
-        根据前后日仓库价值判断盈亏，返回 (标签, 信号) 二元组。
-        UI 层应将信号映射为当前主题颜色。
-        """
-        if prev_warehouse is None:
-            return "—", PnLSignal.无
-        if current_warehouse > prev_warehouse:
-            return "盈", PnLSignal.盈
-        if current_warehouse < prev_warehouse:
-            return "亏", PnLSignal.亏
-        return "—", PnLSignal.平
+        return self._window_delta(days, "cash")
 
     def delete_record(self, date_str: str) -> bool:
         """删除某日记录；不存在时返回 False。"""
@@ -340,12 +235,7 @@ class ProfitCalculatorLogic:
         - 记录数 == 1：总盈亏为该条仓库值（无对比对象，供视图提示「仅 1 条记录」）；
         - 记录数 == 0：总盈亏为 None。
         """
-        records = self.recent_records(days)
-        if not records:
-            return 0, None
-        if len(records) == 1:
-            return 1, records[0][1].warehouse
-        return len(records), records[-1][1].warehouse - records[0][1].warehouse
+        return self._window_delta(days, "warehouse")
 
     def export_csv(self) -> str:
         """生成 CSV 导出文本（列：日期/现金/仓库/较前日/收益率）。
@@ -373,7 +263,7 @@ class ProfitCalculatorLogic:
                 else format_money(record.warehouse - prev_warehouse)
             )
             rate = self.calculate_rate(prev_warehouse, record.warehouse)
-            rate_text, _ = self.format_rate(rate)
+            rate_text, _ = format_rate(rate)
             writer.writerow(
                 [
                     date_str,

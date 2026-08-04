@@ -46,6 +46,7 @@ from app.table_widget import TableWidget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+from presentation import format_saved_indicator, format_window_text
 from settings_store import SettingsStore
 from signals import RateSignal
 
@@ -461,7 +462,7 @@ class MainWindow(QMainWindow):
 
         self.refresh_display()
 
-        indicator = ProfitCalculatorLogic.format_saved_indicator(
+        indicator = format_saved_indicator(
             save_date, warehouse, self.today, deleted, RETENTION_LIMIT
         )
         self.input_panel.set_saved_indicator(indicator)
@@ -599,7 +600,7 @@ class MainWindow(QMainWindow):
         同源 recent_records(_view_n)，随视图 7/30 联动。
         """
         count, total = self.logic.summary(self._view_n)
-        text, signal = ProfitCalculatorLogic.format_summary(count, total, self._view_n)
+        text, signal = format_window_text(count, total, "总盈亏", self._view_n)
         self._summary_label.setText(text)
         if signal is RateSignal.NONE:
             # 数据不足 / 仅 1 条记录：弱化提示（灰字小号）
@@ -613,8 +614,8 @@ class MainWindow(QMainWindow):
         self._summary_label.setStyleSheet(style)
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
-        cash_text, cash_signal = ProfitCalculatorLogic.format_cash_summary(
-            cash_count, cash_delta, self._view_n
+        cash_text, cash_signal = format_window_text(
+            cash_count, cash_delta, "现金总变化", self._view_n
         )
         self._cash_summary_label.setText(cash_text)
         if cash_signal is RateSignal.NONE:

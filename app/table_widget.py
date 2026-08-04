@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 from app.theme import get_color, signal_color
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+from presentation import format_rate, format_signed_money, get_pnl_label
 from signals import PnLSignal
 
 # ── 盈亏信号 → 主题颜色键映射 ────────────────────────
@@ -220,7 +221,7 @@ class _DaySubTable(QTableWidget):
 
             # 3: 较前日
             if prev_warehouse is not None:
-                diff, delta_signal = ProfitCalculatorLogic.format_signed_money(
+                diff, delta_signal = format_signed_money(
                     record.warehouse - prev_warehouse
                 )
                 delta_color = signal_color(delta_signal)
@@ -236,7 +237,7 @@ class _DaySubTable(QTableWidget):
 
             # 4: 收益率
             rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
-            rate_str, rate_signal = ProfitCalculatorLogic.format_rate(rate)
+            rate_str, rate_signal = format_rate(rate)
             rate_color = signal_color(rate_signal)
             item = QTableWidgetItem(rate_str)
             item.setForeground(QColor(rate_color))
@@ -245,7 +246,7 @@ class _DaySubTable(QTableWidget):
             self.setItem(ri, COL_RATE, item)
 
             # 5: 盈亏标签（合并收益率：盈 +2.4% / 亏 -1.3% / —）
-            pnl_text, pnl_signal = ProfitCalculatorLogic.get_pnl_label(
+            pnl_text, pnl_signal = get_pnl_label(
                 prev_warehouse, record.warehouse
             )
             pnl_bg = _pnl_color(pnl_signal)
