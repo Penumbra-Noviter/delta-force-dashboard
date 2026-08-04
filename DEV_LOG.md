@@ -8,12 +8,20 @@
 
 ## 滚动摘要（2026-08-04）
 
+- **打包**：K 系列主分支重新打包（`3efc77c`），`dist/收益计算器/` **64M**；**烟测通过**（exe 启动 8s 进程存活后终止，pid 17536；`.migrated` 10:20 重写证明启动路径完整、日志无异常）
 - **K 系列**：保存保留两位小数（`save_record` 存储前 `round` 银行家舍入，磁盘与视图金额一致）+ 汇总条并排双标签——新增 `cash_summary`/`format_cash_summary` 纯函数 + `_cash_summary_label`（最近 7/30 条现金总变化，随视图联动），详见日志正文
 - **测试**：pytest **253/253** ✅（K 系列 +16：rounding 回归 3 + cash_summary 行为 6 + format_cash_summary 6 + UI 双标签联动 1；237+16）
 
 ---
 
 ## 日志正文
+
+### 2026-08-04 | 打包 | K 系列重新打包（3efc77c）+ 烟测通过
+- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/收益计算器/` **64M**（exe 6.56MB + `_internal/`）；K 系列改动（`calculator.py`/`app/main_window.py`）编译入 PYZ
+- 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
+- 烟测：exe 启动 8s 进程存活后终止 ✅（pid 17536，常驻 ~200MB；`.migrated` 10:20:04 重写证明启动路径完整、日志无异常）
+- release 资产未更新（用户未指示；如需更新 `default.zip` 另行执行）
 
 ### 2026-08-04 | 实现 | K-01 保存保留两位小数 + K-02 现金总变化展示
 - 需求：用户「修改数据保存逻辑：保留两位小数」+「最近7条/30条总盈亏旁边加一条最近现金7条/30条总变化」（并行 fan-out 3 子代理，前两个分别完成、第三个评审——两实现子代理因基础设施 API 错误（`reasoning_content` 回传校验）在落盘代码后中断，由主会话接手补测试/评审/文档闭环）
