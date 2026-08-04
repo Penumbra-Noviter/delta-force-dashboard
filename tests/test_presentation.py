@@ -171,22 +171,22 @@ def test_format_saved_indicator_with_rotation_hint():
 def test_pnl_label_profit():
     label, signal = get_pnl_label(400.0, 420.0)
     assert label == "盈"
-    assert signal == PnLSignal.盈
+    assert signal == PnLSignal.PROFIT
 
 
 def test_pnl_label_loss():
     label, signal = get_pnl_label(400.0, 380.0)
     assert label == "亏"
-    assert signal == PnLSignal.亏
+    assert signal == PnLSignal.LOSS
 
 
 def test_pnl_label_no_change():
     label, signal = get_pnl_label(400.0, 400.0)
     assert label == "—"
-    assert signal == PnLSignal.平
+    assert signal == PnLSignal.NEUTRAL
 
 
 def test_pnl_label_no_prev():
     label, signal = get_pnl_label(None, 420.0)
     assert label == "—"
-    assert signal == PnLSignal.无
+    assert signal == PnLSignal.NONE

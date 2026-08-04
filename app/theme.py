@@ -139,13 +139,13 @@ def get_color(key: str) -> str:
 # 具体色值在调用 get_color() 时实时解析，避免 import 期冻结（C1）。
 _SIGNAL_TO_KEY: dict[RateSignal | PnLSignal, str] = {
     RateSignal.POSITIVE: "FG_POS",
-    PnLSignal.盈: "FG_POS",
+    PnLSignal.PROFIT: "FG_POS",
     RateSignal.NEGATIVE: "FG_NEG",
-    PnLSignal.亏: "FG_NEG",
+    PnLSignal.LOSS: "FG_NEG",
     RateSignal.NEUTRAL: "FG_MUTED",
-    PnLSignal.平: "FG_MUTED",
+    PnLSignal.NEUTRAL: "FG_MUTED",
     RateSignal.NONE: "FG_MUTED",
-    PnLSignal.无: "FG_MUTED",
+    PnLSignal.NONE: "FG_MUTED",
 }
 
 
@@ -167,6 +167,51 @@ def summary_style(signal: RateSignal) -> str:
     if signal is RateSignal.NONE:
         return f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
     return f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
+
+
+def button_style(role: str) -> str:
+    """按角色返回按钮 QSS 样式字符串（运行时解析，避免 import 期冻结）。
+
+    角色：
+    - ``edit_save``：编辑模式保存按钮（BTN_BG 色）
+    - ``danger``：取消复用/危险操作按钮（DANGER_BG 色）
+    """
+    if role == "edit_save":
+        bg = get_color("BTN_BG")
+        fg = get_color("BTN_FG")
+        hover_bg = get_color("BTN_BG_HOVER")
+        return (
+            f"QPushButton#saveBtn {{"
+            f"background-color: {bg};"
+            f"color: {fg};"
+            f"padding: 8px 28px;"
+            f"font-weight: bold;"
+            f"}}"
+            f"QPushButton#saveBtn:hover {{"
+            f"background-color: {hover_bg};"
+            f"}}"
+        )
+    if role == "danger":
+        bg = get_color("DANGER_BG")
+        fg = get_color("DANGER_FG")
+        border = get_color("DANGER_BORDER")
+        hover_bg = get_color("DANGER_HOVER_BG")
+        return (
+            f"QPushButton {{"
+            f"background-color: {bg};"
+            f"color: {fg};"
+            f"border: 1px solid {border};"
+            f"border-radius: 5px;"
+            f"padding: 6px 14px;"
+            f"font-size: 11px;"
+            f"font-weight: bold;"
+            f"}}"
+            f"QPushButton:hover {{"
+            f"background-color: {hover_bg};"
+            f"color: #ffffff;"
+            f"}}"
+        )
+    return ""
 
 
 def generate_qss(theme_name: str) -> str:

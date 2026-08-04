@@ -268,6 +268,18 @@ class ChartWidget(QWidget):
         label_color = get_color("CHART_AXIS")
         grid_color = get_color("CHART_GRID")
 
+        self._create_axes_and_viewbox(w_color, c_color, chart_bg, grid_color)
+        self._create_curves(x, warehouse_vals, cash_vals, w_color, c_color)
+        self._apply_axis_ranges(warehouse_vals, cash_vals, dates)
+        self._create_legend(label_color)
+        self._create_hover_labels(w_color, c_color, chart_bg, label_color)
+        self._setup_context_menu()
+        self._bind_hover_signal()
+
+    def _create_axes_and_viewbox(
+        self, w_color: str, c_color: str, chart_bg: str, grid_color: str
+    ) -> None:
+        """创建左右轴 + PlotWidget + 双 ViewBox + 几何同步。"""
         # ── 左右轴 ──
         left_axis = KMBAxisItem(orientation="left")
         left_axis.setLabel(self._LEFT_SERIES["label"], color=w_color)
@@ -288,9 +300,7 @@ class ChartWidget(QWidget):
         p1.getAxis("bottom").setPen(pg.mkPen(color=grid_color))
         self._plot_item = p1
 
-        # 网格策略（G-02 修正）：双 Y 轴各自量纲、刻度高低交错，任何一条水平
-        # 网格都会与另一轴刻度叠成「百叶窗/蓖齿」密集纹理。故三轴全部关闭网格，
-        # 只靠左右轴刻度标签承当读数参考——曲线最干净，轴线本身已指明趋势方向。
+        # 网格策略（G-02 修正）：双 Y 轴关闭全部网格，只靠标签承当读数参考
         p1.getAxis("left").setGrid(False)
         p1.getAxis("right").setGrid(False)
         p1.getAxis("bottom").setGrid(False)
@@ -302,7 +312,6 @@ class ChartWidget(QWidget):
         p2.setXLink(p1)
 
         def _sync() -> None:
-            # resize 时副 ViewBox 必须跟随主 ViewBox 几何，否则两线 x 错位（ADR-0002 坑位）
             if p1.vb is None:
                 return
             p2.setGeometry(p1.vb.sceneBoundingRect())
@@ -311,6 +320,13 @@ class ChartWidget(QWidget):
         p1.vb.sigResized.connect(_sync)
         _sync()
         self._right_vb = p2
+
+    def _create_curves(
+        self, x, warehouse_vals, cash_vals, w_color: str, c_color: str
+    ) -> None:
+        """创建仓库和现金曲线 + 末端端点标签。"""
+        p1 = self._plot_item
+        p2 = self._right_vb
 
         # ── 仓库序列（主 ViewBox / 左轴）──
         self._warehouse_curve = pg.PlotCurveItem(
@@ -344,17 +360,28 @@ class ChartWidget(QWidget):
         self._cash_endpoint.setPos(x[-1], cash_vals[-1])
         p2.addItem(self._cash_endpoint)
 
-        # ── Y 轴自适应（各自量纲）+ X 轴日期刻度 ──
-        p1.setYRange(*adaptive_range(warehouse_vals))
-        p2.setYRange(*adaptive_range(cash_vals))
-        p1.getAxis("bottom").setTicks([list(enumerate(dates))])
+    def _apply_axis_ranges(
+        self, warehouse_vals, cash_vals, dates
+    ) -> None:
+        """设置 Y 轴自适应范围 + X 轴日期刻度。"""
+        self._plot_item.setYRange(*adaptive_range(warehouse_vals))
+        self._right_vb.setYRange(*adaptive_range(cash_vals))
+        self._plot_item.getAxis("bottom").setTicks([list(enumerate(dates))])
 
-        # ── 图例（副 ViewBox 项目不会自动注册到主 PlotItem 图例，需显式 addItem）──
+    def _create_legend(self, label_color: str) -> None:
+        """创建图例（副 ViewBox 项目需显式 addItem）。"""
+        p1 = self._plot_item
         legend = p1.addLegend(offset=(10, 10), labelTextColor=label_color)
         legend.addItem(self._warehouse_curve, self._LEFT_SERIES["legend_name"])
         legend.addItem(self._cash_curve, self._RIGHT_SERIES["legend_name"])
 
-        # ── hover 竖线 + 双数值标签（各自坐标系，随各自曲线）──
+    def _create_hover_labels(
+        self, w_color: str, c_color: str, chart_bg: str, label_color: str
+    ) -> None:
+        """创建 hover 竖线 + 双数值标签（各自坐标系，随各自曲线）。"""
+        p1 = self._plot_item
+        p2 = self._right_vb
+
         self._vline = pg.InfiniteLine(
             angle=90, movable=False,
             pen=pg.mkPen(color=label_color, width=1, style=Qt.PenStyle.DashLine),
@@ -372,12 +399,11 @@ class ChartWidget(QWidget):
         self._hover_views = [p1.vb, p2]
         self._hover_series = [self._LEFT_SERIES, self._RIGHT_SERIES]
 
-        # ── 右键菜单 ──
-        self._setup_context_menu()
-
-        # ── hover 信号绑定 ──
+    def _bind_hover_signal(self) -> None:
+        """绑定 hover 鼠标移动信号。"""
         self._proxy = pg.SignalProxy(
-            p1.scene().sigMouseMoved, rateLimit=60, slot=self._on_mouse_moved
+            self._plot_item.scene().sigMouseMoved,
+            rateLimit=60, slot=self._on_mouse_moved,
         )
 
     def _update_data(self, x, warehouse_vals, cash_vals, dates) -> None:

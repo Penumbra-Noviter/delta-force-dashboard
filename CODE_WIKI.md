@@ -180,7 +180,7 @@ Profit Calculator/
 
 ---
 
-### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~359 行<!--/AUTO-->）
+### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~334 行<!--/AUTO-->）
 
 #### 类：`MoneyLineEdit(QLineEdit)`
 
@@ -268,7 +268,7 @@ MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均�
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~498 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~522 行<!--/AUTO-->）
 
 #### 函数：`adaptive_range(values)`
 
@@ -326,7 +326,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~378 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~420 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 

@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.theme import get_color
+from app.theme import button_style, get_color
 from calculator import ProfitCalculatorLogic
 from formatting import (
     format_input_value,
@@ -282,18 +282,7 @@ class InputPanel(QWidget):
         self.warehouse_entry.set_value(f"{warehouse:.2f}")
 
         self.save_btn.setText(f"更新数据（{format_short_date(date_str)}）")
-        edit_color = get_color("BTN_BG")
-        self.save_btn.setStyleSheet(f"""
-            QPushButton#saveBtn {{
-                background-color: {edit_color};
-                color: {get_color("BTN_FG")};
-                padding: 8px 28px;
-                font-weight: bold;
-            }}
-            QPushButton#saveBtn:hover {{
-                background-color: {get_color("BTN_BG_HOVER")};
-            }}
-        """)
+        self.save_btn.setStyleSheet(button_style("edit_save"))
         self.cancel_edit_btn.show()
         self.reuse_btn.hide()
         self.saved_indicator.setText("")
@@ -336,21 +325,7 @@ class InputPanel(QWidget):
         self._reusing = True
         self.reuse_btn.setText("取消复用")
         self.reuse_btn.setToolTip("清除已复用的数据")
-        self.reuse_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {get_color('DANGER_BG')};
-                color: {get_color('DANGER_FG')};
-                border: 1px solid {get_color('DANGER_BORDER')};
-                border-radius: 5px;
-                padding: 6px 14px;
-                font-size: 11px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {get_color('DANGER_HOVER_BG')};
-                color: #ffffff;
-            }}
-        """)
+        self.reuse_btn.setStyleSheet(button_style("danger"))
 
     def cancel_reuse(self) -> None:
         """退出复用模式，恢复按钮为「复用昨日」。"""

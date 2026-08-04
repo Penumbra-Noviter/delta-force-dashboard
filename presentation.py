@@ -123,9 +123,9 @@ def get_pnl_label(
     UI 层应将信号映射为当前主题颜色。
     """
     if prev_warehouse is None:
-        return "—", PnLSignal.无
+        return "—", PnLSignal.NONE
     if current_warehouse > prev_warehouse:
-        return "盈", PnLSignal.盈
+        return "盈", PnLSignal.PROFIT
     if current_warehouse < prev_warehouse:
-        return "亏", PnLSignal.亏
-    return "—", PnLSignal.平
+        return "亏", PnLSignal.LOSS
+    return "—", PnLSignal.NEUTRAL

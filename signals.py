@@ -26,7 +26,7 @@ class RateSignal(Enum):
 
 class PnLSignal(Enum):
     """盈亏信号枚举——UI 层根据信号映射颜色。"""
-    盈 = "profit"
-    亏 = "loss"
-    平 = "neutral"
-    无 = "none"
+    PROFIT = "profit"
+    LOSS = "loss"
+    NEUTRAL = "neutral"
+    NONE = "none"
