@@ -6,9 +6,24 @@
 
 ---
 
-## 滚动摘要（2026-08-03）
+## 滚动摘要（2026-08-04）
 
-- **J 系列**：记录保留上限 7→30（`RETENTION_LIMIT`）+ 视图 7/30 可切换（`TableWidget` 按钮组 + `view_changed` 信号），存储与视图解耦、切回 7 不丢数据；ADR-0003 落档，详见日志正文
+- **K 系列**：保存保留两位小数（`save_record` 存储前 `round` 银行家舍入，磁盘与视图金额一致）+ 汇总条并排双标签——新增 `cash_summary`/`format_cash_summary` 纯函数 + `_cash_summary_label`（最近 7/30 条现金总变化，随视图联动），详见日志正文
+- **测试**：pytest **253/253** ✅（K 系列 +16：rounding 回归 3 + cash_summary 行为 6 + format_cash_summary 6 + UI 双标签联动 1；237+16）
+
+---
+
+## 日志正文
+
+### 2026-08-04 | 实现 | K-01 保存保留两位小数 + K-02 现金总变化展示
+- 需求：用户「修改数据保存逻辑：保留两位小数」+「最近7条/30条总盈亏旁边加一条最近现金7条/30条总变化」（并行 fan-out 3 子代理，前两个分别完成、第三个评审——两实现子代理因基础设施 API 错误（`reasoning_content` 回传校验）在落盘代码后中断，由主会话接手补测试/评审/文档闭环）
+- **K-01（数据精度）**：`ProfitCalculatorLogic.save_record` 存储前 `round(cash, 2)`/`round(warehouse, 2)`（Python 银行家舍入，docstring 注明；不变式告警改用舍入后值，保证告警与落盘一致）；磁盘 `serialize()` 输出随之为 2 位小数
+- **K-02（UI 双标签）**：`cash_summary(days)`（镜像 `summary` 的现金版：最新−最旧现金，同窗口语义）+ `format_cash_summary(count, delta, days)`（镜像 `format_summary`，前缀「最近N条现金总变化：」）；`MainWindow` 汇总条改 QHBoxLayout 并排双标签（`_summary_label` 总盈亏 + `_cash_summary_label` 现金总变化），`_update_summary` 双写文本+信号→颜色，随视图 7/30 联动
+- 测试：`test_calculator.py` +15（rounding 回归 3：两位小数/银行家舍入/浮点表示；cash_summary 6：空/单条/正/负/零/超窗截断；format_cash_summary 6：空/单条/正/负/零/days 参数化）、`test_ui_smoke.py` +1（双标签随 7/30 联动）；全量 253/253 ✅
+- 文档：CODE_WIKI 方法表补 `cash_summary`/`format_cash_summary` 行 + `save_record` 说明注舍入；README/CODE_WIKI/PROJECT_REFERENCE 测试数 237→253；TO-TICKETS K 系列归档；doc_sync --check 通过（机械标记 6 处刷新）
+- 注：K-02 复用 D-07 纯函数模式（文本+信号由 logic 生成、样式留 UI），与既有 `summary`/`format_summary` 完全镜像，无新增跨层依赖
+
+### 2026-08-03 | 打包 | 洁癖收尾：布局修复版重新打包 + release 更新（烟测通过）
 - **打包**：主分支重新打包（J-01/J-02 后），`dist/收益计算器/` 64M；**未烟测**（用户指示本次不启动 exe 验证，详见日志正文）
 - **打包**：洁癖收尾补布局修复版（`e261685`）重新打包 + GitHub release 资产替换为 `default.zip`（烟测通过，详见日志正文）
 - **测试**：pytest **237/237** ✅（2026-08-03 J 系列视图切换 UI 用例 +3、summary/format_summary 参数化纯函数 +2）

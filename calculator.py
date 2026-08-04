@@ -80,15 +80,21 @@ class ProfitCalculatorLogic:
 
         业务层不强制「现金 ⊆ 仓库」不变式（允许保留已录入的异常数据并继续展示），
         仅对违反不变式的写入记录 warning——拦截由 UI 层 save_today 负责（O-08）。
+        存储前统一把现金/仓库四舍五入到 2 位小数（round 为银行家舍入），
+        保证磁盘与视图金额一致。
         """
-        if not self.is_cash_under_warehouse(cash, warehouse):
+        rounded_cash = round(cash, 2)
+        rounded_warehouse = round(warehouse, 2)
+        if not self.is_cash_under_warehouse(rounded_cash, rounded_warehouse):
             logger.warning(
                 "记录违反不变式（现金 %.2f > 仓库 %.2f，date=%s）",
-                cash,
-                warehouse,
+                rounded_cash,
+                rounded_warehouse,
                 date_str,
             )
-        record = DayRecord(cash=cash, warehouse=warehouse, date=date_str)
+        record = DayRecord(
+            cash=rounded_cash, warehouse=rounded_warehouse, date=date_str
+        )
         self.data[date_str] = record
         return record
 
@@ -208,6 +214,46 @@ class ProfitCalculatorLogic:
         if count == 1:
             return f"{prefix}{format_money(total)}（仅 1 条记录）", RateSignal.NONE
         total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total)
+        return f"{prefix}{total_text}", total_signal
+
+    def cash_summary(self, days: int = WEEK_DAYS) -> tuple[int, float | None]:
+        """计算最近 days 条实际录入记录的现金总变化。
+
+        与 summary() 完全镜像、基于记录现金（cash）而非仓库值（warehouse）：
+        反映窗口内「可支配现金」的净增减。
+
+        返回 (记录数, 现金变化金额)：
+        - 记录数 >= 2：现金变化 = 最新记录现金 − 最旧记录现金；
+        - 记录数 == 1：现金变化为该条现金值（无对比对象，供视图提示「仅 1 条记录」）；
+        - 记录数 == 0：现金变化为 None。
+        """
+        records = self.recent_records(days)
+        if not records:
+            return 0, None
+        if len(records) == 1:
+            return 1, records[0][1].cash
+        return len(records), records[-1][1].cash - records[0][1].cash
+
+    @staticmethod
+    def format_cash_summary(
+        count: int, total_delta: float | None, days: int = WEEK_DAYS
+    ) -> tuple[str, RateSignal]:
+        """现金汇总标签展示文本的纯函数：按记录数与现金变化返回 (文本, 信号)。
+
+        与 format_summary() 完全镜像（录入条数基准；D-07 文本/样式分离）：
+        - count == 0（total_delta 为 None）：`最近N条现金总变化：数据不足`，信号 NONE；
+        - count == 1：`最近N条现金总变化：¥X（仅 1 条记录）`，信号 NONE
+          （现金值非趋势，不加 + 前缀）；
+        - count >= 2：复用 format_signed_money（带符号、趋势信号）。
+
+        UI 层把信号映射为当前主题颜色（app.theme.signal_color）。
+        """
+        prefix = f"最近{days}条现金总变化："
+        if total_delta is None:
+            return f"{prefix}数据不足", RateSignal.NONE
+        if count == 1:
+            return f"{prefix}{format_money(total_delta)}（仅 1 条记录）", RateSignal.NONE
+        total_text, total_signal = ProfitCalculatorLogic.format_signed_money(total_delta)
         return f"{prefix}{total_text}", total_signal
 
     @staticmethod

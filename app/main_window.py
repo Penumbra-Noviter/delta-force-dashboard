@@ -235,13 +235,26 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(input_card)
         root_layout.addSpacing(8)
 
-        # ── 7日汇总条 ──
+        # ── 汇总条（并排双标签：总盈亏 / 现金总变化）──
+        summary_row = QHBoxLayout()
+        summary_row.setContentsMargins(0, 0, 0, 0)
+        summary_row.setSpacing(16)
+
         self._summary_label = QLabel("")
         self._summary_label.setObjectName("summaryLabel")
         self._summary_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
         )
-        root_layout.addWidget(self._summary_label)
+        summary_row.addWidget(self._summary_label, 1)
+
+        self._cash_summary_label = QLabel("")
+        self._cash_summary_label.setObjectName("cashSummaryLabel")
+        self._cash_summary_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        summary_row.addWidget(self._cash_summary_label, 1)
+
+        root_layout.addLayout(summary_row)
         root_layout.addSpacing(6)
 
         # ── 表格（卡片容器）──
@@ -580,8 +593,10 @@ class MainWindow(QMainWindow):
     def _update_summary(self) -> None:
         """读取 logic 的最近记录汇总（按录入条数），并格式化为标签展示。
 
-        D-07：文本与信号由 format_summary 纯函数生成，本方法只做
-        信号→颜色映射与样式落地（颜色映射留 UI）。
+        D-07：文本与信号由 format_summary / format_cash_summary 纯函数生成，
+        本方法只做信号→颜色映射与样式落地（颜色映射留 UI）。
+        总盈亏（_summary_label）与现金总变化（_cash_summary_label）并排双标签，
+        同源 recent_records(_view_n)，随视图 7/30 联动。
         """
         count, total = self.logic.summary(self._view_n)
         text, signal = ProfitCalculatorLogic.format_summary(count, total, self._view_n)
@@ -596,3 +611,18 @@ class MainWindow(QMainWindow):
                 f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
             )
         self._summary_label.setStyleSheet(style)
+
+        cash_count, cash_delta = self.logic.cash_summary(self._view_n)
+        cash_text, cash_signal = ProfitCalculatorLogic.format_cash_summary(
+            cash_count, cash_delta, self._view_n
+        )
+        self._cash_summary_label.setText(cash_text)
+        if cash_signal is RateSignal.NONE:
+            cash_style = (
+                f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
+            )
+        else:
+            cash_style = (
+                f"color: {signal_color(cash_signal)}; font-size: 13px; font-weight: bold;"
+            )
+        self._cash_summary_label.setStyleSheet(cash_style)

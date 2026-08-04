@@ -707,3 +707,17 @@ def test_view_switch_back_to_7_keeps_storage(view_switch_window):
     assert rows == 7
     assert len(win.logic.data) == 30      # 存储不丢
     assert "最近7条" in win._summary_label.text()
+
+
+def test_cash_summary_label_follows_view(view_switch_window):
+    """现金总变化标签随视图 7/30 联动，与总盈亏标签并排渲染。"""
+    win = view_switch_window
+    assert hasattr(win, "_cash_summary_label")  # 双标签就位（总盈亏旁边）
+
+    win.refresh_display()
+    assert "最近7条" in win._summary_label.text()
+    assert "最近7条现金总变化" in win._cash_summary_label.text()
+
+    btn30 = next(b for b in win.table._view_buttons if b.property("days") == 30)
+    btn30.click()
+    assert "最近30条现金总变化" in win._cash_summary_label.text()

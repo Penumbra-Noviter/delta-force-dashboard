@@ -124,6 +124,36 @@ def test_save_overwrite():
     logic.save_record("2026-07-20", 999.0, 111.0)
     assert logic.serialize()["2026-07-20"]["cash"] == 999.0
 
+
+def test_save_rounds_cash_and_warehouse_to_two_decimals():
+    """保存时现金/仓库四舍五入到 2 位小数，模型与 serialize 均为舍入值。"""
+    logic = ProfitCalculatorLogic({})
+    record = logic.save_record("2026-07-20", 100.126, 200.999)
+    assert record.cash == 100.13
+    assert record.warehouse == 201.0
+    serialized = logic.serialize()["2026-07-20"]
+    assert serialized["cash"] == 100.13
+    assert serialized["warehouse"] == 201.0
+
+
+def test_save_round_follows_bankers_rounding():
+    """round 为银行家舍入：精确 2 位小数边界取偶数（0.125→0.12、0.375→0.38）。"""
+    logic = ProfitCalculatorLogic({})
+    record = logic.save_record("2026-07-21", 0.125, 0.375)
+    assert record.cash == 0.12
+    assert record.warehouse == 0.38
+    assert logic.serialize()["2026-07-21"]["cash"] == 0.12
+    assert logic.serialize()["2026-07-21"]["warehouse"] == 0.38
+
+
+def test_save_round_matches_float_representation():
+    """浮点表示语义：2.675 实际存为 2.6749…，round 后为 2.67（与 Python 行为一致）。"""
+    logic = ProfitCalculatorLogic({})
+    record = logic.save_record("2026-07-22", 2.675, 2.5)
+    assert record.cash == 2.67
+    assert record.warehouse == 2.5
+    assert logic.serialize()["2026-07-22"]["cash"] == 2.67
+
 def test_save_record_logs_warning_when_cash_exceeds_warehouse(caplog):
     """业务层不拦截异常记录（允许保留展示），仅记录 warning（O-08）。"""
     logic = ProfitCalculatorLogic({})
@@ -593,6 +623,114 @@ def test_summary_days_parameterized_window():
     count_30, _ = logic.summary(30)
     assert count_7 == 7
     assert count_30 == 30
+
+# ── ProfitCalculatorLogic.cash_summary ──────────────
+
+def test_cash_summary_empty():
+    """无记录时返回 (0, None)。"""
+    logic = ProfitCalculatorLogic({})
+    count, total = logic.cash_summary()
+    assert count == 0
+    assert total is None
+
+
+def test_cash_summary_single_record():
+    """仅一条记录时返回该条现金值。"""
+    logic = ProfitCalculatorLogic({"2026-07-20": {"cash": 300.0, "warehouse": 500.0}})
+    count, total = logic.cash_summary()
+    assert count == 1
+    assert total == 300.0
+
+
+def test_cash_summary_multiple_records():
+    """现金总变化 = 最新记录现金 − 最旧记录现金。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
+            "2026-07-18": {"cash": 250.0, "warehouse": 700.0},
+        }
+    )
+    count, total = logic.cash_summary()
+    assert count == 2
+    assert total == 150.0
+
+
+def test_cash_summary_negative():
+    """现金下降时总变化为负（仓库上升但现金减少）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 300.0, "warehouse": 400.0},
+            "2026-07-18": {"cash": 100.0, "warehouse": 700.0},
+        }
+    )
+    count, total = logic.cash_summary()
+    assert count == 2
+    assert total == -200.0
+
+
+def test_cash_summary_zero():
+    """最新与最旧现金相等时总变化为 0。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-14": {"cash": 100.0, "warehouse": 400.0},
+            "2026-07-18": {"cash": 100.0, "warehouse": 400.0},
+        }
+    )
+    count, total = logic.cash_summary()
+    assert count == 2
+    assert total == 0.0
+
+
+def test_cash_summary_caps_to_recent_days():
+    """超过上限时只统计最近 days 条记录（与 summary 同窗口语义）。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-01": {"cash": 999.0, "warehouse": 999.0},
+            **{f"2026-07-{d:02d}": {"cash": 100.0 + d, "warehouse": 200.0 + d} for d in range(10, 18)},
+        }
+    )
+    count, total = logic.cash_summary()
+    assert count == 7
+    assert total == 6.0  # 07-11~07-17 现金 111→117（差 6），07-01 不在最近 7 条内
+
+
+def test_format_cash_summary_empty():
+    """无记录（count 0）：数据不足提示，信号 NONE。"""
+    text, signal = ProfitCalculatorLogic.format_cash_summary(0, None)
+    assert text == "最近7条现金总变化：数据不足"
+    assert signal == RateSignal.NONE
+
+
+def test_format_cash_summary_single_record_no_plus_prefix():
+    """仅 1 条记录：现金值非趋势，不加 + 前缀，信号 NONE。"""
+    text, signal = ProfitCalculatorLogic.format_cash_summary(1, 300.0)
+    assert text == "最近7条现金总变化：¥300.00（仅 1 条记录）"
+    assert signal == RateSignal.NONE
+
+
+def test_format_cash_summary_positive():
+    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 150.0)
+    assert text == "最近7条现金总变化：+¥150.00"
+    assert signal == RateSignal.POSITIVE
+
+
+def test_format_cash_summary_negative():
+    text, signal = ProfitCalculatorLogic.format_cash_summary(2, -200.0)
+    assert text == "最近7条现金总变化：¥-200.00"
+    assert signal == RateSignal.NEGATIVE
+
+
+def test_format_cash_summary_zero():
+    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 0.0)
+    assert text == "最近7条现金总变化：¥0.00"
+    assert signal == RateSignal.NEUTRAL
+
+
+def test_format_cash_summary_days_parameterized():
+    """J 系列：format_cash_summary 的「最近N条」前缀随 days 参数走。"""
+    text, signal = ProfitCalculatorLogic.format_cash_summary(2, 150.0, days=30)
+    assert text == "最近30条现金总变化：+¥150.00"
+    assert signal == RateSignal.POSITIVE
 
 
 def test_export_csv_empty():

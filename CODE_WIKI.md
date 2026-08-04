@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列全部完成）  
 > 生成日期：2026-08-03  
-> 测试状态：237 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
+> 测试状态：253 项 pytest 全部通过（含 UI 烟测，C5 迁移后 verify_all.py 已删除）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（237 项） |
+| 测试框架 | pytest（253 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -101,14 +101,14 @@ Profit Calculator/
 │   └── install-hooks.bat    ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── tests/
 │   ├── __init__.py
-│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->76<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
+│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + 带符号金额 D-01 + serialize/加载时过滤 D-03 + 不变式/汇总/指示器纯函数 D-05/06/07 + 跳过记录 warning）
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
-│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->27<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -139,7 +139,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~505 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~531 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -338,7 +338,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~294 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~334 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -354,7 +354,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 |------|------|------|------|
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.__init__-->`__init__`<!--/AUTO--> | `data: dict` | — | 解析并持有 `dict[str, DayRecord]`（兼容裸 dict / 已解析 dict；加载时跳过损坏条目并记 warning，ADR-0001——下次保存不再写回，自愈清除） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.get_record-->`get_record`<!--/AUTO--> | `date_str: str` | `DayRecord \| None` | 一行查询；不存在返回 None（非法条目已由加载时解析过滤） |
-| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.save_record-->`save_record`<!--/AUTO--> | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.save_record-->`save_record`<!--/AUTO--> | `date_str, cash, warehouse` | `DayRecord` | 保存某日记录（内部存 DayRecord 实例）；cash/warehouse 存储前舍入到 2 位小数（round，银行家舍入） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.serialize-->`serialize`<!--/AUTO--> | — | `dict` | 转磁盘持久化形态裸 dict（`{日期: {cash, warehouse}}`）；返回**新 dict**，与内部 data 断共享（ADR-0001） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.last_record_before-->`last_record_before`<!--/AUTO--> | `date_str, max_days=365` | `(str, DayRecord) \| None` | 向前回溯最近有效记录（跳过空/无效日） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.recent_records-->`recent_records`<!--/AUTO--> | `days=7` | `list[(str, DayRecord)]` | 最近 days 条实际录入记录（录入条数语义，无空位占位），按日期升序 |
@@ -363,6 +363,8 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_signed_money-->`format_signed_money`<!--/AUTO--> | `value: float \| None` | `(str, str)` | 带符号金额（较前日差值/总盈亏）：正数 `+¥…`、负数 `¥-…`、零 `¥0.00` 无前缀、None `—`（D-01） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.is_cash_under_warehouse-->`is_cash_under_warehouse`<!--/AUTO--> | `cash, warehouse` | `bool` | 现金⊆仓库不变式判定（唯一所有者 D-05，告警/拦截/红框三处共用） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_summary-->`format_summary`<!--/AUTO--> | `count, total, days=7` | `(str, str)` | 汇总标签文本纯函数（D-07）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.cash_summary-->`cash_summary`<!--/AUTO--> | `days=7` | `(int, float \| None)` | 最近 days 条记录现金总变化（最新−最旧现金，与 summary 同窗口语义，随视图 7/30 联动） |
+| <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_cash_summary-->`format_cash_summary`<!--/AUTO--> | `count, total_delta, days=7` | `(str, str)` | 现金汇总标签文本纯函数（镜像 format_summary）：数据不足/仅 1 条→NONE，≥2 条走 format_signed_money |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.format_saved_indicator-->`format_saved_indicator`<!--/AUTO--> | `save_date, warehouse, today, deleted, keep_days=30` | `str` | 保存成功指示器文本纯函数（今日/已更新 + 轮转清理提示，D-07/J 系列） |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.get_pnl_label-->`get_pnl_label`<!--/AUTO--> | `prev_warehouse, current_warehouse` | `(str, str)` | 判断盈亏标签和颜色 |
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.delete_record-->`delete_record`<!--/AUTO--> | `date_str: str` | `bool` | 删除单日记录，不存在返回 False |
@@ -581,7 +583,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->76<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->91<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
@@ -597,7 +599,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->27<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
