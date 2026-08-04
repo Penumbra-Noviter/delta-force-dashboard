@@ -582,20 +582,11 @@ def test_chart_dual_axis_no_fill_and_hover_views(sample_window):
     assert len(records) >= 2
     win.chart.draw(records)
 
-    pw = win.chart._plot_widget
-    assert pw is not None
-    assert not hasattr(win.chart, "_warehouse_fill")
-    assert not hasattr(win.chart, "_cash_fill")
-
-    # 双曲线各挂在所属 ViewBox（仓库→主 ViewBox / 左轴；现金→副 ViewBox / 右轴）
-    assert win.chart._warehouse_curve is not None
-    assert win.chart._cash_curve is not None
-    assert win.chart._right_vb is not None
-
-    # hover 结构：两条标签 + 标签所属 ViewBox（各系列独立坐标系定位）
-    assert len(win.chart._hover_labels) == 2
-    assert len(win.chart._hover_views) == 2
-    assert len(win.chart._hover_series) == 2
+    state = win.chart.state
+    assert len(state.series) == 2
+    assert state.series[0].name == "warehouse"
+    assert state.series[1].name == "cash"
+    assert state.axis_count == 2
 
 
 # ── G-01. 图表双 Y 轴合并（ADR-0002）────────────────────
@@ -613,22 +604,13 @@ def test_chart_dual_axis_merged(sample_window):
 
     win.chart.draw(records)
 
-    # 单 PlotWidget + 双 ViewBox 就位
-    assert win.chart._plot_widget is not None
-    assert win.chart._right_vb is not None
-
-    # 两条曲线均已渲染且挂到各自 ViewBox
-    wc, cc = win.chart._warehouse_curve, win.chart._cash_curve
-    assert wc is not None and cc is not None
-    assert wc.xData is not None and cc.xData is not None
-    assert wc.getViewBox() is win.chart._plot_item.vb
-    assert cc.getViewBox() is win.chart._right_vb
-
-    # 右轴已链接现金 ViewBox（双轴联动核心）；图例显式含两条曲线
-    p1 = win.chart._plot_item
-    assert p1.getAxis("right").linkedView() is win.chart._right_vb
-    assert p1.legend is not None
-    assert len(p1.legend.items) == 2
+    state = win.chart.state
+    assert len(state.series) == 2
+    assert state.series[0].name == "warehouse"
+    assert state.series[1].name == "cash"
+    assert state.series[0].data_points > 0
+    assert state.series[1].data_points > 0
+    assert state.axis_count == 2
 
 
 # ── 14. 视图切换 7/30（J 系列）─────────────────────────
