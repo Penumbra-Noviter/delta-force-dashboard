@@ -8,13 +8,17 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from config import DATA_FILE, _BACKUP_FILE as BACKUP_FILE
 from json_file import atomic_write_json
+from sqlite_store import SQLiteDataStore
+
+T = TypeVar("T", bound=dict)
 
 __all__ = [
     "DataStore",
+    "SQLiteDataStore",
     "MIGRATED_MARKER_NAME",
     "migrate_legacy_data",
     "log_legacy_cleanup_hint",
@@ -92,7 +96,7 @@ def log_legacy_cleanup_hint(legacy_dir: Path, target_dir: Path) -> None:
     )
 
 
-class DataStore:
+class DataStore(Generic[T]):
     """
     基于本地 JSON 文件的数据存储。
 
@@ -113,7 +117,7 @@ class DataStore:
 
     # ── 公开接口 ────────────────────────────────────────
 
-    def load(self) -> dict[str, Any]:
+    def load(self) -> T:
         """加载数据；主文件损坏时尝试从备份恢复。"""
         data = self._try_load(self.data_file)
         if data is not None:
@@ -134,7 +138,7 @@ class DataStore:
 
         return {}
 
-    def save(self, data: dict[str, Any]) -> None:
+    def save(self, data: T) -> None:
         """保存数据并维护滚动备份。"""
         self._rotate_backups()
         self._atomic_write(data, self.data_file)

@@ -45,6 +45,7 @@ from app.theme import (
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
+from app.registry import AppWidget, WidgetRegistry
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -69,12 +70,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self, store: DataStore | None = None,
                  logic: ProfitCalculatorLogic | None = None,
-                 settings_store: SettingsStore | None = None) -> None:
+                 settings_store: SettingsStore | None = None,
+                 registry: WidgetRegistry | None = None) -> None:
         super().__init__()
 
         self.store = store or DataStore()
         self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
+        self._registry = registry or self._default_registry()
         self.today = datetime.now().strftime(DATE_FORMAT)
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
         self._view_n = VIEW_DAYS[0]
@@ -229,69 +232,9 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self._date_label)
         root_layout.addSpacing(12)
 
-        # ── 输入面板（卡片容器）──
-        input_card = self._build_card()
-        input_card_layout = QVBoxLayout(input_card)
-        input_card_layout.setContentsMargins(12, 10, 12, 10)
-        self.input_panel = InputPanel()
-        input_card_layout.addWidget(self.input_panel)
-        root_layout.addWidget(input_card)
-        root_layout.addSpacing(8)
+        # ── 注册的 widgets（输入面板、汇总条、表格、图表、提示栏）──
+        self._registry.build_all(root_layout, self)
 
-        # ── 汇总条（并排双标签：总盈亏 / 现金总变化）──
-        summary_row = QHBoxLayout()
-        summary_row.setContentsMargins(0, 0, 0, 0)
-        summary_row.setSpacing(16)
-
-        self._summary_label = QLabel("")
-        self._summary_label.setObjectName("summaryLabel")
-        self._summary_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        summary_row.addWidget(self._summary_label, 1)
-
-        self._cash_summary_label = QLabel("")
-        self._cash_summary_label.setObjectName("cashSummaryLabel")
-        self._cash_summary_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        summary_row.addWidget(self._cash_summary_label, 1)
-
-        root_layout.addLayout(summary_row)
-        root_layout.addSpacing(6)
-
-        # ── 表格（卡片容器）──
-        table_card = self._build_card()
-        table_card_layout = QVBoxLayout(table_card)
-        table_card_layout.setContentsMargins(12, 10, 12, 10)
-        self.table = TableWidget()
-        table_card_layout.addWidget(self.table)
-        # 表格为弹性区（stretch=1）：随窗口伸缩，为后续 7/30 天记录预留高度
-        root_layout.addWidget(table_card, 1)
-        root_layout.addSpacing(8)
-
-        # ── 图表（卡片容器，置底固定区间高度，不随窗口扩张）──
-        # 上限：PlotWidget 默认 sizeHint 480px，不设上限会吃掉整块纵向空间，
-        # 挤压表格（stretch=1）只剩 ~107px。卡在 [140, 220]，给表格让出空间。
-        chart_card = self._build_card()
-        chart_card_layout = QVBoxLayout(chart_card)
-        chart_card_layout.setContentsMargins(12, 10, 12, 10)
-        self.chart = ChartWidget()
-        self.chart.setMinimumHeight(140)
-        self.chart.setMaximumHeight(220)
-        chart_card_layout.addWidget(self.chart)
-        root_layout.addWidget(chart_card, 0)
-        root_layout.addSpacing(8)
-
-        # ── 底部提示栏 ──
-        self._hint_label = QLabel(
-            "Enter 保存 ｜ Ctrl+A 全选 ｜ Esc 清空 ｜ "
-            "支持 K/M/B 后缀（如 1.5K = 1,500）"
-        )
-        self._hint_label.setObjectName("hintLabel")
-        root_layout.addWidget(self._hint_label)
-
-        # 更新主题按钮文本
         self._update_theme_btn_text()
 
     def _build_card(self) -> QFrame:
@@ -319,13 +262,8 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _connect_signals(self) -> None:
-        self.input_panel.save_requested.connect(self.save_today)
-        self.input_panel.cancel_requested.connect(self._cancel_edit)
-        self.input_panel.reuse_requested.connect(self._reuse_last_record)
-        self.input_panel.reuse_cancel_requested.connect(self._cancel_reuse)
-        self.table.edit_requested.connect(self._start_edit)
-        self.table.delete_requested.connect(self._delete_record)
-        self.table.view_changed.connect(self._on_view_changed)
+        # Widget 信号（从 registry 连接）
+        self._registry.connect_all(self)
 
         # 键盘快捷键
         save_shortcut = QAction(self)
@@ -613,3 +551,106 @@ class MainWindow(QMainWindow):
         )
         self._cash_summary_label.setText(cash_text)
         self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
+
+    # ═══════════════════════════════════════════════════════
+    # 默认注册表
+    # ═══════════════════════════════════════════════════════
+
+    def _default_registry(self) -> WidgetRegistry:
+        """创建默认 widget 注册表（InputPanel + TableWidget + ChartWidget + 汇总 + 提示）。"""
+        registry = WidgetRegistry()
+
+        # ── InputPanel ──
+        input_panel = InputPanel()
+        self.input_panel = input_panel
+
+        def setup_input(root_layout, mw):
+            card = mw._build_card()
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.addWidget(input_panel)
+            root_layout.addWidget(card)
+            root_layout.addSpacing(8)
+
+        def connect_input(mw):
+            input_panel.save_requested.connect(mw.save_today)
+            input_panel.cancel_requested.connect(mw._cancel_edit)
+            input_panel.reuse_requested.connect(mw._reuse_last_record)
+            input_panel.reuse_cancel_requested.connect(mw._cancel_reuse)
+
+        registry.register(AppWidget(input_panel, setup_input, connect_input))
+
+        # ── 汇总条 ──
+        summary_widget = QWidget()
+        summary_layout = QHBoxLayout(summary_widget)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(16)
+
+        self._summary_label = QLabel("")
+        self._summary_label.setObjectName("summaryLabel")
+        self._summary_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        summary_layout.addWidget(self._summary_label, 1)
+
+        self._cash_summary_label = QLabel("")
+        self._cash_summary_label.setObjectName("cashSummaryLabel")
+        self._cash_summary_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
+        )
+        summary_layout.addWidget(self._cash_summary_label, 1)
+
+        def setup_summary(root_layout, mw):
+            root_layout.addWidget(summary_widget)
+            root_layout.addSpacing(6)
+
+        registry.register(AppWidget(summary_widget, setup_summary, None))
+
+        # ── TableWidget ──
+        table = TableWidget()
+        self.table = table
+
+        def setup_table(root_layout, mw):
+            table_card = mw._build_card()
+            tcl = QVBoxLayout(table_card)
+            tcl.setContentsMargins(12, 10, 12, 10)
+            tcl.addWidget(table)
+            root_layout.addWidget(table_card, 1)
+            root_layout.addSpacing(8)
+
+        def connect_table(mw):
+            table.edit_requested.connect(mw._start_edit)
+            table.delete_requested.connect(mw._delete_record)
+            table.view_changed.connect(mw._on_view_changed)
+
+        registry.register(AppWidget(table, setup_table, connect_table))
+
+        # ── ChartWidget ──
+        chart = ChartWidget()
+        self.chart = chart
+
+        def setup_chart(root_layout, mw):
+            chart_card = mw._build_card()
+            ccl = QVBoxLayout(chart_card)
+            ccl.setContentsMargins(12, 10, 12, 10)
+            ccl.addWidget(chart)
+            chart.setMinimumHeight(140)
+            chart.setMaximumHeight(220)
+            root_layout.addWidget(chart_card, 0)
+            root_layout.addSpacing(8)
+
+        registry.register(AppWidget(chart, setup_chart, None))
+
+        # ── 底部提示栏 ──
+        self._hint_label = QLabel(
+            "Enter 保存 ｜ Ctrl+A 全选 ｜ Esc 清空 ｜ "
+            "支持 K/M/B 后缀（如 1.5K = 1,500）"
+        )
+        self._hint_label.setObjectName("hintLabel")
+
+        def setup_hint(root_layout, mw):
+            root_layout.addWidget(self._hint_label)
+
+        registry.register(AppWidget(self._hint_label, setup_hint, None))
+
+        return registry

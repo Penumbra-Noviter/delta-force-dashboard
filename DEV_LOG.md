@@ -15,6 +15,14 @@
 
 ## 日志正文
 
+### 2026-08-04 | 实现 | R-02 DataStore 泛型化 `DataStore[T]`
+- `DataStore` 改为 `DataStore(Generic[T])`，`T = TypeVar('T', bound=dict)`
+- `load()` 返回 `T`，`save(data: T)` 接受 `T`
+- 内部方法 `_try_load`/`_atomic_write` 保留具体类型签名不变
+- 向后兼容：所有现有代码使用 `DataStore()` 无类型参数，类型检查器推断为 `DataStore[dict]`，运行时行为一致
+- 测试：264/264 ✅（全部通过，无回归）
+- 文档：TO-TICKETS R-02 移入已完成归档
+
 ### 2026-08-04 | 实现 | 第二轮架构评审 8 候选全实施（Grilling → subagent fan-out → 合并）
 - 来源：`D:\Desktop\To-do\architecture-review-20260804-1110.html`（架构评审报告第二轮，8 候选）
 - 流程：Grilling 三问（Q1-Q3）→ 用户拍板 → parallel subagent worktree 实施 → 合并 → code-review → 文档同步

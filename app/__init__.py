@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.chart_widget import adaptive_range, ChartSeries, ChartState, ChartWidget
 from app.input_panel import InputPanel, MoneyLineEdit
 from app.main_window import MainWindow
+from app.registry import AppWidget, WidgetRegistry
 from app.table_widget import PnLBadge, TableWidget
 from app.theme import (
     generate_qss,
@@ -18,6 +19,7 @@ from app.theme import (
 
 __all__ = [
     "adaptive_range",
+    "AppWidget",
     "ChartSeries",
     "ChartState",
     "ChartWidget",
@@ -33,4 +35,5 @@ __all__ = [
     "summary_style",
     "TableWidget",
     "THEMES",
+    "WidgetRegistry",
 ]

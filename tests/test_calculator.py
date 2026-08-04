@@ -4,7 +4,7 @@ Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计�
 
 import pytest
 
-from calculator import DayRecord, ProfitCalculatorLogic
+from calculator import BaseRecord, DayRecord, ProfitCalculatorLogic
 
 
 # ── DayRecord ────────────────────────────────────────
@@ -13,6 +13,21 @@ def test_day_record_is_frozen():
     r = DayRecord(cash=100.0, warehouse=200.0, date="2026-07-20")
     with pytest.raises(Exception):
         r.cash = 999.0  # type: ignore[misc]
+
+
+def test_base_record_can_instantiate():
+    br = BaseRecord(date="2026-07-20")
+    assert br.date == "2026-07-20"
+
+
+def test_base_record_is_frozen():
+    br = BaseRecord(date="2026-07-20")
+    with pytest.raises(Exception):
+        br.date = "2026-07-21"  # type: ignore[misc]
+
+
+def test_day_record_is_subclass_of_base_record():
+    assert issubclass(DayRecord, BaseRecord)
 
 
 # ── ProfitCalculatorLogic.get_record ─────────────────
@@ -692,3 +707,145 @@ def test_reuse_candidate_today_overrides_older():
     date_str, _, is_today_fallback = result
     assert date_str == "2026-07-20"
     assert is_today_fallback is False
+
+
+# ── ProfitCalculatorLogic.import_csv ────────────────────
+
+def test_import_csv_empty():
+    """空 CSV 返回空 dict。"""
+    result = ProfitCalculatorLogic.import_csv("日期,现金,仓库,较前日,收益率\n")
+    assert result == {}
+
+
+def test_import_csv_basic():
+    """正常 CSV 解析。"""
+    csv_text = "日期,现金,仓库,较前日,收益率\n2026-07-20,100.00,200.00,,\n2026-07-21,150.00,250.00,+50.00,+25.0%\n"
+    result = ProfitCalculatorLogic.import_csv(csv_text)
+    assert len(result) == 2
+    assert result["2026-07-20"] == {"cash": 100.0, "warehouse": 200.0}
+    assert result["2026-07-21"] == {"cash": 150.0, "warehouse": 250.0}
+
+
+def test_import_csv_roundtrip():
+    """export_csv → import_csv 往返一致。"""
+    data = {"2026-07-20": {"cash": 100.0, "warehouse": 200.0}}
+    logic = ProfitCalculatorLogic(data)
+    csv_text = logic.export_csv()
+    result = ProfitCalculatorLogic.import_csv(csv_text)
+    assert result == data
+
+# ── ProfitCalculatorLogic.summary_by_period ──────────
+
+def test_summary_by_period_week():
+    """按周聚合：正确按 ISO 周分组并计算期初/期末值。"""
+    # 2026-07-20 周一（ISO 周 2026-W30）
+    # 2026-07-27 周一（ISO 周 2026-W31）
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
+            "2026-07-22": {"cash": 150.0, "warehouse": 550.0},
+            "2026-07-27": {"cash": 200.0, "warehouse": 600.0},
+            "2026-07-28": {"cash": 250.0, "warehouse": 650.0},
+        }
+    )
+    result = logic.summary_by_period("week")
+    assert "2026-W30" in result
+    assert "2026-W31" in result
+
+    w30 = result["2026-W30"]
+    assert w30["start_date"] == "2026-07-20"
+    assert w30["end_date"] == "2026-07-22"
+    assert w30["opening_warehouse"] == 500.0
+    assert w30["closing_warehouse"] == 550.0
+    assert w30["warehouse_change"] == 50.0
+    assert w30["opening_cash"] == 100.0
+    assert w30["closing_cash"] == 150.0
+    assert w30["cash_change"] == 50.0
+    assert w30["record_count"] == 2
+
+    w31 = result["2026-W31"]
+    assert w31["start_date"] == "2026-07-27"
+    assert w31["end_date"] == "2026-07-28"
+    assert w31["opening_warehouse"] == 600.0
+    assert w31["closing_warehouse"] == 650.0
+    assert w31["warehouse_change"] == 50.0
+    assert w31["record_count"] == 2
+
+
+def test_summary_by_period_month():
+    """按月聚合：正确按年月分组。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
+            "2026-07-22": {"cash": 150.0, "warehouse": 550.0},
+            "2026-08-01": {"cash": 200.0, "warehouse": 600.0},
+            "2026-08-15": {"cash": 250.0, "warehouse": 650.0},
+        }
+    )
+    result = logic.summary_by_period("month")
+    assert "2026-07" in result
+    assert "2026-08" in result
+
+    m07 = result["2026-07"]
+    assert m07["start_date"] == "2026-07-20"
+    assert m07["end_date"] == "2026-07-22"
+    assert m07["warehouse_change"] == 50.0
+    assert m07["cash_change"] == 50.0
+    assert m07["record_count"] == 2
+
+    m08 = result["2026-08"]
+    assert m08["start_date"] == "2026-08-01"
+    assert m08["end_date"] == "2026-08-15"
+    assert m08["warehouse_change"] == 50.0
+    assert m08["cash_change"] == 50.0
+    assert m08["record_count"] == 2
+
+
+def test_summary_by_period_empty():
+    """空数据返回空 dict。"""
+    logic = ProfitCalculatorLogic({})
+    assert logic.summary_by_period("week") == {}
+    assert logic.summary_by_period("month") == {}
+    assert logic.summary_by_period("quarter") == {}
+    assert logic.summary_by_period("year") == {}
+
+def test_generate_report_contains_title():
+    """报告包含标题文本。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
+            "2026-07-21": {"cash": 150.0, "warehouse": 550.0},
+        }
+    )
+    html = logic.generate_report(days=7)
+    assert "<h1>收益报告</h1>" in html
+    assert "2026-07-20" in html
+    assert "2026-07-21" in html
+
+
+def test_generate_report_contains_table():
+    """报告包含表格标签。"""
+    logic = ProfitCalculatorLogic(
+        {
+            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
+            "2026-07-21": {"cash": 150.0, "warehouse": 550.0},
+        }
+    )
+    html = logic.generate_report(days=7)
+    assert "<table>" in html
+    assert "<thead>" in html
+    assert "<tbody>" in html
+    assert "日期" in html
+    assert "现金" in html
+    assert "仓库" in html
+    assert "较前日" in html
+    assert "收益率" in html
+
+
+def test_generate_report_empty():
+    """空数据报告不崩溃。"""
+    logic = ProfitCalculatorLogic({})
+    html = logic.generate_report(days=7)
+    assert isinstance(html, str)
+    assert len(html) > 0
+    assert "暂无数据" in html

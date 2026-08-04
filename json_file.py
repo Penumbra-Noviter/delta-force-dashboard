@@ -4,28 +4,57 @@ JSON 文件原子读写 seam：供各类 JSON 持久化复用（D-02）。
 - atomic_write_json：先写 .tmp 再 os.replace，保证任一时刻磁盘上要么旧文件要么新文件；
 - try_load_json：容错读取，文件缺失 / 解析失败返回 None，不抛异常；形状校验（如顶层必须
   为 dict）交由调用方按各自领域规则执行。
+- set_encryption_key：设置全局 Fernet 加密密钥，启用后读写自动加解密（R-07）。
 
 CSV 不走本 seam——CSV 是导出格式而非持久化状态（见 D-02 拍板）。
 """
 
 from __future__ import annotations
 
-__all__ = ["atomic_write_json", "try_load_json"]
+__all__ = ["atomic_write_json", "set_encryption_key", "try_load_json"]
 
 import json
 from pathlib import Path
 from typing import Any, Callable
 
+_FERNET: Any = None  # cryptography.fernet.Fernet | None
+
+
+def set_encryption_key(key: bytes | None) -> None:
+    """设置全局加密密钥（None = 关闭加密）。
+
+    密钥必须是 Fernet 格式（由 Fernet.generate_key() 生成）。
+    cryptography 库未安装时抛出 ImportError。
+    """
+    global _FERNET
+    if key is None:
+        _FERNET = None
+        return
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        raise ImportError(
+            "cryptography 库未安装，请执行 pip install cryptography"
+        )
+    _FERNET = Fernet(key)
+
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     """原子写入 JSON：先写临时文件再 os.replace 覆盖目标。
 
+    当设置了加密密钥时，写入前自动加密 JSON 字符串。
     失败时清理临时文件并重新抛出 OSError，由调用方决定如何告警 / 降级。
     """
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        if _FERNET is not None:
+            payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+            encrypted = _FERNET.encrypt(payload)
+            with open(tmp, "wb") as f:
+                f.write(encrypted)
+        else:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
         tmp.replace(path)
     except OSError:
         tmp.unlink(missing_ok=True)
@@ -44,8 +73,13 @@ def try_load_json(
     if not path.exists():
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        if _FERNET is not None:
+            with open(path, "rb") as f:
+                decrypted = _FERNET.decrypt(f.read())
+            return json.loads(decrypted.decode("utf-8"))
+        else:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         if on_error is not None:
             on_error(e)

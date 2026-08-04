@@ -63,6 +63,39 @@ THEMES = {
         "INPUT_BG": "#ffffff",
         "INPUT_FG": "#14201a",
         "PANEL_2": "#f3f5f1",
+        # 新增：交互态
+        "FOCUS_RING": "#4A8B6A",
+        "SELECTION_BG": "#2F6B4F",
+        "SELECTION_FG": "#ffffff",
+        # 新增：表面层级
+        "SURFACE_0": "#eef0ec",
+        "SURFACE_1": "#ffffff",
+        "SURFACE_2": "#ffffff",
+        # 新增：文字层级
+        "TEXT_PRIMARY": "#14201a",
+        "TEXT_SECONDARY": "#3c4a43",
+        "TEXT_DISABLED": "#b0b8b2",
+        "TEXT_LINK": "#2C7A8C",
+        # 新增：边框
+        "BORDER_LIGHT": "rgba(20,32,26,.04)",
+        "BORDER_HEAVY": "rgba(20,32,26,.14)",
+        # 新增：语义扩展
+        "INFO_BG": "#e8f0f4",
+        "INFO_FG": "#2C7A8C",
+        "SUCCESS_BG": "#e8f4ec",
+        "SUCCESS_FG": "#2F6B4F",
+        "WARNING_BG": "#fcf4e8",
+        "WARNING_FG": "#B77A16",
+        "ERROR_BG": "#fef2f2",
+        "ERROR_FG": "#C0453C",
+        # 新增：图表序列色（扩展用）
+        "CHART_SERIES_0": "#7B8CFF",
+        "CHART_SERIES_1": "#C08A3E",
+        "CHART_SERIES_2": "#6BA08A",
+        "CHART_SERIES_3": "#D46A6A",
+        # 新增：滚动条
+        "SCROLLBAR_BG": "#f3f5f1",
+        "SCROLLBAR_HANDLE": "#d6d3cc",
         # 操作按钮语义色
         "DANGER_BG": "#fef2f2",
         "DANGER_FG": "#C0453C",
@@ -110,6 +143,39 @@ THEMES = {
         "INPUT_BG": "#1a1d27",
         "INPUT_FG": "#eceef5",
         "PANEL_2": "#1a1d27",
+        # 新增：交互态
+        "FOCUS_RING": "#F0B555",
+        "SELECTION_BG": "#E8A33D",
+        "SELECTION_FG": "#141008",
+        # 新增：表面层级
+        "SURFACE_0": "#08090f",
+        "SURFACE_1": "#12141c",
+        "SURFACE_2": "#1a1d27",
+        # 新增：文字层级
+        "TEXT_PRIMARY": "#eceef5",
+        "TEXT_SECONDARY": "#a8adbd",
+        "TEXT_DISABLED": "#5a5f72",
+        "TEXT_LINK": "#7B8CFF",
+        # 新增：边框
+        "BORDER_LIGHT": "rgba(255,255,255,.03)",
+        "BORDER_HEAVY": "rgba(255,255,255,.12)",
+        # 新增：语义扩展
+        "INFO_BG": "#1a2433",
+        "INFO_FG": "#7B8CFF",
+        "SUCCESS_BG": "#14261e",
+        "SUCCESS_FG": "#3FCB86",
+        "WARNING_BG": "#261e14",
+        "WARNING_FG": "#E8A33D",
+        "ERROR_BG": "#1f1418",
+        "ERROR_FG": "#FF5F56",
+        # 新增：图表序列色（扩展用）
+        "CHART_SERIES_0": "#7B8CFF",
+        "CHART_SERIES_1": "#C08A3E",
+        "CHART_SERIES_2": "#3FCB86",
+        "CHART_SERIES_3": "#FF5F56",
+        # 新增：滚动条
+        "SCROLLBAR_BG": "#1a1d27",
+        "SCROLLBAR_HANDLE": "rgba(255,255,255,.12)",
         # 操作按钮语义色
         "DANGER_BG": "#1f1418",
         "DANGER_FG": "#FF5F56",
@@ -309,11 +375,11 @@ QLineEdit {{
     border-radius: 8px;
     padding: 6px 12px;
     font-size: 13px;
-    selection-background-color: {btn_bg};
-    selection-color: {btn_fg};
+    selection-background-color: {t["SELECTION_BG"]};
+    selection-color: {t["SELECTION_FG"]};
 }}
 QLineEdit:focus {{
-    border: 2px solid {btn_bg};
+    border: 2px solid {t["FOCUS_RING"]};
     padding: 5px 11px;
 }}
 QLineEdit[validity="valid"] {{
@@ -413,8 +479,8 @@ QTableWidget::item:hover {{
     background-color: {t.get("TABLE_ROW_HOVER_BG", muted_bg)};
 }}
 QTableWidget::item:selected {{
-    background-color: {btn_bg};
-    color: {btn_fg};
+    background-color: {t["SELECTION_BG"]};
+    color: {t["SELECTION_FG"]};
 }}
 QHeaderView::section {{
     background-color: {table_header_bg};
@@ -448,12 +514,12 @@ QStatusBar {{
    ScrollBar
    ═══════════════════════════════════════════ */
 QScrollBar:vertical {{
-    background: {muted_bg};
+    background: {t["SCROLLBAR_BG"]};
     width: 4px;
     border-radius: 2px;
 }}
 QScrollBar::handle:vertical {{
-    background: {separator};
+    background: {t["SCROLLBAR_HANDLE"]};
     border-radius: 2px;
     min-height: 20px;
 }}

@@ -103,7 +103,7 @@ Profit Calculator/
 │   ├── __init__.py
 │   ├── test_calculator.py
 │   ├── test_presentation.py ← <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> 个测试（展示文本生成：format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label）
-   ← <!--AUTO:tests:tests/test_calculator.py-->69<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
+   ← <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -112,7 +112,9 @@ Profit Calculator/
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->5<!--/AUTO--> 个测试（adaptive_range 纯函数）
-│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
+│   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
+	│   ├── test_sqlite_store.py ← <!--AUTO:tests:tests/test_sqlite_store.py-->7<!--/AUTO--> 个测试（SQLite 持久化 CRUD + 迁移）
+	│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -142,7 +144,7 @@ Profit Calculator/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~515 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~541 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -152,7 +154,7 @@ Profit Calculator/
 
 | 方法 | 说明 |
 |------|------|
-| <!--AUTO:sig:app/main_window.py:MainWindow.__init__-->`__init__(store=None, logic=None, settings_store=None)`<!--/AUTO--> | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
+| <!--AUTO:sig:app/main_window.py:MainWindow.__init__-->`__init__(store=None, logic=None, settings_store=None, registry=None)`<!--/AUTO--> | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
 | <!--AUTO:sig:app/main_window.py:MainWindow._setup_window-->`_setup_window()`<!--/AUTO--> | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._build_ui-->`_build_ui()`<!--/AUTO--> | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._connect_signals-->`_connect_signals()`<!--/AUTO--> | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
@@ -326,7 +328,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~437 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~503 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -341,7 +343,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~261 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~496 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -402,7 +404,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~38 行<!--/AUTO-->）
+### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~40 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
@@ -420,7 +422,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~153 行<!--/AUTO-->）
+### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~156 行<!--/AUTO-->）
 
 #### 类：`DataStore`
 
@@ -473,7 +475,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.11 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~41 行<!--/AUTO-->）
+### 4.11 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~71 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
@@ -602,7 +604,7 @@ main.py
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->69<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
