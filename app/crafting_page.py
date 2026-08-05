@@ -188,17 +188,17 @@ class CraftingPage(QWidget):
             # profit
             profit = layout.itemAt(2).widget()
             if isinstance(profit, QLabel):
-                profit.setText(f"利润：{format_money(product.profit)}")
+                profit.setText(f"总利润：{format_money(product.profit)}")
 
-            # ideal price
+            # current price
             price = layout.itemAt(3).widget()
             if isinstance(price, QLabel):
-                price.setText(f"理想售价：{format_money(product.ideal_price)}")
+                price.setText(f"当前售价：{format_money(product.ideal_price)}")
 
             # sell time
             sell = layout.itemAt(4).widget()
             if isinstance(sell, QLabel):
-                sell.setText(f"建议出售：{product.sell_time}")
+                sell.setText(f"建议出售时段：{product.sell_time}")
 
     def refresh(self) -> None:
         """公开刷新方法（供外部调用）。"""

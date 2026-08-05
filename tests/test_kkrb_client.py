@@ -14,9 +14,9 @@ from kkrb_client import (
 
 class TestDataModels:
     def test_crafting_product_frozen(self) -> None:
-        p = CraftingProduct("技术中心", "复合弓", 3904, 132000, "6小时")
+        p = CraftingProduct("技术中心", "复合弓", 24669, 39077, "晚上8点")
         assert p.station == "技术中心"
-        assert p.profit == 3904
+        assert p.profit == 24669
 
 
 class TestIntOrZero:
@@ -47,40 +47,31 @@ class TestParseOVResponse:
                     "tech": {
                         "placeName": "技术中心",
                         "itemName": "灵眼3/7测距狙击瞄准镜",
-                        "productionTime": 6,
-                        "itemForge": [
-                            {"requiredLevel": 1, "productionTime": 9, "hourlyProfit": 2762},
-                            {"requiredLevel": 2, "productionTime": 6, "hourlyProfit": 4143},
-                        ],
-                        "totalMaterialLists": [
-                            {"itemName": "枪械零件", "totalPrice": 18309},
-                            {"itemName": "高精数显卡尺", "totalPrice": 31536},
-                        ],
+                        "profit": 24669,
+                        "singlePrice": 39077,
+                        "yesterdayHighestTime": "晚上8点",
                     },
                     "workbench": {
                         "placeName": "工作台",
                         "itemName": "4.6x30mm AP SX",
-                        "productionTime": 8,
-                        "itemForge": [
-                            {"requiredLevel": 3, "productionTime": 8, "hourlyProfit": 36804},
-                        ],
-                        "totalMaterialLists": [
-                            {"itemName": "高级燃料", "totalPrice": 200114},
-                        ],
+                        "profit": 272408,
+                        "singlePrice": 3942,
+                        "yesterdayHighestTime": "上午6点",
                     },
                 }
             },
         }
         products = KkrbClient._parse_ov_response(data)
         assert len(products) == 2
-        # 按利润降序排列：工作台 36804 > 技术中心 4143
+        # 按利润降序排列：工作台 272408 > 技术中心 24669
         assert products[0].station == "工作台"
-        assert products[0].profit == 36804
-        assert products[0].ideal_price == 200114
-        assert products[0].sell_time == "8小时"
+        assert products[0].profit == 272408
+        assert products[0].ideal_price == 3942
+        assert products[0].sell_time == "上午6点"
         assert products[1].station == "技术中心"
-        assert products[1].profit == 4143
-        assert products[1].ideal_price == 49845  # 18309 + 31536
+        assert products[1].profit == 24669
+        assert products[1].ideal_price == 39077
+        assert products[1].sell_time == "晚上8点"
 
     def test_parse_empty_sp_data(self) -> None:
         assert KkrbClient._parse_ov_response({"code": 1, "data": {"spData": {}}}) == []

@@ -36,9 +36,9 @@ class CraftingProduct:
 
     station: str          # 台位名（技术中心/工作台/制药台/防具台）
     product: str          # 产物名
-    profit: int           # 每小时利润（最高等级）
-    ideal_price: int      # 材料总成本
-    sell_time: str        # 生产耗时
+    profit: int           # 单件总利润（当前售价 - 材料成本）
+    ideal_price: int      # 当前单个售价
+    sell_time: str        # 建议出售时段（如「晚上8点」「上午6点」）
 
 
 # ── 自定义异常 ──────────────────────────────────────────
@@ -163,9 +163,10 @@ class KkrbClient:
             "code": 1,
             "data": {
                 "spData": {
-                    "tech":     { "placeName": "技术中心", "itemName": "...", "productionTime": 6,
-                                  "itemForge": [{"hourlyProfit": 2762, ...}, ...],
-                                  "totalMaterialLists": [{"totalPrice": 18309, ...}, ...] },
+                    "tech":     { "placeName": "技术中心", "itemName": "...",
+                                  "profit": 24669, "singlePrice": 39077,
+                                  "yesterdayHighestTime": "晚上8点",
+                                  "totalMaterialLists": [...], "totalMaterialValue": 10109 },
                     "workbench": { ... },
                     "pharmacy":  { ... },
                     "armory":    { ... },
@@ -188,29 +189,16 @@ class KkrbClient:
             if not isinstance(station, dict):
                 continue
 
-            # 取最高等级 hourlyProfit
-            hourly_profit = 0
-            for f in station.get("itemForge", []):
-                if isinstance(f, dict):
-                    hp = _int_or_zero(f.get("hourlyProfit"))
-                    if hp > hourly_profit:
-                        hourly_profit = hp
-
-            # 材料总成本
-            total_material_cost = 0
-            for mat in station.get("totalMaterialLists", []):
-                if isinstance(mat, dict):
-                    total_material_cost += _int_or_zero(mat.get("totalPrice"))
-
-            prod_time = station.get("productionTime", "")
-
             products.append(
                 CraftingProduct(
                     station=str(station.get("placeName", _place_key)),
                     product=str(station.get("itemName", "")),
-                    profit=hourly_profit,
-                    ideal_price=total_material_cost,
-                    sell_time=f"{prod_time}小时" if prod_time else "",
+                    # 总利润（当前售价 - 材料成本）
+                    profit=_int_or_zero(station.get("profit")),
+                    # 当前单个售价
+                    ideal_price=_int_or_zero(station.get("singlePrice")),
+                    # 昨日最高价出现时段
+                    sell_time=str(station.get("yesterdayHighestTime", "")),
                 )
             )
 
