@@ -114,7 +114,7 @@ Profit Calculator/
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
-│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->15<!--/AUTO--> 个测试（数据模型 + 解析器：OV/CPV 响应解析）
+│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->16<!--/AUTO--> 个测试（数据模型 + 解析器：OV/CPV 响应解析）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 	│   ├── test_sqlite_store.py ← <!--AUTO:tests:tests/test_sqlite_store.py-->7<!--/AUTO--> 个测试（SQLite 持久化 CRUD + 迁移）
@@ -626,7 +626,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
-| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->15<!--/AUTO--> | 数据模型 + 解析器：OV/CPV 响应解析 |
+| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->16<!--/AUTO--> | 数据模型 + 解析器：OV/CPV 响应解析 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
