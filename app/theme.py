@@ -364,6 +364,27 @@ QLabel#summaryLabel, QLabel#cashSummaryLabel {{
     font-size: 14px;
     font-weight: 600;
 }}
+QLabel#statusLabel {{
+    color: {fg_label};
+    font-size: 12px;
+    padding: 8px;
+}}
+QLabel#craftStation {{
+    color: {fg_muted};
+    font-size: 11px;
+    font-weight: 500;
+}}
+QLabel#schemeSummary {{
+    font-size: 13px;
+    font-weight: 600;
+    color: {table_text_bold};
+}}
+QLabel#tierLabel {{
+    font-size: 14px;
+    font-weight: 600;
+    color: {fg_today};
+    padding: 4px 0;
+}}
 
 /* ═══════════════════════════════════════════
    LineEdit
@@ -459,6 +480,47 @@ QPushButton#pinBtn[active="true"] {{
     color: {btn_fg};
 }}
 
+QPushButton#refreshBtn {{
+    background-color: {muted_bg};
+    color: {fg_label};
+    padding: 6px 18px;
+    font-size: 12px;
+    border-radius: 8px;
+}}
+QPushButton#refreshBtn:hover {{
+    background-color: {separator};
+    color: {table_text_bold};
+}}
+QPushButton#refreshBtn:pressed {{
+    background-color: {btn_hover};
+    color: {btn_fg};
+    padding: 7px 18px 5px 18px;
+}}
+QPushButton#refreshBtn:disabled {{
+    background-color: {muted_bg};
+    color: {fg_muted};
+}}
+
+QPushButton#queryBtn {{
+    background-color: {btn_bg};
+    color: {btn_fg};
+    padding: 8px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+}}
+QPushButton#queryBtn:hover {{
+    background-color: {btn_hover};
+}}
+QPushButton#queryBtn:pressed {{
+    background-color: {btn_hover};
+    padding: 9px 24px 7px 24px;
+}}
+QPushButton#queryBtn:disabled {{
+    background-color: {muted_bg};
+    color: {fg_muted};
+}}
+
 /* ═══════════════════════════════════════════
    表格
    ═══════════════════════════════════════════ */
@@ -495,7 +557,7 @@ QHeaderView::section {{
 /* ═══════════════════════════════════════════
    卡片容器
    ═══════════════════════════════════════════ */
-QFrame#cardFrame {{
+QFrame#cardFrame, QFrame#craftingCard, QFrame#gearSchemeCard {{
     background-color: {card_bg};
     border: 1px solid {card_border};
     border-radius: 12px;
