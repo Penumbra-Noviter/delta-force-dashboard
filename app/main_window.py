@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -45,7 +46,10 @@ from app.theme import (
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
+from app.crafting_page import CraftingPage
+from app.gear_page import GearPage
 from app.registry import AppWidget, WidgetRegistry
+from app.sidebar import Sidebar
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -62,7 +66,50 @@ if platform.system() == "Windows":
 
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
-        pass
+        logger.warning("DPI awareness 设置失败")
+
+
+class DashboardPage(QWidget):
+    """记账仪表盘页面（QStackedWidget Page 0）。
+
+    包含标题栏、日期标签、以及通过 WidgetRegistry 注册的所有输入/展示组件。
+    """
+
+    def __init__(self, registry: WidgetRegistry, main_window: MainWindow,
+                 today: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("dashboardPage")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(32, 24, 32, 16)
+        layout.setSpacing(0)
+
+        # 标题栏（简化版：只保留标题 + 今日未录入提醒）
+        title_bar = QWidget()
+        title_layout = QHBoxLayout(title_bar)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._title_label = QLabel("收益计算器")
+        self._title_label.setObjectName("titleLabel")
+        title_layout.addWidget(self._title_label)
+
+        self._today_status_label = QLabel("今日未录入")
+        self._today_status_label.setObjectName("todayStatusLabel")
+        title_layout.addWidget(self._today_status_label)
+
+        title_layout.addStretch()
+        layout.addWidget(title_bar)
+
+        # 日期
+        self._date_label = QLabel(today)
+        self._date_label.setObjectName("dateLabel")
+        self._date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addSpacing(4)
+        layout.addWidget(self._date_label)
+        layout.addSpacing(12)
+
+        # 注册的 widgets（输入面板、汇总条、表格、图表、提示栏）
+        registry.build_all(layout, main_window)
 
 
 class MainWindow(QMainWindow):
@@ -87,6 +134,7 @@ class MainWindow(QMainWindow):
         set_theme(self._theme)
 
         self._setup_window()
+        self.sidebar = Sidebar()
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
@@ -122,8 +170,7 @@ class MainWindow(QMainWindow):
                     if raw and len(raw) > 4:
                         geo_ok = self.restoreGeometry(raw)
             except Exception:
-                pass
-            # 旧格式兼容（Tkinter geometry string: WxH+X+Y）
+                logger.warning("几何恢复（新格式 hex）失败")
             if not geo_ok and isinstance(saved_geo, str) and "+" in saved_geo:
                 try:
                     parts = saved_geo.replace("+", " ").replace("x", " ").split()
@@ -132,7 +179,7 @@ class MainWindow(QMainWindow):
                         self.move(int(parts[2]), int(parts[3]))
                         geo_ok = True
                 except Exception:
-                    pass
+                    logger.warning("几何恢复（旧格式 Tkinter）失败")
 
         if not geo_ok:
             self.resize(base_w, base_h)
@@ -186,54 +233,35 @@ class MainWindow(QMainWindow):
         central.setObjectName("centralWidget")
         self.setCentralWidget(central)
 
-        root_layout = QVBoxLayout(central)
-        root_layout.setContentsMargins(32, 24, 32, 16)
+        root_layout = QHBoxLayout(central)
+        root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # ── 标题栏 ──
-        title_bar = QWidget()
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(0, 0, 0, 0)
+        # ── 左侧边栏 ──
+        root_layout.addWidget(self.sidebar)
 
-        self._title_label = QLabel("收益计算器")
-        self._title_label.setObjectName("titleLabel")
-        title_layout.addWidget(self._title_label)
+        # ── 右侧页面区（QStackedWidget）──
+        self._stack = QStackedWidget()
+        self._stack.setObjectName("pageStack")
+        root_layout.addWidget(self._stack, 1)
 
-        # 今日未录入提醒（只读检查，今日有记录时隐藏）
-        self._today_status_label = QLabel("今日未录入")
-        self._today_status_label.setObjectName("todayStatusLabel")
-        title_layout.addWidget(self._today_status_label)
+        # ── Page 0：记账仪表盘 ──
+        dashboard = DashboardPage(self._registry, self, self.today)
+        self._title_label = dashboard._title_label
+        self._today_status_label = dashboard._today_status_label
+        self._date_label = dashboard._date_label
+        self._stack.addWidget(dashboard)
 
-        title_layout.addStretch()
+        # ── Page 1：制造产物推荐 ──
+        self.crafting_page = CraftingPage()
+        self._stack.addWidget(self.crafting_page)
 
-        self.theme_btn = QPushButton()
-        self.theme_btn.setObjectName("themeBtn")
-        self.theme_btn.clicked.connect(self._toggle_theme)
-        title_layout.addWidget(self.theme_btn)
+        # ── Page 2：卡战备推荐 ──
+        self.gear_page = GearPage()
+        self._stack.addWidget(self.gear_page)
 
-        self.pin_btn = QPushButton("📌 置顶")
-        self.pin_btn.setObjectName("pinBtn")
-        self.pin_btn.clicked.connect(self._toggle_pin)
-        title_layout.addWidget(self.pin_btn)
-
-        self.export_btn = QPushButton("导出 CSV")
-        self.export_btn.setObjectName("exportBtn")
-        self.export_btn.setToolTip("将数据导出为 CSV 文件（Excel 可直接打开）")
-        self.export_btn.clicked.connect(self._export_csv)
-        title_layout.addWidget(self.export_btn)
-
-        root_layout.addWidget(title_bar)
-
-        # ── 日期 ──
-        self._date_label = QLabel(self.today)
-        self._date_label.setObjectName("dateLabel")
-        self._date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root_layout.addSpacing(4)
-        root_layout.addWidget(self._date_label)
-        root_layout.addSpacing(12)
-
-        # ── 注册的 widgets（输入面板、汇总条、表格、图表、提示栏）──
-        self._registry.build_all(root_layout, self)
+        # ── 侧边栏导航切换 ──
+        self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
 
         self._update_theme_btn_text()
 
@@ -253,7 +281,7 @@ class MainWindow(QMainWindow):
         return card
 
     def _update_theme_btn_text(self) -> None:
-        self.theme_btn.setText(
+        self.sidebar.theme_btn.setText(
             "🌙 暗色" if self._theme == "light" else "☀️ 亮色"
         )
 
@@ -264,6 +292,11 @@ class MainWindow(QMainWindow):
     def _connect_signals(self) -> None:
         # Widget 信号（从 registry 连接）
         self._registry.connect_all(self)
+
+        # 侧边栏按钮
+        self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
+        self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
+        self.sidebar.export_btn.clicked.connect(self._export_csv)
 
         # 键盘快捷键
         save_shortcut = QAction(self)
@@ -292,6 +325,7 @@ class MainWindow(QMainWindow):
     def _apply_qss(self) -> None:
         qss = generate_qss(self._theme)
         self.setStyleSheet(qss)
+        self.sidebar.apply_theme()
 
     def _toggle_theme(self) -> None:
         self._theme = "dark" if self._theme == "light" else "light"
@@ -320,17 +354,17 @@ class MainWindow(QMainWindow):
     def _update_pin_btn_style(self) -> None:
         """更新置顶按钮外观（仅在状态变化时触发 style polish）。"""
         if self._pinned:
-            self.pin_btn.setText("📌 已置顶")
-            if self.pin_btn.property("active") != "true":
-                self.pin_btn.setProperty("active", "true")
-                self.pin_btn.style().unpolish(self.pin_btn)
-                self.pin_btn.style().polish(self.pin_btn)
+            self.sidebar.pin_btn.setText("📌 已置顶")
+            if self.sidebar.pin_btn.property("active") != "true":
+                self.sidebar.pin_btn.setProperty("active", "true")
+                self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)
+                self.sidebar.pin_btn.style().polish(self.sidebar.pin_btn)
         else:
-            self.pin_btn.setText("📌 置顶")
-            if self.pin_btn.property("active") == "true":
-                self.pin_btn.setProperty("active", "false")
-                self.pin_btn.style().unpolish(self.pin_btn)
-                self.pin_btn.style().polish(self.pin_btn)
+            self.sidebar.pin_btn.setText("📌 置顶")
+            if self.sidebar.pin_btn.property("active") == "true":
+                self.sidebar.pin_btn.setProperty("active", "false")
+                self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)
+                self.sidebar.pin_btn.style().polish(self.sidebar.pin_btn)
 
     # ═══════════════════════════════════════════════════════
     # 数据获取

@@ -6,14 +6,35 @@
 
 ---
 
-## 滚动摘要（2026-08-04）
+## 滚动摘要（2026-08-05）
 
+- **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
+- **测试**：pytest **295/295** ✅（+14 kkrb_client 测试）
+- **文档**：TO-TICKETS L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
+
+- **L 系列立项**：Delta Force 游戏工具扩展（侧边栏导航 + 制造利润 + 卡战备推荐），ADR-0004 落档，4 张工单录入 TO-TICKETS 活跃表
 - **架构评审第二轮**：8 候选全实施完毕（#1 展示文本簇→presentation.py / #2 MainWindow 变薄 / #3 原子写合一 / #4 VIEW_DAYS 单源化 / #5 信号→颜色收敛 / #6 汇总四合一 / #7 MoneyLineEdit.set_value / #8 图表几何抽纯函数），详见日志正文
 - **测试**：pytest **259/259** ✅（候选 1+6: -27 移 + 23 新 = 249；候选 3: 不变；候选 2: +5 reuse_candidate 测试；候选 4: 不变；候选 5: 不变；候选 7: 不变；候选 8: +5 adaptive_range 测试；249+5+5=259）
 
 ---
 
 ## 日志正文
+
+### 2026-08-04 | 设计 | L 系列立项 — Delta Force 游戏工具扩展
+- 来源：Grilling 会话，用户需求「制造利润排行 + 卡战备推荐」
+- 范围：两功能整合到现有收益计算器 App，左侧边栏切换（记账/制造/战备）
+- 设计：ADR-0004 落档（QStackedWidget + 侧边栏方案 A），CONTEXT.md 新增 Delta Force 领域词汇
+- 工单：L-01~L-04 录入 TO-TICKETS 活跃表，含详细验收标准
+- 测试：259/259 ✅（纯设计，未动代码）
+- 注：kkrb.net 已确认有公开 REST API（`getOVData`/`getCPVData`），无需浏览器渲染
+
+### 2026-08-05 | 实现 | L 系列全部完成 — Delta Force 游戏工具扩展
+- **L-01（侧边栏导航）**：`app/sidebar.py` 新文件（QWidget + QListWidget 导航 + 底部主题/置顶/导出按钮）；`main_window.py` 重构为水平布局（sidebar | QStackedWidget），Dashboard 为 Page 0，标题栏/日期标签只在记账页显示；侧边栏主题色 `apply_theme()` 方法（运行时 get_color 避免 C1 复发）；按钮引用改为 `self.sidebar.*`
+- **L-02（kkrb.net API 客户端）**：`app/kkrb_client.py` 纯 stdlib（urllib.request），数据模型 `CraftingProduct`/`GearScheme`/`GearItem`（frozen dataclass），CSRF 首页提取 + 缓存复用，`KkrbError` 自定义异常，测试 14 项
+- **L-03（制造利润页面）**：`app/crafting_page.py`，4 台位卡片 2×2 网格，加载中/失败重试状态，刷新按钮，按利润排序
+- **L-04（卡战备推荐页面）**：`app/gear_page.py`，输入框支持 K/M/B 后缀解析，`_find_closest_tier` 匹配最近档位，方案卡片含 QTableWidget 装备清单
+- **测试**：295/295 ✅（+14 kkrb_client 测试）；UI 烟测 28 项全绿（含 sidebar 按钮引用迁移）
+- **文档**：TO-TICKETS L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、DEV_LOG 同步、doc_sync --check 通过
 
 ### 2026-08-04 | 实现 | R-02 DataStore 泛型化 `DataStore[T]`
 - `DataStore` 改为 `DataStore(Generic[T])`，`T = TypeVar('T', bound=dict)`

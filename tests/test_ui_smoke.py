@@ -287,14 +287,14 @@ def test_theme_toggle(sample_window):
     """主题按钮点击切换，文字随主题变化。"""
     win = sample_window
 
-    initial_text = win.theme_btn.text()
+    initial_text = win.sidebar.theme_btn.text()
     assert initial_text in ("🌙 暗色", "☀️ 亮色")
 
-    win.theme_btn.click()  # 切到另一主题
-    assert win.theme_btn.text() != initial_text
+    win.sidebar.theme_btn.click()  # 切到另一主题
+    assert win.sidebar.theme_btn.text() != initial_text
 
-    win.theme_btn.click()  # 切回
-    assert win.theme_btn.text() == initial_text
+    win.sidebar.theme_btn.click()  # 切回
+    assert win.sidebar.theme_btn.text() == initial_text
 
 
 # ── 9. 窗口置顶 ──────────────────────────────────────────
@@ -307,10 +307,10 @@ def test_pin_toggle(sample_window):
 
     assert not bool(win.windowFlags() & stays_on_top)
 
-    win.pin_btn.click()
+    win.sidebar.pin_btn.click()
     assert bool(win.windowFlags() & stays_on_top)
 
-    win.pin_btn.click()
+    win.sidebar.pin_btn.click()
     assert not bool(win.windowFlags() & stays_on_top)
 
 
@@ -325,8 +325,8 @@ def test_settings_persistence(sample_window, tmp_path):
     test_settings = tmp_path / "settings.json"
 
     # 通过公开交互触发状态变更；closeEvent → _save_settings 落盘（公开 seam）
-    win.theme_btn.click()   # _toggle_theme 内部已保存 theme
-    win.pin_btn.click()     # _toggle_pin 不落盘
+    win.sidebar.theme_btn.click()   # _toggle_theme 内部已保存 theme
+    win.sidebar.pin_btn.click()     # _toggle_pin 不落盘
     win.close()
 
     assert test_settings.exists()
@@ -433,8 +433,8 @@ def test_keyboard_shortcuts_enter_and_escape(sample_window):
 def test_export_btn_exists(sample_window):
     """标题栏存在「导出 CSV」按钮。"""
     win = sample_window
-    assert hasattr(win, "export_btn")
-    assert win.export_btn.text() == "导出 CSV"
+    assert hasattr(win.sidebar, "export_btn")
+    assert win.sidebar.export_btn.text() == "导出 CSV"
 
 
 def test_export_csv_writes_file(sample_window, monkeypatch, tmp_path):
@@ -447,7 +447,7 @@ def test_export_csv_writes_file(sample_window, monkeypatch, tmp_path):
         staticmethod(lambda *a, **kw: (str(out), "CSV 文件 (*.csv)")),
     )
 
-    win.export_btn.click()
+    win.sidebar.export_btn.click()
 
     assert out.exists()
     raw = out.read_bytes()
@@ -465,7 +465,7 @@ def test_export_csv_cancel_writes_nothing(sample_window, monkeypatch, tmp_path):
         staticmethod(lambda *a, **kw: ("", "")),
     )
 
-    win.export_btn.click()
+    win.sidebar.export_btn.click()
 
     assert list(tmp_path.iterdir()) == []
 
@@ -490,7 +490,7 @@ def test_export_csv_failure_shows_warning(sample_window, monkeypatch, tmp_path):
         staticmethod(lambda *a, **kw: warnings.append(a)),
     )
 
-    win.export_btn.click()
+    win.sidebar.export_btn.click()
 
     assert warnings  # 写失败时弹了警告
     assert not out.exists()

@@ -25,14 +25,21 @@
 
 ## 界面预览
 
-应用采用纵向卡片式布局，自上而下依次为：
+应用采用左侧边栏导航 + 右侧页面区布局，包含以下页面：
 
-1. **标题栏** — 应用名称、今日未录入提醒、当前日期、主题切换、窗口置顶、导出 CSV 按钮
+### 记账仪表盘
+1. **标题栏** — 应用名称、今日未录入提醒、当前日期
 2. **输入卡片** — 现金 / 仓库输入框 + 复用昨日按钮 + 保存按钮
 3. **最近 7/30 条汇总条** — 总盈亏金额实时显示（随视图切换）
 4. **数据表格** — 7/30 条视图可切换（按钮组），含日期、现金、仓库、较前日、收益率、盈亏 Badge、操作按钮
-5. **双曲线图** — 仓库价值（上图）与现金（下图）趋势对比
+5. **双曲线图** — 仓库价值与现金双轴对比趋势
 6. **提示栏** — 键盘快捷键说明
+
+### 制造产物推荐（新）
+- 4 个制造台位（技术中心/工作台/制药台/防具台）的最新推荐产物，按利润降序排列
+
+### 卡战备推荐（新）
+- 输入目标战备值，自动匹配最近档位，展示多套市场直购方案
 
 ---
 
@@ -45,7 +52,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（253 项测试，含 offscreen UI 烟测） |
+| 测试框架 | pytest（296 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -99,6 +106,12 @@ profit-calculator/
 ├── app/
 │   ├── __init__.py          # app 包标记
 │   ├── main_window.py       # 主窗口（组件协调与数据流）
+│   ├── sidebar.py           # 左侧导航栏（记账/制造/战备 + 底部操作按钮）
+│   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
+│   ├── gear_page.py         # 卡战备推荐页面（输入匹配 + 方案展示）
+│   ├── kkrb_client.py       # kkrb.net API 客户端（纯 stdlib）
+│   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
+│   ├── gear_page.py         # 卡战备推荐页面（输入匹配 + 方案展示）
 │   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
 │   ├── table_widget.py      # 7/30 视图可切换数据表格
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出
@@ -108,10 +121,11 @@ profit-calculator/
 ├── data_store.py            # JSON 持久化（原子写入 + 备份）
 ├── formatting.py            # 金额格式化与输入解析
 ├── json_file.py             # JSON 原子写 seam（atomic_write_json / try_load_json，D-02）
+├── kkrb_client.py           # kkrb.net API 客户端（纯 stdlib，零外部依赖）
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（253 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（296 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── 收益计算器.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）

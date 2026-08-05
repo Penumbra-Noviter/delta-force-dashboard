@@ -11,6 +11,9 @@ __pycache__/
 # pytest 缓存（pytest 自带 .gitignore 自忽略，此处显式声明更稳定可移植）
 .pytest_cache/
 
+# Playwright MCP 运行时数据（设计阶段产物，非项目代码）
+.playwright-mcp/
+
 # ── Virtual environments ───────────────────────────
 venv/
 .venv/
