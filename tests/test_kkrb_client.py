@@ -6,8 +6,6 @@ import pytest
 
 from kkrb_client import (
     CraftingProduct,
-    GearItem,
-    GearScheme,
     KkrbClient,
     KkrbError,
     _int_or_zero,
@@ -19,21 +17,6 @@ class TestDataModels:
         p = CraftingProduct("技术中心", "复合弓", 3904, 132000, "6小时")
         assert p.station == "技术中心"
         assert p.profit == 3904
-
-    def test_gear_item_frozen(self) -> None:
-        item = GearItem("QSZ92G", 4800, 4694, "市场", "全新")
-        assert item.name == "QSZ92G"
-        assert item.cost == 4800
-        assert item.wear == "全新"
-
-    def test_gear_scheme(self) -> None:
-        items = [GearItem("A", 100, 200, "市场")]
-        s = GearScheme("方案 #1", 1000, 1200, items)
-        assert s.title == "方案 #1"
-        assert s.total_cost == 1000
-        assert len(s.items) == 1
-        # wear defaults to ""
-        assert s.items[0].wear == ""
 
 
 class TestIntOrZero:
@@ -108,81 +91,3 @@ class TestParseOVResponse:
     def test_parse_malformed(self) -> None:
         with pytest.raises(KkrbError):
             KkrbClient._parse_ov_response("not a dict")
-
-
-class TestParseCPVResponse:
-    """解析 getCPVData 响应测试（实际 API 格式）。"""
-
-    def test_parse_valid(self) -> None:
-        data = {
-            "code": 1,
-            "data": [
-                {
-                    "targetValue": 112500,
-                    "totalHafCost": 104854,
-                    "currentValue": 112564,
-                    "schemeType": "market",
-                    "schemeItems": [
-                        {
-                            "objectName": "M870霰弹枪",
-                            "costHafCoin": 5000,
-                            "currentValue": 4733,
-                            "from": "市场",
-                        },
-                    ],
-                },
-                {
-                    "targetValue": 112500,
-                    "totalHafCost": 105060,
-                    "currentValue": 112796,
-                    "schemeType": "market",
-                    "schemeItems": [
-                        {
-                            "objectName": "M1911",
-                            "costHafCoin": 17030,
-                            "currentValue": 16915,
-                            "from": "市场",
-                        },
-                    ],
-                },
-            ],
-        }
-        result = KkrbClient._parse_cpv_response(data)
-        assert 112500 in result
-        assert len(result[112500]) == 2
-
-        # 方案按出现顺序编号
-        scheme0 = result[112500][0]
-        assert scheme0.title == "方案 #1"
-        assert scheme0.total_cost == 104854
-        assert scheme0.final_bv == 112564
-        assert len(scheme0.items) == 1
-        assert scheme0.items[0].name == "M870霰弹枪"
-        assert scheme0.items[0].cost == 5000
-        assert scheme0.items[0].battle_value == 4733
-        assert scheme0.items[0].source == "市场"
-        assert scheme0.items[0].wear == ""  # API 不提供磨损度
-
-        scheme1 = result[112500][1]
-        assert scheme1.title == "方案 #2"
-        assert scheme1.total_cost == 105060
-        assert scheme1.final_bv == 112796
-
-    def test_parse_filter_tier(self) -> None:
-        data = {
-            "code": 1,
-            "data": [
-                {"targetValue": 112500, "totalHafCost": 0, "currentValue": 0, "schemeItems": []},
-                {"targetValue": 187500, "totalHafCost": 0, "currentValue": 0, "schemeItems": []},
-            ],
-        }
-        result = KkrbClient._parse_cpv_response(data, filter_tier=187500)
-        assert 112500 not in result
-        assert 187500 in result
-
-    def test_parse_empty(self) -> None:
-        assert KkrbClient._parse_cpv_response({"code": 1, "data": []}) == {}
-
-    def test_parse_malformed(self) -> None:
-        with pytest.raises(KkrbError):
-            KkrbClient._parse_cpv_response("not a dict")

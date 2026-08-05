@@ -557,7 +557,7 @@ QHeaderView::section {{
 /* ═══════════════════════════════════════════
    卡片容器
    ═══════════════════════════════════════════ */
-QFrame#cardFrame, QFrame#craftingCard, QFrame#gearSchemeCard {{
+QFrame#cardFrame, QFrame#craftingCard {{
     background-color: {card_bg};
     border: 1px solid {card_border};
     border-radius: 12px;

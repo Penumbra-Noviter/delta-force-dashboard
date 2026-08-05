@@ -1,5 +1,5 @@
 """
-kkrb.net API 客户端：获取制造产物推荐和卡战备方案数据。
+kkrb.net API 客户端：获取制造产物推荐数据。
 
 纯 stdlib 实现（urllib.request + http.cookiejar），零外部依赖。
 """
@@ -8,8 +8,6 @@ from __future__ import annotations
 
 __all__ = [
     "CraftingProduct",
-    "GearItem",
-    "GearScheme",
     "KkrbClient",
     "KkrbError",
 ]
@@ -17,7 +15,7 @@ __all__ = [
 import logging
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from http.cookiejar import CookieJar
 from typing import Any
 from urllib.request import HTTPCookieProcessor, Request, build_opener
@@ -26,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.kkrb.net"
 _OV_ENDPOINT = f"{_BASE_URL}/getOVData"
-_CPV_ENDPOINT = f"{_BASE_URL}/getCPVData"
 _TIMEOUT = 10
 
 
@@ -42,27 +39,6 @@ class CraftingProduct:
     profit: int           # 每小时利润（最高等级）
     ideal_price: int      # 材料总成本
     sell_time: str        # 生产耗时
-
-
-@dataclass(frozen=True)
-class GearItem:
-    """卡战备方案中的单个装备项。"""
-
-    name: str             # 装备名
-    cost: int             # 花费
-    battle_value: int     # 战备值
-    source: str           # 来源（市场/兑换等）
-    wear: str = ""        # 磨损度（API 暂不提供）
-
-
-@dataclass(frozen=True)
-class GearScheme:
-    """卡战备方案。"""
-
-    title: str              # 方案标题
-    total_cost: int         # 总花费
-    final_bv: int           # 最终战备值
-    items: list[GearItem]   # 装备清单
 
 
 # ── 自定义异常 ──────────────────────────────────────────
@@ -81,7 +57,6 @@ class KkrbClient:
     用法：
         client = KkrbClient()
         products = client.fetch_ov_data()
-        schemes = client.fetch_cpv_data()
     """
 
     def __init__(self) -> None:
@@ -102,21 +77,6 @@ class KkrbClient:
         """
         data = self._post_json(_OV_ENDPOINT)
         return self._parse_ov_response(data)
-
-    def fetch_cpv_data(self, tier: int | None = None) -> dict[int, list[GearScheme]]:
-        """获取卡战备方案数据。
-
-        Args:
-            tier: 可选，指定战备档位（如 112500）。不传则返回所有档位。
-
-        Returns:
-            {档位: [GearScheme, ...]} 的映射。
-
-        Raises:
-            KkrbError: 网络请求失败或数据解析失败。
-        """
-        data = self._post_json(_CPV_ENDPOINT)
-        return self._parse_cpv_response(data, tier)
 
     # ── CSRF 管理 ───────────────────────────────────────
 
@@ -256,75 +216,6 @@ class KkrbClient:
 
         products.sort(key=lambda p: p.profit, reverse=True)
         return products
-
-    @staticmethod
-    def _parse_cpv_response(data: Any, filter_tier: int | None = None) -> dict[int, list[GearScheme]]:
-        """解析 getCPVData 响应。
-
-        实际格式：
-        {
-            "code": 1,
-            "data": [
-                {
-                    "targetValue": 112500,
-                    "totalHafCost": 104854,
-                    "currentValue": 112564,
-                    "schemeType": "market",
-                    "schemeItems": [
-                        { "objectName": "M870霰弹枪", "costHafCoin": 5000, "currentValue": 4733, "from": "市场" },
-                        ...
-                    ]
-                },
-                ...
-            ]
-        }
-        """
-        if not isinstance(data, dict):
-            raise KkrbError(f"CPV 数据格式异常: 期望 dict，got {type(data).__name__}")
-
-        tiers = data.get("data", [])
-        if not isinstance(tiers, list):
-            if isinstance(tiers, dict) and not tiers:
-                return {}
-            raise KkrbError(f"CPV 数据格式异常: 期望列表，got {type(tiers).__name__}")
-
-        result: dict[int, list[GearScheme]] = {}
-        for tier_item in tiers:
-            if not isinstance(tier_item, dict):
-                continue
-            try:
-                tier_value = int(tier_item.get("targetValue", 0))
-            except (ValueError, TypeError):
-                continue
-            if filter_tier is not None and tier_value != filter_tier:
-                continue
-
-            if tier_value not in result:
-                result[tier_value] = []
-
-            items_raw = tier_item.get("schemeItems", [])
-            items = [
-                GearItem(
-                    name=str(it.get("objectName", "")),
-                    cost=_int_or_zero(it.get("costHafCoin")),
-                    battle_value=_int_or_zero(it.get("currentValue")),
-                    source=str(it.get("from", "")),
-                )
-                for it in items_raw
-                if isinstance(it, dict)
-            ]
-
-            scheme_idx = len(result[tier_value]) + 1
-            result[tier_value].append(
-                GearScheme(
-                    title=f"方案 #{scheme_idx}",
-                    total_cost=_int_or_zero(tier_item.get("totalHafCost")),
-                    final_bv=_int_or_zero(tier_item.get("currentValue")),
-                    items=items,
-                )
-            )
-
-        return result
 
     # ── 辅助 ────────────────────────────────────────────
 

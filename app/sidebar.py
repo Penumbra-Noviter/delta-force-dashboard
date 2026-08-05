@@ -17,7 +17,7 @@ class Sidebar(QWidget):
     """左侧导航栏：导航项列表 + 底部操作按钮。"""
 
     nav_changed = Signal(int)
-    NAV_ITEMS = ["📒 记账", "🔧 制造", "🛡️ 战备"]
+    NAV_ITEMS = ["📒 记账", "🔧 制造"]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

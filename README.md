@@ -38,9 +38,6 @@
 ### 制造产物推荐（新）
 - 4 个制造台位（技术中心/工作台/制药台/防具台）的最新推荐产物，按利润降序排列
 
-### 卡战备推荐（新）
-- 输入目标战备值，自动匹配最近档位，展示多套市场直购方案
-
 ---
 
 ## 技术栈
@@ -106,12 +103,8 @@ profit-calculator/
 ├── app/
 │   ├── __init__.py          # app 包标记
 │   ├── main_window.py       # 主窗口（组件协调与数据流）
-│   ├── sidebar.py           # 左侧导航栏（记账/制造/战备 + 底部操作按钮）
+│   ├── sidebar.py           # 左侧导航栏（记账/制造 + 底部操作按钮）
 │   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
-│   ├── gear_page.py         # 卡战备推荐页面（输入匹配 + 方案展示）
-│   ├── kkrb_client.py       # kkrb.net API 客户端（纯 stdlib）
-│   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
-│   ├── gear_page.py         # 卡战备推荐页面（输入匹配 + 方案展示）
 │   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
 │   ├── table_widget.py      # 7/30 视图可切换数据表格
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出

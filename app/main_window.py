@@ -47,7 +47,6 @@ from app.theme import (
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 from app.crafting_page import CraftingPage
-from app.gear_page import GearPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
 from data_store import DataStore
@@ -255,10 +254,6 @@ class MainWindow(QMainWindow):
         # ── Page 1：制造产物推荐 ──
         self.crafting_page = CraftingPage()
         self._stack.addWidget(self.crafting_page)
-
-        # ── Page 2：卡战备推荐 ──
-        self.gear_page = GearPage()
-        self._stack.addWidget(self.gear_page)
 
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
