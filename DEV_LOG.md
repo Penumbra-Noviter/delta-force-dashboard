@@ -8,9 +8,10 @@
 
 ## 滚动摘要（2026-08-05）
 
+- **M-01 修复**：暗色主题 `CHART_GRID` 色值 `rgba(255,255,255,.05)` 无法被 pyqtgraph 解析（`pg.mkColor` 只认十六进制/SVG 名，浮点 alpha 的 `rgba()` 抛 ValueError）→ 暗色主题下首次绘制图表即崩；改 `#RRGGBBAA` 八位十六进制（`#FFFFFF0D`，alpha 13≈5%，视觉一致）+ 回归测试
 - **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
-- **测试**：pytest **295/295** ✅（+14 kkrb_client 测试）
-- **文档**：TO-TICKETS L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
+- **测试**：pytest **297/297** ✅（295 + 1 M-01 回归）
+- **文档**：TO-TICKETS M-01/L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
 
 - **L 系列立项**：Delta Force 游戏工具扩展（侧边栏导航 + 制造利润 + 卡战备推荐），ADR-0004 落档，4 张工单录入 TO-TICKETS 活跃表
 - **架构评审第二轮**：8 候选全实施完毕（#1 展示文本簇→presentation.py / #2 MainWindow 变薄 / #3 原子写合一 / #4 VIEW_DAYS 单源化 / #5 信号→颜色收敛 / #6 汇总四合一 / #7 MoneyLineEdit.set_value / #8 图表几何抽纯函数），详见日志正文
@@ -19,6 +20,14 @@
 ---
 
 ## 日志正文
+
+### 2026-08-05 | 修复 | M-01 暗色主题图表网格色 pyqtgraph 解析崩溃
+- 症状：暗色主题（Midnight & Amber）下应用启动即崩 `ValueError: Unable to convert rgba(255,255,255,.05) to QColor`（`chart_widget.py` 创建轴时 `pg.mkPen(color=grid_color)`）
+- 根因：`app/theme.py` 暗色 `CHART_GRID = "rgba(255,255,255,.05)"` 是 QSS 风格色（浮点 alpha），**pyqtgraph 的 `pg.mkColor` 只认十六进制/SVG 颜色名，不解析 `rgba()`**；其余 `rgba()` 色值只进 QSS 不受影响，唯一流入 pyqtgraph 的就是 CHART_GRID
+- 修复：改 `#FFFFFF0D`（RRGGBBAA 八位十六进制，alpha 13≈5%，与原视觉一致）；亮色 `#e2e4df` 本就合法未动
+- 回归测试（先写复现）：`tests/test_chart_geometry.py` 新增 `test_chart_colors_parseable_by_pyqtgraph`——双主题 × 5 个图表取色键逐一 `pg.mkColor()`，防再混入 QSS-only 色值
+- 测试：pytest 297/297 ✅（296+1）；doc_sync 刷新 CODE_WIKI 机械标记
+- TO-TICKETS M-01 → ✅ 归档（2026-08-05）
 
 ### 2026-08-04 | 设计 | L 系列立项 — Delta Force 游戏工具扩展
 - 来源：Grilling 会话，用户需求「制造利润排行 + 卡战备推荐」

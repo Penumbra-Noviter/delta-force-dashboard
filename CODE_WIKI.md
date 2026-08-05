@@ -115,7 +115,7 @@ Profit Calculator/
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->15<!--/AUTO--> 个测试（数据模型 + 解析器：OV/CPV 响应解析）
-│   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->5<!--/AUTO--> 个测试（adaptive_range 纯函数）
+│   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 	│   ├── test_sqlite_store.py ← <!--AUTO:tests:tests/test_sqlite_store.py-->7<!--/AUTO--> 个测试（SQLite 持久化 CRUD + 迁移）
 	│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
@@ -614,7 +614,7 @@ main.py
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
-| `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->5<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
+| `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
 
 **运行方式**：在项目根目录执行 `pytest`
 

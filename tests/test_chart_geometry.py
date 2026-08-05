@@ -37,3 +37,22 @@ def test_adaptive_range_identical_values():
     assert lo < 50
     assert hi > 50
     assert pytest.approx(hi - lo, abs=0.1) == 5.0  # 50 * 0.05 * 2
+
+def test_chart_colors_parseable_by_pyqtgraph():
+    """回归：暗色主题 CHART_GRID 曾为 rgba(255,255,255,.05)，pg.mkColor 无法解析。
+
+    复现：pg.mkColor("rgba(255,255,255,.05)") → ValueError: Unable to convert...
+    修复：改为 #RRGGBBAA 八位十六进制（#FFFFFF0D，alpha 13≈5%）。
+    双主题下所有图表取色键都必须能被 pyqtgraph 解析，防止再混入 QSS-only 的 rgba()。
+    """
+    import pyqtgraph as pg
+
+    from app.theme import THEMES
+
+    chart_keys = {
+        "CHART_WAREHOUSE", "CHART_CASH", "CHART_BG",
+        "CHART_AXIS", "CHART_GRID",
+    }
+    for theme_name, palette in THEMES.items():
+        for key in chart_keys:
+            pg.mkColor(palette[key])  # 解析失败即抛 ValueError（原 bug）

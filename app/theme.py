@@ -126,7 +126,7 @@ THEMES = {
         "CHART_CASH": "#7B8CFF",     # 紫蓝色（accent-2 现金线）
         "CHART_WAREHOUSE": "#E8A33D",# 琥珀橙（accent 仓库线）
         "CHART_TOTAL": "#3FCB86",
-        "CHART_GRID": "rgba(255,255,255,.05)",
+        "CHART_GRID": "#FFFFFF0D",        # RRGGBBAA（alpha 13≈5%）；pyqtgraph 不解析 rgba() 浮点 alpha
         "CHART_BG": "#0c0e16",
         "CHART_AXIS": "#848aa0",
         "CHART_TEXT": "#a8adbd",
