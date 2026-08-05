@@ -11,6 +11,7 @@
 - **M-01 修复**：暗色主题 `CHART_GRID` 色值 `rgba(255,255,255,.05)` 无法被 pyqtgraph 解析（`pg.mkColor` 只认十六进制/SVG 名，浮点 alpha 的 `rgba()` 抛 ValueError）→ 暗色主题下首次绘制图表即崩；改 `#RRGGBBAA` 八位十六进制（`#FFFFFF0D`，alpha 13≈5%，视觉一致）+ 回归测试
 - **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
 - **测试**：pytest **297/297** ✅（295 + 1 M-01 回归）
+- **打包**：M-01 后主分支重新打包，`dist/收益计算器/` **68M**（exe 6.67MB + `_internal/`），烟测通过（dark 主题 + 9 条记录 = M-01 修复前崩溃场景，直接验证修复）
 - **文档**：TO-TICKETS M-01/L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
 
 - **L 系列立项**：Delta Force 游戏工具扩展（侧边栏导航 + 制造利润 + 卡战备推荐），ADR-0004 落档，4 张工单录入 TO-TICKETS 活跃表
@@ -20,6 +21,14 @@
 ---
 
 ## 日志正文
+
+### 2026-08-05 | 打包 | 主分支重新打包（M-01 后）+ 烟测通过（dark 崩溃场景直接验证）
+- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/收益计算器/` **68M**（exe 6.67MB + `_internal/`）；M-01 改动（`app/theme.py`）编译入 PYZ
+- 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
+- 烟测：exe 启动 8s 进程存活后终止 ✅（pid 14980，常驻 ~226MB）；用户真实 settings 为 **dark 主题 + 9 条记录**（≥2 触发图表创建路径）——正是 M-01 修复前的崩溃场景，存活 8s 无 Traceback 直接验证修复生效
+- 分发前确认：dist 内无运行态数据（data.json/settings.json/log 均缺）
+- release 资产未更新（用户未指示；如需更新 `default.zip` 另行执行）
 
 ### 2026-08-05 | 修复 | M-01 暗色主题图表网格色 pyqtgraph 解析崩溃
 - 症状：暗色主题（Midnight & Amber）下应用启动即崩 `ValueError: Unable to convert rgba(255,255,255,.05) to QColor`（`chart_widget.py` 创建轴时 `pg.mkPen(color=grid_color)`）
