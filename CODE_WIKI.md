@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-05  
-> 测试状态：296 项 pytest 全部通过（含 UI 烟测 + L 系列 Delta Force 工具扩展）
+> 测试状态：292 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
-| 测试框架 | pytest（296 项） |
+| 测试框架 | pytest（292 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -85,7 +85,6 @@ Profit Calculator/
 │   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
-│   ├── gear_page.py         ← 卡战备推荐页面（输入匹配 + 方案展示，L-04）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
@@ -114,7 +113,7 @@ Profit Calculator/
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
-│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->10<!--/AUTO--> 个测试（数据模型 + 解析器：OV/CPV 响应解析）
+│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->10<!--/AUTO--> 个测试（数据模型 + OV 响应解析）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 	│   ├── test_sqlite_store.py ← <!--AUTO:tests:tests/test_sqlite_store.py-->7<!--/AUTO--> 个测试（SQLite 持久化 CRUD + 迁移）
@@ -524,7 +523,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 | 296 项（含 L 系列 Delta Force 工具扩展） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 | 292 项（含制造产物推荐） |
 
 ### 5.2 模块间依赖关系图
 
@@ -626,7 +625,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
-| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->10<!--/AUTO--> | 数据模型 + 解析器：OV/CPV 响应解析 |
+| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->10<!--/AUTO--> | 数据模型 + OV 响应解析 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
