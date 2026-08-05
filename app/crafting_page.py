@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -39,8 +40,16 @@ class CraftingPage(QWidget):
         self._products: list[CraftingProduct] = []
         self._loading = False
         self._error: str | None = None
+        self._loaded_once = False
 
         self._build_ui()
+
+    def showEvent(self, event: QShowEvent) -> None:
+        """首次显示时自动加载数据。"""
+        super().showEvent(event)
+        if not self._loaded_once:
+            self._loaded_once = True
+            self._load_data()
 
     # ── UI 构建 ─────────────────────────────────────────
 
