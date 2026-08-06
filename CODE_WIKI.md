@@ -1,8 +1,8 @@
 # 收益计算器 (Profit Calculator) — Code Wiki
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
-> 生成日期：2026-08-05  
-> 测试状态：292 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐）
+> 生成日期：2026-08-06  
+> 测试状态：300 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -85,6 +85,8 @@ Profit Calculator/
 │   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
+│   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，M-01）
+│   ├── profit_page.py       ← 利润页面标签页容器（制造产物 + 兑换利润）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
@@ -523,7 +525,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 | 292 项（含制造产物推荐） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 | 300 项（含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
