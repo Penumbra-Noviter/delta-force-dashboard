@@ -501,6 +501,70 @@ QPushButton#refreshBtn:disabled {{
     color: {fg_muted};
 }}
 
+/* ═══════════════════════════════════════════
+   QTabWidget（利润页面标签页）
+   ═══════════════════════════════════════════ */
+QTabWidget::pane {{
+    background: transparent;
+    border: none;
+    border-top: 1px solid {separator};
+    padding: 0;
+}}
+QTabWidget::tab-bar {{
+    alignment: left;
+    padding: 0 32px;
+}}
+QTabBar::tab {{
+    background: transparent;
+    color: {fg_muted};
+    padding: 10px 20px;
+    margin: 0;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 13px;
+    font-weight: 500;
+}}
+QTabBar::tab:selected {{
+    color: {fg_today};
+    border-bottom: 2px solid {btn_bg};
+    font-weight: 600;
+}}
+QTabBar::tab:hover:!selected {{
+    color: {fg_label};
+    border-bottom: 2px solid {separator};
+}}
+
+/* ═══════════════════════════════════════════
+   兑换利润页面卡片
+   ═══════════════════════════════════════════ */
+QFrame#exchangeCard {{
+    background-color: {card_bg};
+    border: 1px solid {card_border};
+    border-radius: 12px;
+}}
+QLabel#exchangeItemName {{
+    color: {table_text_bold};
+    font-size: 16px;
+    font-weight: bold;
+}}
+QLabel#exchangeProfit {{
+    color: {fg_pos};
+    font-size: 14px;
+    font-weight: 600;
+}}
+QLabel#exchangePrice {{
+    color: {fg_label};
+    font-size: 12px;
+}}
+QLabel#exchangeTotal {{
+    color: {fg_label};
+    font-size: 12px;
+}}
+QLabel#exchangePackage {{
+    color: {fg_muted};
+    font-size: 11px;
+}}
+
 QPushButton#queryBtn {{
     background-color: {btn_bg};
     color: {btn_fg};

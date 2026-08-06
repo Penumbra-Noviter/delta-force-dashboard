@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from kkrb_client import (
+    AmmoPackageItem,
     CraftingProduct,
     KkrbClient,
     KkrbError,
@@ -82,3 +83,157 @@ class TestParseOVResponse:
     def test_parse_malformed(self) -> None:
         with pytest.raises(KkrbError):
             KkrbClient._parse_ov_response("not a dict")
+
+
+class TestAmmoPackageItem:
+    """AmmoPackageItem 数据模型测试。"""
+
+    def test_ammo_package_item_frozen(self) -> None:
+        item = AmmoPackageItem(
+            package_name="3级子弹自选包",
+            item_name="5.7x28mm L191",
+            item_grade=3,
+            item_count=200,
+            single_price=555,
+            total_price=111000,
+            profit=98790,
+        )
+        assert item.package_name == "3级子弹自选包"
+        assert item.item_name == "5.7x28mm L191"
+        assert item.item_grade == 3
+        assert item.item_count == 200
+        assert item.single_price == 555
+        assert item.total_price == 111000
+        assert item.profit == 98790
+
+
+class TestParseAmmoPackageResponse:
+    """解析 getAmmoPackageData 响应测试。"""
+
+    def test_parse_valid_cn_only(self) -> None:
+        data = {
+            "code": 1,
+            "data": {
+                "cn": [
+                    {
+                        "packageName": "3级子弹自选包",
+                        "itemName": "5.7x28mm L191",
+                        "itemGrade": 3,
+                        "itemCount": 200,
+                        "singlePrice": 555,
+                        "totalPrice": 111000,
+                        "profit": 98790,
+                    },
+                    {
+                        "packageName": "4级子弹自选包",
+                        "itemName": "6.8x51mm FMJ",
+                        "itemGrade": 4,
+                        "itemCount": 150,
+                        "singlePrice": 1934,
+                        "totalPrice": 290100,
+                        "profit": 258189,
+                    },
+                    {
+                        "packageName": "5级子弹自选包",
+                        "itemName": "5.8x42mm DVC12",
+                        "itemGrade": 5,
+                        "itemCount": 240,
+                        "singlePrice": 4585,
+                        "totalPrice": 1100400,
+                        "profit": 979356,
+                    },
+                ],
+                "en": [],
+                "version": "202608061035",
+            },
+        }
+        items = KkrbClient._parse_ammo_package_response(data)
+        # 只解析 cn 数据，3 条
+        assert len(items) == 3
+        # 按利润降序排列：5级 > 4级 > 3级
+        assert items[0].item_grade == 5
+        assert items[0].profit == 979356
+        assert items[1].item_grade == 4
+        assert items[1].profit == 258189
+        assert items[2].item_grade == 3
+        assert items[2].profit == 98790
+
+    def test_parse_filters_grade_2(self) -> None:
+        """2级子弹应被过滤掉。"""
+        data = {
+            "code": 1,
+            "data": {
+                "cn": [
+                    {
+                        "packageName": "2级子弹自选包",
+                        "itemName": "5.7x28mm SS197SR",
+                        "itemGrade": 2,
+                        "itemCount": 250,
+                        "singlePrice": 103,
+                        "totalPrice": 25750,
+                        "profit": 22917,
+                    },
+                    {
+                        "packageName": "3级子弹自选包",
+                        "itemName": "5.7x28mm L191",
+                        "itemGrade": 3,
+                        "itemCount": 200,
+                        "singlePrice": 555,
+                        "totalPrice": 111000,
+                        "profit": 98790,
+                    },
+                ],
+                "en": [],
+            },
+        }
+        items = KkrbClient._parse_ammo_package_response(data)
+        assert len(items) == 1
+        assert items[0].item_grade == 3
+
+    def test_parse_empty_data(self) -> None:
+        assert KkrbClient._parse_ammo_package_response(
+            {"code": 1, "data": {"cn": [], "en": []}}
+        ) == []
+
+    def test_parse_missing_data_key(self) -> None:
+        assert KkrbClient._parse_ammo_package_response({}) == []
+
+    def test_parse_malformed(self) -> None:
+        with pytest.raises(KkrbError):
+            KkrbClient._parse_ammo_package_response("not a dict")
+
+    def test_parse_multiple_same_grade(self) -> None:
+        """同一等级多个条目，全部返回（由 UI 层取最高利润）。"""
+        data = {
+            "code": 1,
+            "data": {
+                "cn": [
+                    {
+                        "packageName": "3级子弹自选包",
+                        "itemName": "5.7x28mm L191",
+                        "itemGrade": 3,
+                        "itemCount": 200,
+                        "singlePrice": 555,
+                        "totalPrice": 111000,
+                        "profit": 98790,
+                    },
+                    {
+                        "packageName": "3级子弹自选包",
+                        "itemName": ".45 ACP FMJ",
+                        "itemGrade": 3,
+                        "itemCount": 180,
+                        "singlePrice": 611,
+                        "totalPrice": 109980,
+                        "profit": 97882,
+                    },
+                ],
+                "en": [],
+            },
+        }
+        items = KkrbClient._parse_ammo_package_response(data)
+        assert len(items) == 2
+        # 按利润降序
+        assert items[0].item_name == "5.7x28mm L191"
+        assert items[0].profit == 98790
+        assert items[1].item_name == ".45 ACP FMJ"
+        assert items[1].profit == 97882

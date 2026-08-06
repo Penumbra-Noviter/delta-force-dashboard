@@ -46,7 +46,7 @@ from app.theme import (
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
-from app.crafting_page import CraftingPage
+from app.profit_page import ProfitPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
 from data_store import DataStore
@@ -251,9 +251,9 @@ class MainWindow(QMainWindow):
         self._date_label = dashboard._date_label
         self._stack.addWidget(dashboard)
 
-        # ── Page 1：制造产物推荐 ──
-        self.crafting_page = CraftingPage()
-        self._stack.addWidget(self.crafting_page)
+        # ── Page 1：利润（制造产物 + 兑换利润）──
+        self.profit_page = ProfitPage()
+        self._stack.addWidget(self.profit_page)
 
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)

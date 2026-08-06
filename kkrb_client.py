@@ -1,5 +1,5 @@
 """
-kkrb.net API 客户端：获取制造产物推荐数据。
+kkrb.net API 客户端：获取制造产物推荐数据及子弹自选包兑换利润数据。
 
 纯 stdlib 实现（urllib.request + http.cookiejar），零外部依赖。
 """
@@ -7,6 +7,7 @@ kkrb.net API 客户端：获取制造产物推荐数据。
 from __future__ import annotations
 
 __all__ = [
+    "AmmoPackageItem",
     "CraftingProduct",
     "KkrbClient",
     "KkrbError",
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.kkrb.net"
 _OV_ENDPOINT = f"{_BASE_URL}/getOVData"
+_AMMO_PACKAGE_ENDPOINT = f"{_BASE_URL}/getAmmoPackageData"
 _TIMEOUT = 10
 
 
@@ -39,6 +41,19 @@ class CraftingProduct:
     profit: int           # 单件总利润（当前售价 - 材料成本）
     ideal_price: int      # 当前单个售价
     sell_time: str        # 建议出售时段（如「晚上8点」「上午6点」）
+
+
+@dataclass(frozen=True)
+class AmmoPackageItem:
+    """子弹自选包兑换利润数据。"""
+
+    package_name: str        # 包名（如「3级子弹自选包」）
+    item_name: str           # 子弹名（如「5.7x28mm L191」）
+    item_grade: int          # 等级（3/4/5）
+    item_count: int          # 数量
+    single_price: int        # 单个售价
+    total_price: int         # 总价
+    profit: int              # 利润
 
 
 # ── 自定义异常 ──────────────────────────────────────────
@@ -77,6 +92,18 @@ class KkrbClient:
         """
         data = self._post_json(_OV_ENDPOINT)
         return self._parse_ov_response(data)
+
+    def fetch_ammo_package_data(self) -> list[AmmoPackageItem]:
+        """获取子弹自选包兑换利润数据。
+
+        Returns:
+            AmmoPackageItem 列表（仅 3/4/5 级），按利润降序排列。
+
+        Raises:
+            KkrbError: 网络请求失败或数据解析失败。
+        """
+        data = self._post_json(_AMMO_PACKAGE_ENDPOINT)
+        return self._parse_ammo_package_response(data)
 
     # ── CSRF 管理 ───────────────────────────────────────
 
@@ -153,6 +180,68 @@ class KkrbClient:
             return json.loads(text)
         except json.JSONDecodeError as e:
             raise KkrbError(f"JSON 解析失败: {e}") from e
+
+    @staticmethod
+    def _parse_ammo_package_response(data: Any) -> list[AmmoPackageItem]:
+        """解析 getAmmoPackageData 响应。
+
+        实际格式：
+        {
+            "code": 1,
+            "data": {
+                "cn": [...],
+                "en": [...],
+                "version": "..."
+            }
+        }
+
+        每个条目格式：
+        {
+            "packageName": "3级子弹自选包",
+            "itemName": "5.7x28mm L191",
+            "itemGrade": 3,
+            "itemCount": 200,
+            "singlePrice": 555,
+            "totalPrice": 111000,
+            "profit": 98790
+        }
+        """
+        if not isinstance(data, dict):
+            raise KkrbError(
+                f"弹药包数据格式异常: 期望 dict，got {type(data).__name__}"
+            )
+
+        raw = data.get("data", {})
+        if not isinstance(raw, dict):
+            return []
+
+        items: list[AmmoPackageItem] = []
+        for region in ("cn",):
+            region_data = raw.get(region, [])
+            if not isinstance(region_data, list):
+                continue
+            for entry in region_data:
+                if not isinstance(entry, dict):
+                    continue
+                grade = _int_or_zero(entry.get("itemGrade"))
+                # 只取 3/4/5 级子弹
+                if grade not in (3, 4, 5):
+                    continue
+                items.append(
+                    AmmoPackageItem(
+                        package_name=str(entry.get("packageName", "")),
+                        item_name=str(entry.get("itemName", "")),
+                        item_grade=grade,
+                        item_count=_int_or_zero(entry.get("itemCount")),
+                        single_price=_int_or_zero(entry.get("singlePrice")),
+                        total_price=_int_or_zero(entry.get("totalPrice")),
+                        profit=_int_or_zero(entry.get("profit")),
+                    )
+                )
+
+        # 按利润降序排列
+        items.sort(key=lambda p: p.profit, reverse=True)
+        return items
 
     @staticmethod
     def _parse_ov_response(data: Any) -> list[CraftingProduct]:
