@@ -544,23 +544,27 @@ QFrame#exchangeCard {{
 }}
 QLabel#exchangeItemName {{
     color: {table_text_bold};
-    font-size: 16px;
+    font-size: 15px;
     font-weight: bold;
 }}
 QLabel#exchangeProfit {{
     color: {fg_pos};
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
 }}
 QLabel#exchangePrice {{
     color: {fg_label};
-    font-size: 12px;
+    font-size: 11px;
 }}
 QLabel#exchangeTotal {{
     color: {fg_label};
-    font-size: 12px;
+    font-size: 11px;
 }}
-QLabel#exchangePackage {{
+QLabel#exchangePackageLabel {{
+    font-size: 14px;
+    font-weight: 700;
+}}
+QLabel#exchangeGradeLabel2 {{
     color: {fg_muted};
     font-size: 11px;
 }}

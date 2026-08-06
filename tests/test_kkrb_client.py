@@ -158,8 +158,8 @@ class TestParseAmmoPackageResponse:
         assert items[2].item_grade == 3
         assert items[2].profit == 98790
 
-    def test_parse_filters_grade_2(self) -> None:
-        """2级子弹应被过滤掉。"""
+    def test_parse_returns_all_grades(self) -> None:
+        """所有等级条目均返回，不再过滤 2 级。"""
         data = {
             "code": 1,
             "data": {
@@ -187,8 +187,10 @@ class TestParseAmmoPackageResponse:
             },
         }
         items = KkrbClient._parse_ammo_package_response(data)
-        assert len(items) == 1
+        assert len(items) == 2
+        # 按利润降序：3级 98790 > 2级 22917
         assert items[0].item_grade == 3
+        assert items[1].item_grade == 2
 
     def test_parse_empty_data(self) -> None:
         assert KkrbClient._parse_ammo_package_response(
@@ -237,3 +239,57 @@ class TestParseAmmoPackageResponse:
         assert items[0].profit == 98790
         assert items[1].item_name == ".45 ACP FMJ"
         assert items[1].profit == 97882
+
+    def test_parse_special_packages(self) -> None:
+        """特殊包类型（通行证/物流）被正确解析。"""
+        data = {
+            "code": 1,
+            "data": {
+                "cn": [
+                    {
+                        "packageName": "通行证基础子弹自选包",
+                        "itemName": ".45 ACP FMJ",
+                        "itemGrade": 3,
+                        "itemCount": 100,
+                        "singlePrice": 611,
+                        "totalPrice": 61100,
+                        "profit": 54379,
+                    },
+                    {
+                        "packageName": "通行证高级子弹自选包",
+                        "itemName": "5.8x42mm DBP10",
+                        "itemGrade": 4,
+                        "itemCount": 50,
+                        "singlePrice": 1813,
+                        "totalPrice": 90650,
+                        "profit": 80678,
+                    },
+                    {
+                        "packageName": "进阶物流子弹自选包",
+                        "itemName": ".50 AE JHP",
+                        "itemGrade": 3,
+                        "itemCount": 200,
+                        "singlePrice": 644,
+                        "totalPrice": 128800,
+                        "profit": 114632,
+                    },
+                    {
+                        "packageName": "特级物流子弹自选包",
+                        "itemName": "6.8x51mm FMJ",
+                        "itemGrade": 4,
+                        "itemCount": 200,
+                        "singlePrice": 1934,
+                        "totalPrice": 386800,
+                        "profit": 344252,
+                    },
+                ],
+                "en": [],
+            },
+        }
+        items = KkrbClient._parse_ammo_package_response(data)
+        assert len(items) == 4
+        names = {i.package_name for i in items}
+        assert "通行证基础子弹自选包" in names
+        assert "通行证高级子弹自选包" in names
+        assert "进阶物流子弹自选包" in names
+        assert "特级物流子弹自选包" in names

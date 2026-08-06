@@ -97,7 +97,7 @@ class KkrbClient:
         """获取子弹自选包兑换利润数据。
 
         Returns:
-            AmmoPackageItem 列表（仅 3/4/5 级），按利润降序排列。
+            AmmoPackageItem 列表，按利润降序排列。
 
         Raises:
             KkrbError: 网络请求失败或数据解析失败。
@@ -223,15 +223,11 @@ class KkrbClient:
             for entry in region_data:
                 if not isinstance(entry, dict):
                     continue
-                grade = _int_or_zero(entry.get("itemGrade"))
-                # 只取 3/4/5 级子弹
-                if grade not in (3, 4, 5):
-                    continue
                 items.append(
                     AmmoPackageItem(
                         package_name=str(entry.get("packageName", "")),
                         item_name=str(entry.get("itemName", "")),
-                        item_grade=grade,
+                        item_grade=_int_or_zero(entry.get("itemGrade")),
                         item_count=_int_or_zero(entry.get("itemCount")),
                         single_price=_int_or_zero(entry.get("singlePrice")),
                         total_price=_int_or_zero(entry.get("totalPrice")),

@@ -1,6 +1,9 @@
 """
-子弹自选包兑换利润页面：展示 3/4/5 级中利润最高的子弹兑换方案。
+子弹自选包兑换利润页面：展示所有子弹自选包中利润最高的子弹方案。
 
+包类型（7 种）：
+  - 普通：3/4/5 级子弹自选包
+  - 特殊：通行证基础/高级、进阶物流、特级物流
 数据来源于 kkrb.net API（KkrbClient.fetch_ammo_package_data），手动刷新。
 """
 
@@ -9,12 +12,12 @@ from __future__ import annotations
 __all__ = ["ExchangePage"]
 
 import logging
-from typing import Any
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -27,8 +30,19 @@ from formatting import format_money
 
 logger = logging.getLogger(__name__)
 
-_GRADE_LABELS = {3: "3级子弹", 4: "4级子弹", 5: "5级子弹"}
-_GRADE_COLORS = {3: "#6BA08A", 4: "#C08A3E", 5: "#D46A6A"}
+# 包类型显示配置：(显示名, 颜色标签, 颜色)
+_PACKAGE_CONFIG: list[tuple[str, str, str]] = [
+    ("3级子弹自选包", "3级子弹", "#6BA08A"),
+    ("4级子弹自选包", "4级子弹", "#C08A3E"),
+    ("5级子弹自选包", "5级子弹", "#D46A6A"),
+    ("通行证基础子弹自选包", "通行证基础", "#7B8CFF"),
+    ("通行证高级子弹自选包", "通行证高级", "#A58BFF"),
+    ("进阶物流子弹自选包", "进阶物流", "#E8A33D"),
+    ("特级物流子弹自选包", "特级物流", "#E8833D"),
+]
+
+# 每行卡片数
+_COLS = 4
 
 
 class ExchangePage(QWidget):
@@ -83,42 +97,47 @@ class ExchangePage(QWidget):
         self._status_label.setVisible(False)
         layout.addWidget(self._status_label)
 
-        # 3 个等级卡片（水平排列）
-        self._card_row = QHBoxLayout()
-        self._card_row.setSpacing(12)
-        self._cards: dict[int, QFrame] = {}
-        for grade in (3, 4, 5):
-            card = self._build_grade_card(grade)
-            self._cards[grade] = card
-            self._card_row.addWidget(card, 1)
-        layout.addLayout(self._card_row)
+        # 所有包卡片（网格布局，每行 4 列）
+        self._card_grid = QGridLayout()
+        self._card_grid.setSpacing(10)
+        self._cards: list[QFrame] = []
+        for i, (pkg_name, short_name, color) in enumerate(_PACKAGE_CONFIG):
+            card = self._build_package_card(short_name, color)
+            self._cards.append(card)
+            self._card_grid.addWidget(card, i // _COLS, i % _COLS)
+        layout.addLayout(self._card_grid)
 
         layout.addStretch()
 
-    def _build_grade_card(self, grade: int) -> QFrame:
-        """构建单个等级卡片。"""
+    def _build_package_card(self, short_name: str, color: str) -> QFrame:
+        """构建单个包类型的卡片。"""
         card = QFrame()
         card.setObjectName("exchangeCard")
         card.setFrameShape(QFrame.Shape.StyledPanel)
 
         cl = QVBoxLayout(card)
-        cl.setContentsMargins(16, 14, 16, 14)
-        cl.setSpacing(8)
+        cl.setContentsMargins(14, 12, 14, 12)
+        cl.setSpacing(6)
 
-        # 等级标签（带颜色）
-        grade_label = QLabel(_GRADE_LABELS.get(grade, f"{grade}级子弹"))
-        grade_label.setObjectName("exchangeGradeLabel")
-        color = _GRADE_COLORS.get(grade, "#6BA08A")
-        grade_label.setStyleSheet(
-            f"font-size: 15px; font-weight: 700; color: {color};"
+        # 包名标签（带颜色）
+        pkg_label = QLabel(short_name)
+        pkg_label.setObjectName("exchangePackageLabel")
+        pkg_label.setStyleSheet(
+            f"font-size: 14px; font-weight: 700; color: {color};"
         )
-        cl.addWidget(grade_label)
+        cl.addWidget(pkg_label)
 
         # 子弹名
         item_name = QLabel("加载中…")
         item_name.setObjectName("exchangeItemName")
-        item_name.setStyleSheet("font-size: 16px; font-weight: bold;")
+        item_name.setStyleSheet("font-size: 15px; font-weight: bold;")
         cl.addWidget(item_name)
+
+        # 等级标签
+        grade_label = QLabel("")
+        grade_label.setObjectName("exchangeGradeLabel2")
+        grade_label.setStyleSheet("font-size: 11px;")
+        cl.addWidget(grade_label)
 
         # 分隔线
         sep = QFrame()
@@ -136,26 +155,19 @@ class ExchangePage(QWidget):
         price.setObjectName("exchangePrice")
         cl.addWidget(price)
 
-        # 总价
+        # 总价 + 数量
         total = QLabel("")
         total.setObjectName("exchangeTotal")
         cl.addWidget(total)
 
-        # 包名
-        pkg = QLabel("")
-        pkg.setObjectName("exchangePackage")
-        pkg.setStyleSheet("font-size: 11px;")
-        cl.addWidget(pkg)
-
         cl.addStretch()
 
         # 存储子控件引用
-        card._grade = grade
         card._item_name = item_name
+        card._grade_label = grade_label
         card._profit = profit
         card._price = price
         card._total = total
-        card._pkg = pkg
 
         return card
 
@@ -163,17 +175,17 @@ class ExchangePage(QWidget):
         """更新卡片内容。"""
         if item is None:
             card._item_name.setText("暂无数据")
+            card._grade_label.setText("")
             card._profit.setText("")
             card._price.setText("")
             card._total.setText("")
-            card._pkg.setText("")
             return
 
         card._item_name.setText(item.item_name)
+        card._grade_label.setText(f"Lv.{item.item_grade}  ×{item.item_count}")
         card._profit.setText(f"利润：{format_money(item.profit)}")
-        card._price.setText(f"单个售价：{format_money(item.single_price)}")
+        card._price.setText(f"单价：{format_money(item.single_price)}")
         card._total.setText(f"总价：{format_money(item.total_price)}")
-        card._pkg.setText(f"来源：{item.package_name} × {item.item_count}")
 
     # ── 数据加载 ────────────────────────────────────────
 
@@ -211,21 +223,20 @@ class ExchangePage(QWidget):
             self._render_cards()
 
     def _render_cards(self) -> None:
-        """为每个等级选取利润最高的条目并渲染卡片。"""
-        # 按等级分组
-        best_by_grade: dict[int, AmmoPackageItem] = {}
+        """为每个包类型选取利润最高的条目并渲染卡片。"""
+        # 按包名分组，每组取利润最高
+        best_by_package: dict[str, AmmoPackageItem] = {}
         for item in self._items:
-            g = item.item_grade
-            if g not in best_by_grade or item.profit > best_by_grade[g].profit:
-                best_by_grade[g] = item
+            pkg = item.package_name
+            if pkg not in best_by_package or item.profit > best_by_package[pkg].profit:
+                best_by_package[pkg] = item
 
-        # 更新卡片
-        for grade in (3, 4, 5):
-            card = self._cards.get(grade)
-            if card is None:
-                continue
-            best = best_by_grade.get(grade)
-            self._update_card(card, best)
+        # 按配置顺序更新卡片
+        for i, (pkg_name, _short_name, _color) in enumerate(_PACKAGE_CONFIG):
+            if i >= len(self._cards):
+                break
+            best = best_by_package.get(pkg_name)
+            self._update_card(self._cards[i], best)
 
     def refresh(self) -> None:
         """公开刷新方法（供外部调用）。"""
