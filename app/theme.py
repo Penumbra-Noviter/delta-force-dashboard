@@ -564,7 +564,7 @@ QLabel#exchangePackageLabel {{
     font-size: 14px;
     font-weight: 700;
 }}
-QLabel#exchangeGradeLabel2 {{
+QLabel#exchangeGradeAndCount {{
     color: {fg_muted};
     font-size: 11px;
 }}

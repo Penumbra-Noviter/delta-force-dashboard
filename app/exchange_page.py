@@ -25,20 +25,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from typing import NamedTuple
+
 from kkrb_client import AmmoPackageItem, KkrbClient, KkrbError
 from formatting import format_money
 
 logger = logging.getLogger(__name__)
 
-# 包类型显示配置：(显示名, 颜色标签, 颜色)
-_PACKAGE_CONFIG: list[tuple[str, str, str]] = [
-    ("3级子弹自选包", "3级子弹", "#6BA08A"),
-    ("4级子弹自选包", "4级子弹", "#C08A3E"),
-    ("5级子弹自选包", "5级子弹", "#D46A6A"),
-    ("通行证基础子弹自选包", "通行证基础", "#7B8CFF"),
-    ("通行证高级子弹自选包", "通行证高级", "#A58BFF"),
-    ("进阶物流子弹自选包", "进阶物流", "#E8A33D"),
-    ("特级物流子弹自选包", "特级物流", "#E8833D"),
+# 包类型显示配置
+class _PackageConfig(NamedTuple):
+    """一个子弹自选包类型的显示配置。"""
+    display_name: str   # 包全名（在 API 中用作 key）
+    short_name: str     # 卡片上显示的短标签
+    color: str          # 标签颜色
+
+_PACKAGE_CONFIG: list[_PackageConfig] = [
+    _PackageConfig("3级子弹自选包", "3级子弹", "#6BA08A"),
+    _PackageConfig("4级子弹自选包", "4级子弹", "#C08A3E"),
+    _PackageConfig("5级子弹自选包", "5级子弹", "#D46A6A"),
+    _PackageConfig("通行证基础子弹自选包", "通行证基础", "#7B8CFF"),
+    _PackageConfig("通行证高级子弹自选包", "通行证高级", "#A58BFF"),
+    _PackageConfig("进阶物流子弹自选包", "进阶物流", "#E8A33D"),
+    _PackageConfig("特级物流子弹自选包", "特级物流", "#E8833D"),
 ]
 
 # 每行卡片数
@@ -101,8 +109,8 @@ class ExchangePage(QWidget):
         self._card_grid = QGridLayout()
         self._card_grid.setSpacing(10)
         self._cards: list[QFrame] = []
-        for i, (pkg_name, short_name, color) in enumerate(_PACKAGE_CONFIG):
-            card = self._build_package_card(short_name, color)
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
+            card = self._build_package_card(cfg.short_name, cfg.color)
             self._cards.append(card)
             self._card_grid.addWidget(card, i // _COLS, i % _COLS)
         layout.addLayout(self._card_grid)
@@ -135,7 +143,7 @@ class ExchangePage(QWidget):
 
         # 等级标签
         grade_label = QLabel("")
-        grade_label.setObjectName("exchangeGradeLabel2")
+        grade_label.setObjectName("exchangeGradeAndCount")
         grade_label.setStyleSheet("font-size: 11px;")
         cl.addWidget(grade_label)
 
@@ -232,10 +240,10 @@ class ExchangePage(QWidget):
                 best_by_package[pkg] = item
 
         # 按配置顺序更新卡片
-        for i, (pkg_name, _short_name, _color) in enumerate(_PACKAGE_CONFIG):
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
             if i >= len(self._cards):
                 break
-            best = best_by_package.get(pkg_name)
+            best = best_by_package.get(cfg.display_name)
             self._update_card(self._cards[i], best)
 
     def refresh(self) -> None:
