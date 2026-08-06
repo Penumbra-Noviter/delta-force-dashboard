@@ -86,7 +86,7 @@ Profit Calculator/
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，M-01）
-│   ├── profit_page.py       ← 利润页面标签页容器（制造产物 + 兑换利润）
+│   ├── profit_page.py       ← 利润页面单页滚动容器（制造产物 + 兑换利润纵向堆叠）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
@@ -118,8 +118,7 @@ Profit Calculator/
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->18<!--/AUTO--> 个测试（数据模型 + OV 响应解析）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
-	│   ├── test_sqlite_store.py ← <!--AUTO:tests:tests/test_sqlite_store.py-->7<!--/AUTO--> 个测试（SQLite 持久化 CRUD + 迁移）
-	│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
+		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -333,7 +332,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~629 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~597 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -427,7 +426,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~156 行<!--/AUTO-->）
+### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~154 行<!--/AUTO-->）
 
 #### 类：`DataStore`
 

@@ -107,7 +107,7 @@ profit-calculator/
 │   ├── sidebar.py           # 左侧导航栏（记账/利润 + 底部操作按钮）
 │   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
 │   ├── exchange_page.py     # 兑换利润页面（7 种子弹自选包）
-│   ├── profit_page.py       # 利润页面（标签页容器：制造产物 + 兑换利润）
+│   ├── profit_page.py       # 利润页面（纵向堆叠：制造产物 + 兑换利润）
 │   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
 │   ├── table_widget.py      # 7/30 视图可切换数据表格
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出
