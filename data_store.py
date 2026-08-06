@@ -12,13 +12,11 @@ from typing import Any, Generic, TypeVar
 
 from config import DATA_FILE, _BACKUP_FILE as BACKUP_FILE
 from json_file import atomic_write_json
-from sqlite_store import SQLiteDataStore
 
 T = TypeVar("T", bound=dict)
 
 __all__ = [
     "DataStore",
-    "SQLiteDataStore",
     "MIGRATED_MARKER_NAME",
     "migrate_legacy_data",
     "log_legacy_cleanup_hint",
