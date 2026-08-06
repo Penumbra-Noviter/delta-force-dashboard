@@ -6,7 +6,13 @@
 
 ---
 
-## 滚动摘要（2026-08-05）
+## 滚动摘要（2026-08-06）
+
+- **X 系列完成**：子弹自选包兑换利润模块 — X-01 兑换利润页面（`app/exchange_page.py`，7 种包类型网格展示，kkrb_client 新增 `AmmoPackageItem`/`fetch_ammo_package_data()`）+ X-02 特殊子弹自选包扩展（4 种新增包：通行证基础/高级、进阶物流、特级物流）+ X-03 代码气味消除（NamedTuple `_PackageConfig`、`exchangeGradeAndCount` 重命名）
+- **ProfitPage 重构**：QTabWidget 标签页 → QScrollArea 纵向堆叠，制造产物与兑换利润无需切换直接可见
+- **死代码清理**：移除 SQLiteDataStore（`sqlite_store.py` + `test_sqlite_store.py`，有测试无 UI 消费者，与 D-06 纪律对齐）
+- **测试**：pytest **293/293** ✅
+- **文档**：8 已有提交补 DEV_LOG + TO-TICKETS 归档
 
 - **M-01 修复**：暗色主题 `CHART_GRID` 色值 `rgba(255,255,255,.05)` 无法被 pyqtgraph 解析（`pg.mkColor` 只认十六进制/SVG 名，浮点 alpha 的 `rgba()` 抛 ValueError）→ 暗色主题下首次绘制图表即崩；改 `#RRGGBBAA` 八位十六进制（`#FFFFFF0D`，alpha 13≈5%，视觉一致）+ 回归测试
 - **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
@@ -21,6 +27,50 @@
 ---
 
 ## 日志正文
+
+### 2026-08-06 | 清理 | 移除 SQLiteDataStore 死代码（与 D-06 纪律对齐）
+- 删 `sqlite_store.py`（99 行）+ `tests/test_sqlite_store.py`（107 行）
+- `data_store.py` 脱 `from sqlite_store import SQLiteDataStore` 导入 + `__all__` 移除条目
+- `CODE_WIKI.md` 文件树同步删 `test_sqlite_store.py` 行
+- 有测试无 UI 消费者，真死代码，与 D-06 一致
+- pytest 293/293 ✅
+
+### 2026-08-06 | 重构 | ProfitPage 标签页改为纵向堆叠（QTabWidget→QScrollArea）
+- 制造产物推荐 + 兑换利润在同一滚动页面内纵向堆叠，无需标签页切换
+- 各自保留标题栏与刷新按钮，独立刷新；`setSizePolicy(Policy.Fixed)` 按内容高度排列
+- `addStretch()` 内容不足时推到顶部，超出时滚动条自动出现
+- theme.py 删除 QTabWidget/QTabBar 33 行 QSS 样式（不再需要）
+- CODE_WIKI/README profit_page 描述同步更新
+- pytest 293/293 ✅
+
+### 2026-08-06 | 多个 | 兑换利润模块（X 系列）— 无工单无日志，补充记录
+- 源：08-05 起从 L-03 制造利润页面延伸，独立进入兑换利润方向
+- 以下 4 个提交合并为 X 系列统一补录
+
+#### X-01（8c6393e）：子弹自选包兑换利润模块，制造板块更名为利润
+- 新增 `AmmoPackageItem` 数据模型（frozen dataclass）和 `fetch_ammo_package_data()` API
+- 新增 `ExchangePage`：展示 3/4/5 级子弹中利润最高的兑换方案，QTabWidget 标签页容器
+- 新增 `ProfitPage`：QTabWidget 标签页容器（制造产物 + 兑换利润）
+- 侧边栏「制造」→「利润」；新增 QTabWidget + 兑换卡片 QSS
+- 测试 +7；pytest 299/299 ✅
+
+#### X-02（7977de6）：兑换利润页面增加 4 种特殊子弹自选包
+- 取消 kkrb_client 等级过滤，返回所有子弹数据
+- exchange_page 重构：7 种包类型各一张卡片（4 列网格布局）
+- 新增卡片：通行证基础/高级、进阶物流、特级物流
+- 新增样式 exchangeGradeLabel2/exchangePackageLabel；测试 +2（全等级解析 + 特殊包解析）
+
+#### （235cf9a）：文档同步（测试计数、页面列表、项目结构）
+- CODE_WIKI.md + README.md 同步
+
+#### X-03（c9bdeb7）：消除两个代码气味
+- Primitive Obsession：`_PACKAGE_CONFIG` list[tuple] → NamedTuple `_PackageConfig`
+- Mysterious Name：`exchangeGradeLabel2` → `exchangeGradeAndCount`
+
+### 2026-08-06 | 推送 | origin 4 提交落后修复 + 8 提交统一推送
+- origin/main 落后 HEAD 4 个提交（X 系列 + 文档同步）
+- 工作区 3 个改动（profit_page 重构 + 死代码清理 + DEV_LOG/TO-TICKETS 补录）一并提交
+- 共 8 提交推送至 origin（已推 + 4 新增）
 
 ### 2026-08-05 | 打包 | 主分支重新打包（M-01 后）+ 烟测通过（dark 崩溃场景直接验证）
 - 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
