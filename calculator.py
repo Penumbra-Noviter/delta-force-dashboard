@@ -62,6 +62,8 @@ class ProfitCalculatorLogic:
                 # 记 warning 使该行为可观测（O-01：不允许静默）。
                 logger.warning("跳过损坏/非法记录（%s）", date_str)
 
+        self._sorted_dates: list[str] = sorted(self.data.keys())
+
     @staticmethod
     def _parse_record(date_str: str, raw: object) -> DayRecord | None:
         """把单条裸 dict 解析为 DayRecord；已是 DayRecord 直接返回，损坏/非法返回 None。"""
@@ -102,7 +104,11 @@ class ProfitCalculatorLogic:
         record = DayRecord(
             cash=rounded_cash, warehouse=rounded_warehouse, date=date_str
         )
+        is_new = date_str not in self.data
         self.data[date_str] = record
+        if is_new:
+            self._sorted_dates.append(date_str)
+            self._sorted_dates.sort()
         return record
 
     @staticmethod
@@ -151,7 +157,7 @@ class ProfitCalculatorLogic:
         不因日历窗口丢弃仍保留在 data 中的老记录；无效/缺失字段的记录被跳过。
         """
         records: list[tuple[str, "DayRecord"]] = []
-        for date_str in sorted(self.data):
+        for date_str in self._sorted_dates:
             record = self.get_record(date_str)
             if record is not None:
                 records.append((date_str, record))
@@ -235,6 +241,7 @@ class ProfitCalculatorLogic:
         """删除某日记录；不存在时返回 False。"""
         if date_str in self.data:
             del self.data[date_str]
+            self._sorted_dates.remove(date_str)
             return True
         return False
 
@@ -253,10 +260,10 @@ class ProfitCalculatorLogic:
         """
         if len(self.data) <= days:
             return []
-        sorted_dates = sorted(self.data.keys())
-        deleted = sorted_dates[: len(sorted_dates) - days]
+        deleted = self._sorted_dates[: len(self._sorted_dates) - days]
         for old_date in deleted:
             del self.data[old_date]
+            self._sorted_dates.remove(old_date)
             logger.info("保留策略删除最旧记录（保留最近 %d 条）: %s", days, old_date)
         return deleted
 
@@ -308,7 +315,7 @@ class ProfitCalculatorLogic:
         writer = csv.writer(buffer, lineterminator="\n")
         writer.writerow(["日期", "现金", "仓库", "较前日", "收益率"])
         prev_warehouse: float | None = None
-        for date_str in sorted(self.data):
+        for date_str in self._sorted_dates:
             record = self.get_record(date_str)
             if record is None:
                 continue
@@ -365,7 +372,7 @@ class ProfitCalculatorLogic:
         if not self.data:
             return {}
 
-        sorted_dates = sorted(self.data)
+        sorted_dates = self._sorted_dates
         groups: dict[str, list[DayRecord]] = {}
 
         for date_str in sorted_dates:

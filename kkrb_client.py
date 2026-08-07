@@ -14,6 +14,7 @@ __all__ = [
 ]
 
 import logging
+import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ _BASE_URL = "https://www.kkrb.net"
 _OV_ENDPOINT = f"{_BASE_URL}/getOVData"
 _AMMO_PACKAGE_ENDPOINT = f"{_BASE_URL}/getAmmoPackageData"
 _TIMEOUT = 10
+_CACHE_TTL = 60  # 秒；缓存有效期内不重复请求
 
 
 # ── 数据模型 ────────────────────────────────────────────
@@ -78,6 +80,7 @@ class KkrbClient:
         self._cookie_jar = CookieJar()
         self._opener = build_opener(HTTPCookieProcessor(self._cookie_jar))
         self._csrf_token: str | None = None
+        self._cache: dict[str, tuple[float, Any]] = {}  # url → (timestamp, data)
 
     # ── 公开接口 ────────────────────────────────────────
 
@@ -147,7 +150,14 @@ class KkrbClient:
     # ── HTTP 请求 ───────────────────────────────────────
 
     def _post_json(self, url: str) -> Any:
-        """发送 POST 请求并解析 JSON 响应。"""
+        """发送 POST 请求并解析 JSON 响应（带 TTL 缓存）。"""
+        # 缓存命中且未过期 → 直接返回
+        now = time.monotonic()
+        if url in self._cache:
+            cached_at, data = self._cache[url]
+            if now - cached_at < _CACHE_TTL:
+                return data
+
         token = self._ensure_csrf()
         headers = {
             "User-Agent": self._user_agent(),
@@ -160,7 +170,9 @@ class KkrbClient:
         try:
             with self._opener.open(req, timeout=_TIMEOUT) as resp:
                 body = resp.read().decode("utf-8", errors="replace")
-            return self._parse_json(body)
+            data = self._parse_json(body)
+            self._cache[url] = (time.monotonic(), data)
+            return data
         except (OSError, ValueError) as e:
             msg = f"POST {url} 失败: {e}"
             logger.error(msg)
@@ -297,9 +309,10 @@ class KkrbClient:
         return "ProfitCalculator/1.0"
 
     def reset(self) -> None:
-        """重置 CSRF token 和 cookie jar（强制下次请求重新认证）。"""
+        """重置 CSRF token、cookie jar 和缓存（强制下次请求重新认证）。"""
         self._csrf_token = None
         self._cookie_jar.clear()
+        self._cache.clear()
 
 
 def _int_or_zero(value: Any) -> int:

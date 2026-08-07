@@ -146,6 +146,7 @@ class CraftingPage(QWidget):
         self._worker.start()
 
     def _on_fetch_done(self, products: list[CraftingProduct]) -> None:
+        self._loaded_once = True
         self._products = products
         self._error = None
         self._status_label.setVisible(False)

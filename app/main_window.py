@@ -12,7 +12,7 @@ import logging
 import platform
 from datetime import datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -140,6 +140,9 @@ class MainWindow(QMainWindow):
 
         # 初始渲染
         self.refresh_display()
+
+        # 仪表盘渲染完成后，后台预加载利润页面数据
+        QTimer.singleShot(500, self._preload_profit_page)
 
         # 恢复置顶状态
         if self._settings.get("pinned", False):
@@ -325,14 +328,25 @@ class MainWindow(QMainWindow):
     def _toggle_theme(self) -> None:
         self._theme = "dark" if self._theme == "light" else "light"
         set_theme(self._theme)
+        self.refresh_theme()
+        self._save_settings()
+
+    def refresh_theme(self) -> None:
+        """仅刷新主题视觉样式，不重新加载数据。
+
+        主题切换时，get_color() 已返回新主题色值，全部 UI 组件
+        通过调用自身的 apply_theme 方法增量更新颜色，无需重新获取数据。
+        """
         self._apply_qss()
         self._update_theme_btn_text()
         self._update_pin_btn_style()
         self.input_panel.apply_theme()
-        # 图表在主题切换后标记清除，下次 draw 重建
         self.chart.apply_theme()
-        self.refresh_display()
-        self._save_settings()
+        # 表格用当前数据重绘（get_color 自动取新主题色）
+        records = self._get_records()
+        self._update_summary()
+        self._update_today_status()
+        self.table.draw(records, self.today)
 
     # ═══════════════════════════════════════════════════════
     # 置顶
@@ -550,6 +564,28 @@ class MainWindow(QMainWindow):
         self._update_today_status()
         self.table.draw(records, self.today)
         self.chart.draw(records)
+
+    def _preload_profit_page(self) -> None:
+        """仪表盘渲染完成后，后台预加载利润页面制造产物数据。
+
+        用户导航到 ProfitPage 时制造产物数据已就绪，消除加载中闪烁。
+        兑换利润数据由 ProfitPage 首次 showEvent 自行加载（不预加载）。
+        预加载失败时静默处理，用户手动刷新即可。
+        测试（offscreen 模式）下跳过预加载，避免后台线程冲突。
+        """
+        import os
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return
+
+        from app.fetch_worker import FetchWorker
+
+        crafting = self.profit_page.crafting_page
+        if crafting._loaded_once or crafting._loading:
+            return
+        worker = FetchWorker(crafting._client.fetch_ov_data)
+        worker.done.connect(crafting._on_fetch_done)
+        worker.error.connect(lambda e: None)
+        worker.start()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。

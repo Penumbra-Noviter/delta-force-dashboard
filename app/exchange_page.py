@@ -214,6 +214,7 @@ class ExchangePage(QWidget):
         self._worker.start()
 
     def _on_fetch_done(self, items: list[AmmoPackageItem]) -> None:
+        self._loaded_once = True
         self._items = items
         self._error = None
         self._status_label.setVisible(False)
