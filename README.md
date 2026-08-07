@@ -1,4 +1,4 @@
-# 收益计算器 (Profit Calculator)
+# Delta Force Dashboard
 
 一款为个人投资者打造的 Windows 桌面收益追踪工具。每天记录「当前现金」与「仓库价值」两个数字，自动计算盈亏变化、收益率，并以表格和双曲线图直观展示最近 7/30 条记录的趋势（视图可切换）。
 
@@ -58,14 +58,14 @@
 
 ### 方式一：直接运行打包版（推荐）
 
-前往 [Releases](../../releases) 下载 `收益计算器` 打包目录（压缩包），解压后双击目录内 `收益计算器.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `C:\Users\<你的用户名>\收益计算器\`（开发版与打包版共用；旧版 exe 目录/项目根内的数据会在首次启动时自动迁移过去；迁移完成后若旧源仍存在，启动时会提示可手动清理旧数据源，应用不会自动删除）。
+前往 [Releases](../../releases) 下载 `Delta Force Dashboard` 打包目录（压缩包），解压后双击目录内 `Delta Force Dashboard.exe` 即可运行，无需安装 Python 环境。运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `C:\Users\<你的用户名>\Delta Force Dashboard\`（开发版与打包版共用；旧版 exe 目录/项目根内的数据会在首次启动时自动迁移过去；迁移完成后若旧源仍存在，启动时会提示可手动清理旧数据源，应用不会自动删除）。
 
 ### 方式二：从源码运行
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Penumbra-Noviter/profit-calculator.git
-cd profit-calculator
+git clone https://github.com/Penumbra-Noviter/delta-force-dashboard.git
+cd delta-force-dashboard
 
 # 2. 安装依赖
 pip install -r requirements.txt
@@ -89,7 +89,7 @@ python main.py
 
 ## 数据与隐私
 
-- 所有数据存储于本地 `data.json` 文件（`C:\Users\<你的用户名>\收益计算器\data.json`），**不联网、不上传、不收集任何信息**
+- 所有数据存储于本地 `data.json` 文件（`C:\Users\<你的用户名>\Delta Force Dashboard\data.json`），**不联网、不上传、不收集任何信息**
 - 每次保存自动生成滚动备份，最多保留 4 份历史备份（3 份滚动 + 1 份兼容旧版）
 - 数据文件损坏时可自动从最近备份恢复
 - 窗口位置、主题、置顶状态等设置保存于 `settings.json`（同一目录）
@@ -99,7 +99,7 @@ python main.py
 ## 项目结构
 
 ```
-profit-calculator/
+delta-force-dashboard/
 ├── main.py                  # 程序入口（单实例 + 应用图标）
 ├── app/
 │   ├── __init__.py          # app 包标记
@@ -123,7 +123,7 @@ profit-calculator/
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
 ├── tests/                   # 测试（292 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
-├── 收益计算器.spec           # PyInstaller 打包配置
+├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）
 └── requirements-dev.txt     # 开发依赖（pytest）
 ```
@@ -141,10 +141,10 @@ python -m pytest tests/ -q
 ### 打包
 
 ```bash
-python -m PyInstaller 收益计算器.spec --noconfirm
+python -m PyInstaller delta_force_dashboard.spec --noconfirm
 ```
 
-打包产物位于 `dist/收益计算器/`（onedir：`收益计算器.exe` + `_internal/`，整目录分发或 zip 压缩）。O-20 起由单文件改为 onedir——免去每次启动把 80MB 包解压成 181MB 的开销，启动从 ~2-4s 降至 ~1.5s；体积经 excludes（matplotlib/PIL）+ Qt 模块白名单 + 翻译文件剔除瘦身。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
+打包产物位于 `dist/Delta Force Dashboard/`（onedir：`Delta Force Dashboard.exe` + `_internal/`，整目录分发或 zip 压缩）。O-20 起由单文件改为 onedir——免去每次启动把 80MB 包解压成 181MB 的开销，启动从 ~2-4s 降至 ~1.5s；体积经 excludes（matplotlib/PIL）+ Qt 模块白名单 + 翻译文件剔除瘦身。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
 
 ---
 

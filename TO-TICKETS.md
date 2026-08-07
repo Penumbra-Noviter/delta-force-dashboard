@@ -1,4 +1,4 @@
-# To-Tickets — Profit Calculator 衍生的框架
+# To-Tickets — Delta Force Dashboard
 
 > **来源**：2026-08-04 架构迁移（domain/skeleton/adapter 三包分离）+ 后续增强候选
 > **规则**：本文件是**仓库内唯一的待办事实来源**。活跃表只保留「未完成」工单；每完成一项 → 移入「已完成归档」并记日期 → 同步 `DEV_LOG.md` → 与本提交一起 commit。

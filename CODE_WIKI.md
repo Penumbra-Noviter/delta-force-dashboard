@@ -1,4 +1,4 @@
-# 收益计算器 (Profit Calculator) — Code Wiki
+# Delta Force Dashboard — Code Wiki
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-06  
@@ -8,7 +8,7 @@
 
 ## 一、项目概述
 
-**收益计算器**是一款 Windows 桌面工具，面向个人投资者。用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动保留最近 30 条实际录入记录（间断录入不丢历史），视图 7/30 可切换，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
+**Delta Force Dashboard**是一款 Windows 桌面工具，面向个人投资者。用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动保留最近 30 条实际录入记录（间断录入不丢历史），视图 7/30 可切换，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
 | 属性 | 说明 |
 |------|------|
@@ -16,7 +16,7 @@
 | UI 框架 | PySide6（Qt 官方绑定，LGPL 协议） |
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
-| 打包方式 | PyInstaller → onedir 目录（`dist/收益计算器/`，O-20 起） |
+| 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
 | 测试框架 | pytest（292 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
@@ -79,7 +79,7 @@
 ## 三、文件结构
 
 ```
-Profit Calculator/
+Delta Force Dashboard/
 ├── main.py                  ← [主入口] PySide6 QApplication + 单实例保证 + 应用图标
 ├── app/
 │   ├── __init__.py          ← app 包标记
@@ -120,7 +120,7 @@ Profit Calculator/
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
-├── 收益计算器.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
+├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
 ├── settings.json            ← 窗口几何 + 置顶 + 主题持久化
 ├── requirements.txt         ← PySide6==6.11.1, pyqtgraph==0.14.0（O-12 版本锁定）
@@ -134,7 +134,7 @@ Profit Calculator/
 
 ## 四、核心模块详细说明
 
-### 4.1 `main.py` — 程序入口（<!--AUTO:lines:main.py-->~98 行<!--/AUTO-->）
+### 4.1 `main.py` — 程序入口（<!--AUTO:lines:main.py-->~108 行<!--/AUTO-->）
 
 **职责**：启动 PySide6 应用，单实例保证，应用图标，事件循环管理。
 
@@ -408,12 +408,12 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~40 行<!--/AUTO-->）
+### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~43 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
 | `APP_DIR` | Path | 应用所在目录（打包版为 exe 目录，源码版为项目根）；O-22 起仅作「旧数据源」供一次性迁移 |
-| `DATA_DIR` | `Path.home()/收益计算器` | 统一数据目录（开发版与 exe 共用，O-22） |
+| `DATA_DIR` | `Path.home()/Delta Force Dashboard` | 统一数据目录（开发版与 exe 共用，O-22） |
 | `DATA_FILE` | `DATA_DIR/data.json` | 数据文件路径 |
 | `BACKUP_FILE` | `DATA_DIR/data.json.bak` | 备份文件基础路径 |
 | `SETTINGS_FILE` | `DATA_DIR/settings.json` | 设置文件路径 |
@@ -667,16 +667,16 @@ pytest
 
 ```bash
 pip install pyinstaller
-python -m PyInstaller 收益计算器.spec --noconfirm
+python -m PyInstaller delta_force_dashboard.spec --noconfirm
 ```
 
-**产物**（O-20 起为 onedir）：`dist/收益计算器/收益计算器.exe` + `dist/收益计算器/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `~/收益计算器`（O-22），与 exe 位置/重建解耦——`dist/` 每次构建整体覆盖也不影响用户数据。旧版 exe 目录/项目根内的数据在首次启动时由 `migrate_legacy_data` 自动复制（复制非移动，源保留）。迁移完成后写 `.migrated` 完成标记（F-02）；启动时若标记存在且旧源 `data.json` 仍在，打 info 日志提示「旧数据源可手动清理」。**源清理时间点 = 目标数据确认健康之后，用户确认后手动执行**：应用绝不自动删源，删除是用户确认的手动动作。
+**产物**（O-20 起为 onedir）：`dist/Delta Force Dashboard/Delta Force Dashboard.exe` + `dist/Delta Force Dashboard/_internal/`。整目录分发或 zip 压缩，双击 exe 即运行；运行态数据（`data.json`/`settings.json`/日志）统一生成在用户目录 `~/Delta Force Dashboard`（O-22），与 exe 位置/重建解耦——`dist/` 每次构建整体覆盖也不影响用户数据。旧版 exe 目录/项目根内的数据在首次启动时由 `migrate_legacy_data` 自动复制（复制非移动，源保留）。迁移完成后写 `.migrated` 完成标记（F-02）；启动时若标记存在且旧源 `data.json` 仍在，打 info 日志提示「旧数据源可手动清理」。**源清理时间点 = 目标数据确认健康之后，用户确认后手动执行**：应用绝不自动删源，删除是用户确认的手动动作。
 
-**为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致；O-22 后运行态数据不再依赖 `APP_DIR`，改走 `DATA_DIR`（`Path.home()/收益计算器`）。
+**为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致；O-22 后运行态数据不再依赖 `APP_DIR`，改走 `DATA_DIR`（`Path.home()/Delta Force Dashboard`）。
 
 **体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件。`upx=False`（本机未装 UPX，此前为空转）。
 
-**图标**：`收益计算器.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随包内嵌，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
+**图标**：`delta_force_dashboard.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随包内嵌，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
 
 ### 8.5 文档同步（F-01）
 

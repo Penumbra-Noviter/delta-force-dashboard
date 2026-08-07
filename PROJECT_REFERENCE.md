@@ -1,14 +1,14 @@
-# 收益计算器 — 项目介绍书
+# Delta Force Dashboard — 项目介绍书
 
 > **一句话**：每日记录现金和仓库价值两项数据，自动保留最近 30 条记录并绘制收益曲线，计算盈亏（视图 7/30 可切换）。
 > **技术栈**：Python PySide6 + pyqtgraph
-> **打包**：PyInstaller onedir（`dist/收益计算器/`，exe + `_internal/`）
+> **打包**：PyInstaller onedir（`dist/Delta Force Dashboard/`，exe + `_internal/`）
 
 ---
 
 ## 一、项目概述
 
-收益计算器（Profit Calculator）是一款 Windows 桌面工具，主要面向个人投资者。
+Delta Force Dashboard 是一款 Windows 桌面工具，主要面向个人投资者。
 
 **核心场景**：用户每天记录「当前现金」和「仓库价值（含现金）」两个数字，工具自动保留最近 30 条实际录入记录（间断录入不丢历史），视图 7/30 可切换，以表格展示每日盈亏变化，并以双曲线图可视化趋势。
 
@@ -67,7 +67,7 @@ rate = (today.warehouse - prev_day.warehouse) / prev_day.warehouse * 100
 | **输入解析** | 兼容 ¥/￥/$、千分位、K/M/B 后缀、负号、首尾空格 |
 | **主题系统** | 两套完整色板（light/dark），约 30 个语义化 token，运行时 `get_color()` 解析 |
 | **图表** | pyqtgraph 原生渲染，双图（仓库价值 + 现金），持久化 PlotCurveItem/FillBetweenItem 增量更新 |
-| **打包** | PyInstaller onedir（`dist/收益计算器/`，exe + `_internal/`），`app_icon.ico` 设 exe 图标 + 运行窗口图标 |
+| **打包** | PyInstaller onedir（`dist/Delta Force Dashboard/`，exe + `_internal/`），`app_icon.ico` 设 exe 图标 + 运行窗口图标 |
 
 ---
 

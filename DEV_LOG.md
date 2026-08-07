@@ -1,4 +1,4 @@
-# DEV_LOG — 收益计算器开发日志
+# DEV_LOG — Delta Force Dashboard 开发日志
 
 > **格式**：`YYYY-MM-DD` | `<操作>` | `<描述>`（倒序，最新在前）
 >
@@ -6,7 +6,9 @@
 
 ---
 
-## 滚动摘要（2026-08-06）
+## 滚动摘要（2026-08-07）
+
+- **项目更名（2026-08-07）**：正式更名为 **Delta Force Dashboard**（原「收益计算器 / Profit Calculator」）——窗口标题、应用名、`DATA_DIR`（`~/收益计算器` → `~/Delta Force Dashboard`，`_LEGACY_DATA_DIR` 一次性迁移旧数据）、spec 改名 `delta_force_dashboard.spec`（exe `Delta Force Dashboard.exe`）、README/PROJECT_REFERENCE/CODE_WIKI/CONSENSUS/CONTEXT/TO-TICKETS/ADR 文档、GitHub 仓库 `profit-calculator` → `delta-force-dashboard`；按「仅改身份标识」决策，`ProfitCalculatorLogic` 类名、日志文件名、单实例锁、user-agent 等内部标识保留
 
 - **X 系列完成**：子弹自选包兑换利润模块 — X-01 兑换利润页面（`app/exchange_page.py`，7 种包类型网格展示，kkrb_client 新增 `AmmoPackageItem`/`fetch_ammo_package_data()`）+ X-02 特殊子弹自选包扩展（4 种新增包：通行证基础/高级、进阶物流、特级物流）+ X-03 代码气味消除（NamedTuple `_PackageConfig`、`exchangeGradeAndCount` 重命名）
 - **ProfitPage 重构**：QTabWidget 标签页 → QScrollArea 纵向堆叠，制造产物与兑换利润无需切换直接可见
@@ -17,7 +19,7 @@
 - **M-01 修复**：暗色主题 `CHART_GRID` 色值 `rgba(255,255,255,.05)` 无法被 pyqtgraph 解析（`pg.mkColor` 只认十六进制/SVG 名，浮点 alpha 的 `rgba()` 抛 ValueError）→ 暗色主题下首次绘制图表即崩；改 `#RRGGBBAA` 八位十六进制（`#FFFFFF0D`，alpha 13≈5%，视觉一致）+ 回归测试
 - **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
 - **测试**：pytest **297/297** ✅（295 + 1 M-01 回归）
-- **打包**：M-01 后主分支重新打包，`dist/收益计算器/` **68M**（exe 6.67MB + `_internal/`），烟测通过（dark 主题 + 9 条记录 = M-01 修复前崩溃场景，直接验证修复）
+- **打包**：M-01 后主分支重新打包，`dist/Delta Force Dashboard/` **68M**（exe 6.67MB + `_internal/`），烟测通过（dark 主题 + 9 条记录 = M-01 修复前崩溃场景，直接验证修复）
 - **文档**：TO-TICKETS M-01/L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
 
 - **L 系列立项**：Delta Force 游戏工具扩展（侧边栏导航 + 制造利润 + 卡战备推荐），ADR-0004 落档，4 张工单录入 TO-TICKETS 活跃表
@@ -73,8 +75,8 @@
 - 共 8 提交推送至 origin（已推 + 4 新增）
 
 ### 2026-08-05 | 打包 | 主分支重新打包（M-01 后）+ 烟测通过（dark 崩溃场景直接验证）
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
-- 产物：`dist/收益计算器/` **68M**（exe 6.67MB + `_internal/`）；M-01 改动（`app/theme.py`）编译入 PYZ
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/Delta Force Dashboard/` **68M**（exe 6.67MB + `_internal/`）；M-01 改动（`app/theme.py`）编译入 PYZ
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
 - 烟测：exe 启动 8s 进程存活后终止 ✅（pid 14980，常驻 ~226MB）；用户真实 settings 为 **dark 主题 + 9 条记录**（≥2 触发图表创建路径）——正是 M-01 修复前的崩溃场景，存活 8s 无 Traceback 直接验证修复生效
 - 分发前确认：dist 内无运行态数据（data.json/settings.json/log 均缺）
@@ -90,7 +92,7 @@
 
 ### 2026-08-04 | 设计 | L 系列立项 — Delta Force 游戏工具扩展
 - 来源：Grilling 会话，用户需求「制造利润排行 + 卡战备推荐」
-- 范围：两功能整合到现有收益计算器 App，左侧边栏切换（记账/制造/战备）
+- 范围：两功能整合到现有Delta Force Dashboard App，左侧边栏切换（记账/制造/战备）
 - 设计：ADR-0004 落档（QStackedWidget + 侧边栏方案 A），CONTEXT.md 新增 Delta Force 领域词汇
 - 工单：L-01~L-04 录入 TO-TICKETS 活跃表，含详细验收标准
 - 测试：259/259 ✅（纯设计，未动代码）
@@ -126,8 +128,8 @@
 - 文档：TO-TICKETS 归档 8 候选 + DEV_LOG 同步；code-review 通过（Standards 0 硬违反，Spec 2 项需注意）
 
 ### 2026-08-04 | 打包 | K 系列重新打包（3efc77c）+ 烟测通过
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
-- 产物：`dist/收益计算器/` **64M**（exe 6.56MB + `_internal/`）；K 系列改动（`calculator.py`/`app/main_window.py`）编译入 PYZ
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.56MB + `_internal/`）；K 系列改动（`calculator.py`/`app/main_window.py`）编译入 PYZ
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
 - 烟测：exe 启动 8s 进程存活后终止 ✅（pid 17536，常驻 ~200MB；`.migrated` 10:20:04 重写证明启动路径完整、日志无异常）
 - release 资产未更新（用户未指示；如需更新 `default.zip` 另行执行）
@@ -141,7 +143,7 @@
 - 注：K-02 复用 D-07 纯函数模式（文本+信号由 logic 生成、样式留 UI），与既有 `summary`/`format_summary` 完全镜像，无新增跨层依赖
 
 ### 2026-08-03 | 打包 | 洁癖收尾：布局修复版重新打包 + release 更新（烟测通过）
-- **打包**：主分支重新打包（J-01/J-02 后），`dist/收益计算器/` 64M；**未烟测**（用户指示本次不启动 exe 验证，详见日志正文）
+- **打包**：主分支重新打包（J-01/J-02 后），`dist/Delta Force Dashboard/` 64M；**未烟测**（用户指示本次不启动 exe 验证，详见日志正文）
 - **打包**：洁癖收尾补布局修复版（`e261685`）重新打包 + GitHub release 资产替换为 `default.zip`（烟测通过，详见日志正文）
 - **测试**：pytest **237/237** ✅（2026-08-03 J 系列视图切换 UI 用例 +3、summary/format_summary 参数化纯函数 +2）
 - **图表**：样式对齐原型评审修正版（0559537）——删填充区域、hover 改「系列短名+值、按所属 ViewBox 顶部堆叠定位」；布局把曲线图置底固定高度、表格改弹性区，为后续 7/30 天记录预留高度（用户预告将记录天数设为 7/30 天）
@@ -154,8 +156,8 @@
 
 ### 2026-08-03 | 打包 | 洁癖收尾：布局修复版重新打包 + release 更新（烟测通过）
 - 背景：`e261685`（图表卡片封顶 220px，880 窗口表格 107→367px）在 `92acd44` 打包**之后**提交，`dist/` 与 GitHub release 均落后一个提交；洁癖收尾核对发布面时发现并补齐
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
-- 产物：`dist/收益计算器/` **64M**（exe 6.56MB + `_internal/`）；唯一 warn 仍为 `pyqtgraph.opengl` 可选子模块未收集（历次一致）
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（UPX 在 PATH）；spec 无变更
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.56MB + `_internal/`）；唯一 warn 仍为 `pyqtgraph.opengl` 可选子模块未收集（历次一致）
 - 烟测：exe 启动 8s 进程存活后终止 ✅（pid 14812；`.migrated` 15:38 重写证明启动路径完整、日志无异常）；pytest 237/237 ✅
 - release：更新 GitHub release（tag `default`）资产——旧 `default.rar`（37.9M，H-01/G-01 版，落后布局修复）删除，上传 `default.zip`（布局修复版，64M→zip）。**压缩格式 rar→zip**：本机无 rar/WinRAR，README 已提前改「压缩包」通用措辞，zip 为 Windows 原生可解压
 - 清场（用户确认）：删 throwaway 分支 `prototype/chart-merge`（`0559537`）/`prototype/multiview`（`f39c66f`）；清 `build/`（21M）/`__pycache__`/`.pytest_cache`；`.claude/settings.local.json` 删一次性调试授权残留（.shots / download_finesse_cdn.py / /tmp 脚手架等），保留 pytest / doc_sync / pre-commit / install-hooks 可复用条目
@@ -166,11 +168,11 @@
 - 验证：offscreen 实测 880 窗口表格 107→**367px**（1000 窗口 →487px）；pytest **237/237** ✅；`doc_sync --check` 通过
 
 ### 2026-08-03 | 打包 | 主分支重新打包（J-01/J-02 视图切换后，含 J 系列改动）
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）
-- 产物：`dist/收益计算器/` **64M**（exe 6.56MB + `_internal/`）；J 系列改动（`calculator.py`/`config.py`/`app/table_widget.py`/`app/main_window.py`）编译入 PYZ，spec 无需变更（无新资源/依赖）
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（UPX 在 PATH）
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.56MB + `_internal/`）；J 系列改动（`calculator.py`/`config.py`/`app/table_widget.py`/`app/main_window.py`）编译入 PYZ，spec 无需变更（无新资源/依赖）
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
 - 分发前确认：dist 内无运行态数据（data.json/settings.json/log 均缺），`app_icon.ico` 内嵌
-- **未烟测**：用户指示本次不启动 exe 验证；源码态 pytest 237/237 ✅ + 打包 exit 0（如需冒烟，启动 `dist/收益计算器/收益计算器.exe` 观察进程存活与日志）
+- **未烟测**：用户指示本次不启动 exe 验证；源码态 pytest 237/237 ✅ + 打包 exit 0（如需冒烟，启动 `dist/Delta Force Dashboard/Delta Force Dashboard.exe` 观察进程存活与日志）
 
 ### 2026-08-03 | 实现 | J-01 保留上限 7→30 + J-02 视图 7/30 切换（ADR-0003，存储/视图解耦）
 - 需求：用户「记录天数上限 7→30 + 多视图切换」（Grilling Q1–Q11 收敛，`CONSENSUS.md` §7）。核心=把**保留 Retention**与**视图 View**解耦
@@ -181,8 +183,8 @@
 - 验证：pytest 237/237 ✅；`doc_sync --check` 通过
 
 ### 2026-08-03 | 打包 | 主分支重新打包（H-01 图表样式 + G-01 双轴合并后，含图表改动）
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（UPX 在 PATH）
-- 产物：`dist/收益计算器/` **64M**（exe 6.5MB + `_internal/`）；H-01/G-01 图表改动（`chart_widget.py`/`main_window.py`）编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（UPX 在 PATH）
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.5MB + `_internal/`）；H-01/G-01 图表改动（`chart_widget.py`/`main_window.py`）编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（可选依赖，应用不加载，历次一致）
 - 分发前确认：dist 内无运行态数据（data.json/settings.json/log 均缺）
 - 烟测：exe 启动 8s 进程存活后终止 ✅（无启动崩溃）；pytest 231/231 ✅
@@ -210,8 +212,8 @@
 - 原型留存：throwaway 分支 `prototype/chart-merge`（`b6800bb`），主分支不含原型文件
 
 ### 2026-08-02 | 打包 | 主分支重新打包（F-01/F-02 后，含 .migrated 标记 + 清理提示）
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`，UPX 已在 PATH）
-- 产物：`dist/收益计算器/` **64M**（exe 6.5MB + `_internal/`）；F-02 `.migrated` 标记 + `log_legacy_cleanup_hint` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`，UPX 已在 PATH）
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.5MB + `_internal/`）；F-02 `.migrated` 标记 + `log_legacy_cleanup_hint` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（`No module named 'OpenGL'`，可选依赖，应用不加载，历次一致）
 - 烟测：exe 启动 8s 进程存活后终止 ✅（无启动崩溃）；pytest 229/229 ✅
 
@@ -239,23 +241,23 @@
 - TO-TICKETS F-02 → ✅ 归档（2026-08-02，提交 `fc28fff`）
 
 ### 2026-08-02 | 待办 | 复盘反思评估 → F 系列工单录入（TO-TICKETS）
-- 来源：`D:\Desktop\knowledge base\demo\experience\收益计算器项目经验复盘.md` 五、复盘反思（5 条可提升方向）
+- 来源：`D:\Desktop\knowledge base\demo\experience\Delta Force Dashboard项目经验复盘.md` 五、复盘反思（5 条可提升方向）
 - 评估：① **文档同步自动化 ✅ 值得做**——实测 `CODE_WIKI` §7 测试表各文件用例和 214 ≠ 实际 pytest 221，且漏 `test_migration.py`，手工同步又漂移（正是 3.6 教训现场）→ 录 **F-01**；④ **数据迁移源清理时间点 ✅ 值得做**——O-22 复制非移动的源清理时间点模糊（E-04 本机残留已清），转为前瞻性策略 → 录 **F-02**
 - 不建工单：② 提交前 code-review——交互式 skill 无法进 git 钩子，习惯已由流程覆盖，可行自动化（AST 守卫 + doc-sync）并入 F-01；③ 并行开发命名/接口先约——流程约定，O 系列合并教训已留痕，无需代码；⑤ 规模悖论——原则性边界，作为后续工单验收标准（覆盖真实路径 + 防复发，不堆测试数量）
-- 现状核对：根目录 `data.json.bak*` 4 份（E-04 暂缓项）已清空，无残留；`~/收益计算器/` 数据自足健康
+- 现状核对：根目录 `data.json.bak*` 4 份（E-04 暂缓项）已清空，无残留；`~/Delta Force Dashboard/` 数据自足健康
 - 2026-08-02 拍板：F-01 / F-02 均采纳（待开发）；本次 TO-TICKETS / DEV_LOG 变更**未提交**（用户指示，工作区保留）
 
 ### 2026-08-02 | 运维 | 项目评估报告核对 + E 系列工单收口
 - 背景：外部 AI 评估报告（`项目评估报告.md`，8.80/10）与 HEAD 逐条核对——3 条 P1 中 2 条已存在（纯函数 docstring / ADR 文档），1 条论据过期（其引用的 `DATA_RETENTION_DAYS` 常量 O-17 已删）；报告文件已不在工作区（用户自行处理，git 零引用）
 - 拍板（用户）：E-01 保留天数可配置 **关闭**（不知配置对用户实际作用）；E-02 操作审计日志 **关闭**（单用户无追责场景 + 覆盖写日志留不下旧值，救不了撤销）；E-03 图表脚本化导出 **关闭**（不需要，YAGNI）；E-04 陈旧产物清理 **授权**（已录入 TO-TICKETS 活跃表 🔄）
-- E-04 执行：删 5 个 stale pyc（`app/__pycache__/` 下 logic/data_store/formatting/config + 根 `verify_all`——C5/D 系列重构残留，gitignore 已忽略无害）+ 根目录旧 `profit_calculator.log`（O-22 前 APP_DIR 日志，现日志在 `~/收益计算器/`）
-- ⚠️ **根目录 `data.json.bak*` 4 份暂缓**：核对发现值差异——bak 含 07-24 唯一记录、07-25/08-01 数值与权威 `~/收益计算器/data.json` 不同（疑 O-08 测试污染或旧快照）；权威数据自足健康（含当日 08-02 记录 + 完整备份链），07-24 系 08-02 保存时正常轮转删除。用户确认后删除（E-04 归档）
+- E-04 执行：删 5 个 stale pyc（`app/__pycache__/` 下 logic/data_store/formatting/config + 根 `verify_all`——C5/D 系列重构残留，gitignore 已忽略无害）+ 根目录旧 `profit_calculator.log`（O-22 前 APP_DIR 日志，现日志在 `~/Delta Force Dashboard/`）
+- ⚠️ **根目录 `data.json.bak*` 4 份暂缓**：核对发现值差异——bak 含 07-24 唯一记录、07-25/08-01 数值与权威 `~/Delta Force Dashboard/data.json` 不同（疑 O-08 测试污染或旧快照）；权威数据自足健康（含当日 08-02 记录 + 完整备份链），07-24 系 08-02 保存时正常轮转删除。用户确认后删除（E-04 归档）
 - pytest 221/221 不受影响（纯运维 + 文档）
 
 ### 2026-08-02 | 打包 | 主分支重新打包（D-08 后，含 signals.py）
-- 命令：`pyinstaller 收益计算器.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`）
+- 命令：`pyinstaller delta_force_dashboard.spec --noconfirm --log-level=WARN`（未显式 `--upx-dir`）
 - ⚠️ UPX 现已在 PATH：WinGet 安装的 `upx 5.2.0`（`C:/Users/.../WinGet/Packages/UPX.UPX.../upx.exe`），spec `upx=True` 自动命中，无需再显式传 `--upx-dir`（滚动摘要第 12 行旧避坑已过时，保留为无 PATH 环境的兜底）
-- 产物：`dist/收益计算器/` **64M**（exe 6.5MB + `_internal/`，与 O-21 UPX 后持平）；`signals.py` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
+- 产物：`dist/Delta Force Dashboard/` **64M**（exe 6.5MB + `_internal/`，与 O-21 UPX 后持平）；`signals.py` 编译入 PYZ，`app_icon.ico` 内嵌 `_internal/`
 - 唯一 warn：`pyqtgraph.opengl` 子模块未收集（`No module named 'OpenGL'`，可选依赖，应用不加载，历次一致）
 - 烟测：exe 启动 6s 进程存活后终止 ✅（无启动崩溃）
 
@@ -324,7 +326,7 @@
 - 纯文档改动，pytest 187/187 不受影响
 
 ### 2026-08-01 | 修复 | O-22 空启动日志目录未建崩溃（`c2e34f9`）
-- 症状：exe 空环境首启即崩 `FileNotFoundError: ~/收益计算器/profit_calculator.log`
+- 症状：exe 空环境首启即崩 `FileNotFoundError: ~/Delta Force Dashboard/profit_calculator.log`
 - 根因：`main()` 先构造 `RotatingFileHandler`（打开 LOG_FILE）再执行迁移；目录创建仅在迁移分支内，空启动提前返回时目录未建
 - 修复：`main()` 第一行 `DATA_DIR.mkdir(parents=True, exist_ok=True)`，先于日志 handler/迁移/写入
 - 回归测试：AST 静态断言 mkdir 行号先于 RotatingFileHandler（防顺序回退复发）
@@ -332,7 +334,7 @@
 
 ### 2026-08-01 | 重构+运维 | O-22 运行态数据统一到用户目录（`9835387`）
 - 动机：`dist/` 重建整体覆盖丢数据（O-20/O-21 已踩两次）；exe 移动丢数据；开发版与 exe 两套数据割裂
-- 改动：`DATA_DIR = Path.home()/"收益计算器"`，`DATA_FILE`/`BACKUP_FILE`/`SETTINGS_FILE`/`LOG_FILE` 全挂其下；`APP_DIR` 保留为旧数据源；`migrate_legacy_data` 幂等（目标已有 data.json 跳过 / legacy 无数据跳过 / **复制非移动** / 失败仅 warning）；CSV 默认导出路径同改；`main.py` 单实例检查后、建 MainWindow 前迁移
+- 改动：`DATA_DIR = Path.home()/"Delta Force Dashboard"`，`DATA_FILE`/`BACKUP_FILE`/`SETTINGS_FILE`/`LOG_FILE` 全挂其下；`APP_DIR` 保留为旧数据源；`migrate_legacy_data` 幂等（目标已有 data.json 跳过 / legacy 无数据跳过 / **复制非移动** / 失败仅 warning）；CSV 默认导出路径同改；`main.py` 单实例检查后、建 MainWindow 前迁移
 - 测试：`tests/test_migration.py` +6；pytest 186/186 ✅（180+6）
 - 取舍：复制非移动——源保留（`.gitignore` 已忽略）可逆，用户确认后手动清理
 
@@ -345,7 +347,7 @@
 
 ### 2026-08-01 | 打包 | O-20 onedir 化 + 体积瘦身（`5913a22`）
 - 背景：单文件 80MB 每次启动解压 181MB 到 `%TEMP%\_MEI*`（启动慢 ~2-4s 根因），残留 5 个孤儿目录 905MB（O-21 已清）
-- 改动：① spec 重写 `EXE(exclude_binaries=True) + COLLECT`（onedir 免解压，交付 `dist/收益计算器/`，exe 6.3MB + `_internal/`）；② 瘦身：excludes 剔 matplotlib/PIL（pyqtgraph 导出器运行时从不加载）、Qt 二进制白名单（仅留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test，8 pyd/8 DLL）、剔 translations/opengl32sw/tls 插件；③ 单实例等待 `waitForConnected(500→100)`（main.py:52）
+- 改动：① spec 重写 `EXE(exclude_binaries=True) + COLLECT`（onedir 免解压，交付 `dist/Delta Force Dashboard/`，exe 6.3MB + `_internal/`）；② 瘦身：excludes 剔 matplotlib/PIL（pyqtgraph 导出器运行时从不加载）、Qt 二进制白名单（仅留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test，8 pyd/8 DLL）、剔 translations/opengl32sw/tls 插件；③ 单实例等待 `waitForConnected(500→100)`（main.py:52）
 - 结果：80MB 单文件→117MB 目录（onedir 免压缩，可 zip 分发）；冷启动烟测 1560ms（vs 解压 2~4s+）；二次实例 667ms 被拦截
 - `config.APP_DIR`/`_icon_path`（`sys._MEIPASS`）在 onedir 下行为不变，源码零改动；pytest 180/180 ✅
 

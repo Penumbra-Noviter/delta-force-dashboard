@@ -1,4 +1,4 @@
-# 收益计算器 — 开发共识文档
+# Delta Force Dashboard — 开发共识文档
 
 > 生成日期：2026-07-28  
 > 状态：第一阶段 ✅ 已完成 | 第二阶段 ✅ 已完成 | 第三阶段 ✅ 已完成
@@ -103,7 +103,7 @@
 ### 3.4 文件结构新规划
 
 ```
-Profit Calculator/
+Delta Force Dashboard/
 ├── main.py                 ← 入口
 ├── app/
 │   ├── __init__.py
