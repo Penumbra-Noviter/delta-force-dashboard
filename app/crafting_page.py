@@ -11,7 +11,7 @@ __all__ = ["CraftingPage"]
 import logging
 from typing import Any
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.fetch_worker import FetchWorker
 from kkrb_client import CraftingProduct, KkrbClient, KkrbError
 from formatting import format_money
 
@@ -41,6 +42,7 @@ class CraftingPage(QWidget):
         self._loading = False
         self._error: str | None = None
         self._loaded_once = False
+        self._worker: FetchWorker | None = None
 
         self._build_ui()
 
@@ -138,29 +140,32 @@ class CraftingPage(QWidget):
         self._status_label.setVisible(True)
         self._refresh_btn.setEnabled(False)
 
-        QTimer.singleShot(0, self._do_fetch)
+        self._worker = FetchWorker(self._client.fetch_ov_data)
+        self._worker.done.connect(self._on_fetch_done)
+        self._worker.error.connect(self._on_fetch_error)
+        self._worker.start()
 
-    def _do_fetch(self) -> None:
-        try:
-            self._products = self._client.fetch_ov_data()
-            self._error = None
-            self._status_label.setVisible(False)
-        except KkrbError as e:
+    def _on_fetch_done(self, products: list[CraftingProduct]) -> None:
+        self._products = products
+        self._error = None
+        self._status_label.setVisible(False)
+        self._loading = False
+        self._refresh_btn.setEnabled(True)
+        self._render_cards()
+
+    def _on_fetch_error(self, e: Exception) -> None:
+        if isinstance(e, KkrbError):
             logger.warning("制造产物数据获取失败: %s", e)
-            self._error = str(e)
             self._status_label.setText("⚠️ 数据获取失败，点击重试")
-            self._status_label.setVisible(True)
-            self._products = []
-        except Exception as e:
+        else:
             logger.error("制造产物数据获取异常: %s", e)
-            self._error = str(e)
             self._status_label.setText("⚠️ 网络异常，请检查连接后重试")
-            self._status_label.setVisible(True)
-            self._products = []
-        finally:
-            self._loading = False
-            self._refresh_btn.setEnabled(True)
-            self._render_cards()
+        self._error = str(e)
+        self._status_label.setVisible(True)
+        self._products = []
+        self._loading = False
+        self._refresh_btn.setEnabled(True)
+        self._render_cards()
 
     def _render_cards(self) -> None:
         products = self._products or []

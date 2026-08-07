@@ -226,7 +226,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~431 行<!--/AUTO-->
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~476 行<!--/AUTO-->
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -244,8 +244,7 @@ Delta Force Dashboard/
 
 | 方法 | 说明 |
 |------|------|
-| <!--AUTO:sig:app/table_widget.py:_DaySubTable.draw-->`draw(records, today, prev_warehouse=None)`<!--/AUTO--> | 逐行绘制：日期、现金、仓库、较前日差值、收益率、盈亏标签、操作按钮 |
-| <!--AUTO:sig:app/table_widget.py:_DaySubTable._create_action_buttons-->`_create_action_buttons(date_str, record)`<!--/AUTO--> | 创建"编辑"+"删除"按钮，带 hover 样式 |
+| <!--AUTO:sig:app/table_widget.py:_DaySubTable.draw-->`draw(records, today, prev_warehouse=None)`<!--/AUTO--> | 逐行绘制（复用 widget）：日期、现金、仓库、较前日差值、收益率、盈亏标签、操作按钮 |
 
 **7 列定义**：
 

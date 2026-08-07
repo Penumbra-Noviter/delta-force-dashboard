@@ -70,6 +70,15 @@ class PnLBadge(QWidget):
 
         self._label = QLabel(label)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._label)
+        self._apply_style(bg_color, fg_color)
+
+    def update_content(self, label: str, bg_color: str, fg_color: str = "#ffffff") -> None:
+        """复用：更新文本与配色，不重建 widget。"""
+        self._label.setText(label)
+        self._apply_style(bg_color, fg_color)
+
+    def _apply_style(self, bg_color: str, fg_color: str) -> None:
         self._label.setStyleSheet(
             f"""
             background-color: {bg_color};
@@ -80,7 +89,90 @@ class PnLBadge(QWidget):
             font-weight: 600;
         """
         )
-        layout.addWidget(self._label)
+
+
+class _ActionButtons(QWidget):
+    """操作列按钮：编辑 + 删除。复用 widget，仅更新数据与主题样式。"""
+
+    edit_requested = Signal(str, object)  # date_str, DayRecord
+    delete_requested = Signal(str)  # date_str
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(2, 0, 2, 0)
+        layout.setSpacing(4)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self._edit_btn = QPushButton("编辑")
+        self._edit_btn.setFixedHeight(24)
+        self._edit_btn.clicked.connect(self._on_edit_clicked)
+        layout.addWidget(self._edit_btn)
+
+        self._delete_btn = QPushButton("删除")
+        self._delete_btn.setFixedHeight(24)
+        self._delete_btn.clicked.connect(self._on_delete_clicked)
+        layout.addWidget(self._delete_btn)
+
+        self._date_str = ""
+        self._record: DayRecord | None = None
+        self.apply_theme()
+
+    def update_data(self, date_str: str, record: DayRecord) -> None:
+        """更新当前行数据（复用时不重建按钮，只换数据）。"""
+        self._date_str = date_str
+        self._record = record
+
+    def apply_theme(self) -> None:
+        """根据当前主题色更新按钮内联样式。"""
+        btn_fg = get_color("BTN_BG")
+        btn_hover = get_color("BTN_BG_HOVER")
+        muted_bg = get_color("MUTED_BG")
+        border_def = get_color("BORDER_DEFAULT")
+        danger_bg = get_color("DANGER_BG")
+        danger_fg = get_color("DANGER_FG")
+        danger_border = get_color("DANGER_BORDER")
+        danger_hover = get_color("DANGER_HOVER_BG")
+
+        self._edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {muted_bg};
+                color: {btn_fg};
+                border: 1px solid {border_def};
+                border-radius: 6px;
+                padding: 2px 10px;
+                font-size: 10px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {btn_fg};
+                color: #ffffff;
+                border-color: {btn_hover};
+            }}
+        """)
+        self._delete_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {danger_bg};
+                color: {danger_fg};
+                border: 1px solid {danger_border};
+                border-radius: 6px;
+                padding: 2px 10px;
+                font-size: 10px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: {danger_hover};
+                color: #ffffff;
+                border-color: {danger_hover};
+            }}
+        """)
+
+    def _on_edit_clicked(self) -> None:
+        if self._record is not None:
+            self.edit_requested.emit(self._date_str, self._record)
+
+    def _on_delete_clicked(self) -> None:
+        self.delete_requested.emit(self._date_str)
 
 
 class _DaySubTable(QTableWidget):
@@ -158,18 +250,23 @@ class _DaySubTable(QTableWidget):
                 self.setColumnWidth(ci, min_w)
 
     def draw(self, records: list, today: str, prev_warehouse: float | None = None) -> None:
-        """根据 records 绘制单栏表格。
+        """根据 records 绘制单栏表格（复用已有 widget，仅更新内容）。
 
         Args:
             records: [(date_str, DayRecord), ...]
             today: 今日日期字符串 YYYY-MM-DD
             prev_warehouse: 前一条记录的仓库值（用于跨栏计算较前日）
         """
-        self.setRowCount(len(records))
+        n = len(records)
+        # 行数变化时才调 setRowCount（避免不必要的重排）
+        if self.rowCount() != n:
+            self.setRowCount(n)
+
+        _align_right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        _bold_font = QFont("Microsoft YaHei", 10, QFont.Weight.Bold)
 
         for ri, (date_str, record) in enumerate(records):
             is_today = date_str == today
-            # 今日行用浅青底，其他行用交替底
             if is_today:
                 row_bg = QColor(get_color("TABLE_ROW_TODAY_BG"))
             else:
@@ -180,27 +277,35 @@ class _DaySubTable(QTableWidget):
             # 0: 日期
             date_display = f"{format_short_date(date_str)} 今天" if is_today else format_short_date(date_str)
             date_color = get_color("FG_TODAY") if is_today else get_color("TABLE_TEXT")
-            item = QTableWidgetItem(date_display)
+            item = self.item(ri, COL_DATE)
+            if item is None:
+                item = QTableWidgetItem()
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(ri, COL_DATE, item)
+            item.setText(date_display)
             item.setForeground(QColor(date_color))
             item.setBackground(row_bg)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.setItem(ri, COL_DATE, item)
 
             # 1: 现金
-            item = QTableWidgetItem(format_money(record.cash))
+            item = self.item(ri, COL_CASH)
+            if item is None:
+                item = QTableWidgetItem()
+                item.setTextAlignment(_align_right)
+                self.setItem(ri, COL_CASH, item)
+            item.setText(format_money(record.cash))
             item.setForeground(QColor(get_color("TABLE_TEXT")))
             item.setBackground(row_bg)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.setItem(ri, COL_CASH, item)
 
             # 2: 仓库（总收益）
-            item = QTableWidgetItem(format_money(record.warehouse))
+            item = self.item(ri, COL_WAREHOUSE)
+            if item is None:
+                item = QTableWidgetItem()
+                item.setTextAlignment(_align_right)
+                item.setFont(_bold_font)
+                self.setItem(ri, COL_WAREHOUSE, item)
+            item.setText(format_money(record.warehouse))
             item.setForeground(QColor(get_color("TABLE_TEXT_BOLD")))
             item.setBackground(row_bg)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            bold_font = QFont("Microsoft YaHei", 10, QFont.Weight.Bold)
-            item.setFont(bold_font)
-            self.setItem(ri, COL_WAREHOUSE, item)
 
             # 3: 较前日
             if prev_warehouse is not None:
@@ -212,21 +317,27 @@ class _DaySubTable(QTableWidget):
                 diff = "—"
                 delta_color = get_color("FG_MUTED")
 
-            item = QTableWidgetItem(diff)
+            item = self.item(ri, COL_DIFF)
+            if item is None:
+                item = QTableWidgetItem()
+                item.setTextAlignment(_align_right)
+                self.setItem(ri, COL_DIFF, item)
+            item.setText(diff)
             item.setForeground(QColor(delta_color))
             item.setBackground(row_bg)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.setItem(ri, COL_DIFF, item)
 
             # 4: 收益率
             rate = ProfitCalculatorLogic.calculate_rate(prev_warehouse, record.warehouse)
             rate_str, rate_signal = format_rate(rate)
             rate_color = signal_color(rate_signal)
-            item = QTableWidgetItem(rate_str)
+            item = self.item(ri, COL_RATE)
+            if item is None:
+                item = QTableWidgetItem()
+                item.setTextAlignment(_align_right)
+                self.setItem(ri, COL_RATE, item)
+            item.setText(rate_str)
             item.setForeground(QColor(rate_color))
             item.setBackground(row_bg)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.setItem(ri, COL_RATE, item)
 
             # 5: 盈亏标签（合并收益率：盈 +2.4% / 亏 -1.3% / —）
             pnl_text, pnl_signal = get_pnl_label(
@@ -237,12 +348,23 @@ class _DaySubTable(QTableWidget):
                 badge_text = "—"
             else:
                 badge_text = f"{pnl_text} {rate_str}"
-            badge = PnLBadge(badge_text, pnl_bg)
-            self.setCellWidget(ri, COL_PNL, badge)
+            badge = self.cellWidget(ri, COL_PNL)
+            if badge is None:
+                badge = PnLBadge(badge_text, pnl_bg)
+                self.setCellWidget(ri, COL_PNL, badge)
+            else:
+                badge.update_content(badge_text, pnl_bg)
 
             # 6: 操作按钮
-            action_widget = self._create_action_buttons(date_str, record)
-            self.setCellWidget(ri, COL_ACTIONS, action_widget)
+            actions = self.cellWidget(ri, COL_ACTIONS)
+            if actions is None:
+                actions = _ActionButtons()
+                actions.edit_requested.connect(self.edit_requested.emit)
+                actions.delete_requested.connect(self.delete_requested.emit)
+                self.setCellWidget(ri, COL_ACTIONS, actions)
+            else:
+                actions.apply_theme()
+            actions.update_data(date_str, record)
 
             prev_warehouse = record.warehouse
 
@@ -250,73 +372,6 @@ class _DaySubTable(QTableWidget):
         self.resizeRowsToContents()
         # 按比例分配列宽（窗口首次显示时 resizeEvent 可能还未触发）
         self._apply_proportional_widths()
-
-    def _create_action_buttons(
-        self, date_str: str, record: DayRecord
-    ) -> QWidget:
-        """创建操作列：编辑 + 删除按钮（明显可见的样式）。"""
-        widget = QWidget()
-        layout = QHBoxLayout(widget)
-        layout.setContentsMargins(2, 0, 2, 0)
-        layout.setSpacing(4)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        btn_fg = get_color("BTN_BG")
-        btn_hover = get_color("BTN_BG_HOVER")
-        neg_color = get_color("FG_NEG")
-        muted_bg = get_color("MUTED_BG")
-        danger_bg = get_color("DANGER_BG")
-        danger_fg = get_color("DANGER_FG")
-        danger_border = get_color("DANGER_BORDER")
-        danger_hover = get_color("DANGER_HOVER_BG")
-
-        edit_btn = QPushButton("编辑")
-        edit_btn.setFixedHeight(24)
-        edit_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {muted_bg};
-                color: {btn_fg};
-                border: 1px solid {get_color("BORDER_DEFAULT")};
-                border-radius: 6px;
-                padding: 2px 10px;
-                font-size: 10px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {btn_fg};
-                color: #ffffff;
-                border-color: {btn_hover};
-            }}
-        """)
-        edit_btn.clicked.connect(
-            lambda checked, d=date_str, r=record: self.edit_requested.emit(d, r)
-        )
-        layout.addWidget(edit_btn)
-
-        delete_btn = QPushButton("删除")
-        delete_btn.setFixedHeight(24)
-        delete_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {danger_bg};
-                color: {danger_fg};
-                border: 1px solid {danger_border};
-                border-radius: 6px;
-                padding: 2px 10px;
-                font-size: 10px;
-                font-weight: 600;
-            }}
-            QPushButton:hover {{
-                background-color: {danger_hover};
-                color: #ffffff;
-                border-color: {danger_hover};
-            }}
-        """)
-        delete_btn.clicked.connect(
-            lambda checked, d=date_str: self.delete_requested.emit(d)
-        )
-        layout.addWidget(delete_btn)
-
-        return widget
 
 
 class TableWidget(QWidget):
