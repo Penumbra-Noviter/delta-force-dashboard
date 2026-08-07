@@ -1,5 +1,5 @@
 """
-收益计算器 — PySide6 版入口。
+Delta Force Dashboard — PySide6 版入口。
 
 启动 PySide6 QApplication 并打开主窗口。
 保证同时只有一个实例在运行。
@@ -19,7 +19,12 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 from app import MainWindow
-from config import DATA_DIR, _APP_DIR as APP_DIR, _LOG_FILE as LOG_FILE
+from config import (
+    DATA_DIR,
+    _APP_DIR as APP_DIR,
+    _LEGACY_DATA_DIR as LEGACY_DATA_DIR,
+    _LOG_FILE as LOG_FILE,
+)
 from data_store import log_legacy_cleanup_hint, migrate_legacy_data
 
 # 单实例锁名称（全局唯一）
@@ -92,7 +97,7 @@ def main() -> None:
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
     app = QApplication(sys.argv)
-    app.setApplicationName("收益计算器")
+    app.setApplicationName("Delta Force Dashboard")
     app.setWindowIcon(QIcon(_icon_path()))
 
     # ── 单实例检查 ──
@@ -101,10 +106,15 @@ def main() -> None:
         # 已有实例在运行，静默退出
         sys.exit(0)
 
-    # ── 旧数据一次性迁移（O-22）：运行态数据统一到 ~/收益计算器 ──
+    # ── 旧数据一次性迁移（O-22 / 更名）：运行态数据统一到 ~/Delta Force Dashboard ──
     # 目标目录已有数据则跳过；旧数据保留原位置（复制非移动）。
+    # 迁移源：① 更名前数据目录 ~/收益计算器（较新权威，先迁）；
+    #         ② 项目根 APP_DIR（远古旧源，后迁）。migrate_legacy_data 对目标已有
+    #            data.json 幂等跳过，故权威源必须在前，避免旧数据覆盖新数据。
+    migrate_legacy_data(LEGACY_DATA_DIR, DATA_DIR)
     migrate_legacy_data(APP_DIR, DATA_DIR)
     # 迁移完成后提示旧数据源可手动清理（F-02）：仅打日志，删除须用户手动确认。
+    log_legacy_cleanup_hint(LEGACY_DATA_DIR, DATA_DIR)
     log_legacy_cleanup_hint(APP_DIR, DATA_DIR)
 
     window = MainWindow()

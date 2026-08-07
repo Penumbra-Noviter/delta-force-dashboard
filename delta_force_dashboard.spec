@@ -6,7 +6,7 @@
 # A. onefile → onedir：
 #    单文件模式每次启动要把整包解压到 %TEMP%\_MEI*（实测 181MB），是启动
 #    慢（2~4s）的根因。onedir 免解压，启动约 0.7s。交付形态变为
-#    dist/收益计算器/（exe + _internal/），可整目录分发或 zip 压缩。
+#    dist/Delta Force Dashboard/（exe + _internal/），可整目录分发或 zip 压缩。
 #    运行路径逻辑（config.APP_DIR 的 sys.executable、main._icon_path 的
 #    sys._MEIPASS）在 onedir 下行为与 onefile 一致，无需改源码。
 #
@@ -122,7 +122,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='收益计算器',
+    name='Delta Force Dashboard',
     icon='app_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,
@@ -145,5 +145,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='收益计算器',
+    name='Delta Force Dashboard',
 )

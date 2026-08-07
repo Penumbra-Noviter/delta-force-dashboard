@@ -88,7 +88,7 @@ class DashboardPage(QWidget):
         title_layout = QHBoxLayout(title_bar)
         title_layout.setContentsMargins(0, 0, 0, 0)
 
-        self._title_label = QLabel("收益计算器")
+        self._title_label = QLabel("Delta Force Dashboard")
         self._title_label.setObjectName("titleLabel")
         title_layout.addWidget(self._title_label)
 
@@ -112,7 +112,7 @@ class DashboardPage(QWidget):
 
 
 class MainWindow(QMainWindow):
-    """收益计算器主窗口。"""
+    """Delta Force Dashboard 主窗口。"""
 
     def __init__(self, store: DataStore | None = None,
                  logic: ProfitCalculatorLogic | None = None,
@@ -152,7 +152,7 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _setup_window(self) -> None:
-        self.setWindowTitle("收益计算器")
+        self.setWindowTitle("Delta Force Dashboard")
 
         # 基础大小（双栏表格需更宽）
         base_w, base_h = 820, 880

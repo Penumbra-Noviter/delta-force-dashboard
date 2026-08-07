@@ -529,7 +529,7 @@ tr:last-child td {{ border-bottom: none; }}
 <tbody>
 {table_rows}</tbody>
 </table>
-<div class="footer">Profit Calculator &mdash; 自动生成报告</div>
+<div class="footer">Delta Force Dashboard &mdash; 自动生成报告</div>
 </div>
 </body>
 </html>"""
@@ -568,7 +568,7 @@ p { font-size: 14px; color: #888; }
 <div class="container">
 <h1>收益报告</h1>
 <p>暂无数据，请先录入记录。</p>
-<div class="footer">Profit Calculator &mdash; 自动生成报告</div>
+<div class="footer">Delta Force Dashboard &mdash; 自动生成报告</div>
 </div>
 </body>
 </html>"""

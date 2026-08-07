@@ -204,7 +204,7 @@ def test_cleanup_hint_silent_when_legacy_cleaned(tmp_path, caplog):
 #
 # O-22 把日志路径改挂 DATA_DIR 后，曾出现「空启动即崩」：
 # main() 先构造 RotatingFileHandler（打开 LOG_FILE），再执行迁移——
-# 而目录创建仅发生在迁移逻辑内，空启动（无旧数据、无 ~/收益计算器）
+# 而目录创建仅发生在迁移逻辑内，空启动（无旧数据、无 ~/Delta Force Dashboard）
 # 时迁移提前返回、目录从未创建 → FileNotFoundError。
 # 修复：main() 第一行显式 DATA_DIR.mkdir(parents=True, exist_ok=True)。
 # 本组用 AST 静态断言「mkdir 必须先于 RotatingFileHandler」，防复发。

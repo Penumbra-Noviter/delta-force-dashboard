@@ -56,7 +56,7 @@ Desktop.ini
 .env.*
 
 # Build outputs
-收益计算器.exe
+Delta Force Dashboard.exe
 
 # 架构评审陈旧产物（报告输出至 D:\Desktop\To-do，仓库内不入库）
 python-arch-review-*.html

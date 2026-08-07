@@ -26,7 +26,11 @@ _APP_DIR: Path = (
 )
 
 # 统一数据目录：开发版与打包版共用，exe 任意位置/重建都不丢数据（O-22）。
-DATA_DIR: Path = Path.home() / "收益计算器"
+DATA_DIR: Path = Path.home() / "Delta Force Dashboard"
+
+# 更名前旧数据目录（2026-08-07 项目更名 Delta Force Dashboard）：一次性迁移源，
+# main() 启动时复制（非移动）到 DATA_DIR，O-22 语义——目标已有数据则跳过、旧数据不删。
+_LEGACY_DATA_DIR: Path = Path.home() / "收益计算器"
 
 DATA_FILE = DATA_DIR / "data.json"
 SQLITE_FILE = DATA_DIR / "data.db"
