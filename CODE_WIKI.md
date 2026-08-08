@@ -1,8 +1,8 @@
 # Delta Force Dashboard — Code Wiki
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
-> 生成日期：2026-08-06  
-> 测试状态：300 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 生成日期：2026-08-08  
+> 测试状态：<!--AUTO:tests_total:total-->305<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（292 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->305<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -84,8 +84,11 @@ Delta Force Dashboard/
 ├── app/
 │   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
+│   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮，L-01，~98 行）
+│   ├── registry.py          ← 插件式 Widget 注册系统（AppWidget + WidgetRegistry，~54 行）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
-│   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，M-01）
+│   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
+│   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
 │   ├── profit_page.py       ← 利润页面单页滚动容器（制造产物 + 兑换利润纵向堆叠）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
@@ -107,7 +110,7 @@ Delta Force Dashboard/
 │   ├── __init__.py
 │   ├── test_calculator.py
 │   ├── test_presentation.py ← <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> 个测试（展示文本生成：format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label）
-   ← <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
+│   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -116,6 +119,7 @@ Delta Force Dashboard/
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->18<!--/AUTO--> 个测试（数据模型 + OV 响应解析）
+│   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->12<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
@@ -148,7 +152,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~592 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~588 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -226,7 +230,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~476 行<!--/AUTO-->
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~480 行<!--/AUTO-->
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -331,7 +335,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~597 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~612 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -346,7 +350,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~502 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~500 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -375,14 +379,6 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:calculator.py:ProfitCalculatorLogic.export_csv-->`export_csv`<!--/AUTO--> | — | `str` | 生成 CSV 导出文本（日期/现金/仓库/较前日/收益率，日期升序，O-04） |
 
 
-### 4.8  — 展示文本生成（<!--AUTO:lines:presentation.py-->~110 行<!--/AUTO-->）
-
-领域值 → 展示文本 + 语义信号纯函数（架构评审候选 1/6，与  解耦）。
-
-| 方法 | 参数 | 返回 | 说明 |
-|------|------|------|------|
-
-
 ### 4.8 `presentation.py` — 展示文本生成（<!--AUTO:lines:presentation.py-->~110 行<!--/AUTO-->）
 
 领域值 → 展示文本 + 语义信号纯函数（架构评审候选 1/6，与 `calculator.py` 解耦）。
@@ -407,7 +403,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.8 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~43 行<!--/AUTO-->）
+### 4.9 `config.py` — 基础配置（<!--AUTO:lines:config.py-->~41 行<!--/AUTO-->）
 
 | 常量 | 值 | 说明 |
 |------|-----|------|
@@ -425,7 +421,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.9 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~154 行<!--/AUTO-->）
+### 4.10 `data_store.py` — 数据持久化（<!--AUTO:lines:data_store.py-->~154 行<!--/AUTO-->）
 
 #### 类：`DataStore`
 
@@ -457,7 +453,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.10 `formatting.py` — 金额格式化工具（<!--AUTO:lines:formatting.py-->~116 行<!--/AUTO-->）
+### 4.11 `formatting.py` — 金额格式化工具（<!--AUTO:lines:formatting.py-->~116 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
@@ -478,7 +474,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.11 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~71 行<!--/AUTO-->）
+### 4.12 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~71 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
@@ -489,7 +485,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.12 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~41 行<!--/AUTO-->）
+### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~41 行<!--/AUTO-->）
 
 #### 类：`SettingsStore`
 
@@ -503,7 +499,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.13 `signals.py` — 领域信号枚举（<!--AUTO:lines:signals.py-->~23 行<!--/AUTO-->）
+### 4.14 `signals.py` — 领域信号枚举（<!--AUTO:lines:signals.py-->~23 行<!--/AUTO-->）
 
 | 枚举 | 说明 |
 |------|------|
@@ -523,7 +519,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架 | 300 项（含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->305<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -608,9 +604,11 @@ main.py
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
 | `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
+| `tests/test_presentation.py` | <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> | 展示文本生成纯函数（format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label，D-01/D-07 架构评审候选 1） |
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->18<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
+| `tests/test_json_file.py` | <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> | json_file seam（D-02）：原子写（失败清理临时文件）/ 容错读（缺失/解析失败返回 None）/ on_error 回调异常详情 |
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
@@ -626,6 +624,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->28<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->18<!--/AUTO--> | 数据模型 + OV 响应解析 |
+| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->12<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/offscreen 守卫/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->21<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->4<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
@@ -679,7 +678,7 @@ python -m PyInstaller delta_force_dashboard.spec --noconfirm
 
 ### 8.5 文档同步（F-01）
 
-`CODE_WIKI.md` 中的三类机械标记（§4 各模块 `（~N 行）`、§7 各测试文件用例数、§4 方法表签名）由 `scripts/doc_sync.py` 从代码生成，**修改代码后需运行它保持同步**：
+`CODE_WIKI.md` 中的四类机械标记（§4 各模块 `（~N 行）`、§7 各测试文件用例数、§4 方法表签名、头部横幅/属性表/依赖表的测试总数 `tests_total`）由 `scripts/doc_sync.py` 从代码生成，**修改代码后需运行它保持同步**：
 
 ```bash
 python scripts/doc_sync.py               # 就地刷新所有现有标记（不新增标记）

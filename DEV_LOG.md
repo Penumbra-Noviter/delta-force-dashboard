@@ -6,7 +6,11 @@
 
 ---
 
-## 滚动摘要（2026-08-07）
+## 滚动摘要（2026-08-08）
+
+- **评审修复（08-08，多维度评审 → 子代理按优先级实现）**：P0 `FetchWorker.shutdown()` 关闭逃生舱（请求在途关窗不再 "QThread: Destroyed while thread is still running" abort，atexit 兜底 join）；P1 `app/fetch_page_base.py` 共享基类（crafting/exchange 双页重复提炼，210→122 / 256→178 行，`_error` 死状态删除）+ `preload()` 公开 seam（消除 main_window 四处私有穿透与 lambda 吞错）；P1 硬编码颜色收敛 theme.py（新增 BTN_HOVER_FG/BADGE_FG/NAV_HOVER_BG/OVERLAY_BG/PACKAGE_COLOR_0~2 七键，dark NAV_HOVER_BG 灰 overlay→半透明白，其余逐字保持）；P2 死代码清理（calculator 不可达 return + calendar、config SQLITE_FILE）+ 更名收尾（日志文件名 `profit_calculator.log` → `delta_force_dashboard.log`，推翻「仅改身份标识」中日志名保留项——单实例锁/user-agent 仍保留）；doc_sync 新增 `tests_total` 机械标记（测试数入 pre-commit 保护）；测试数 6 处文档 + memory 统一 305
+- **性能优化（08-07 `ded4a5d` + 08-08 `762ef27`）**：crafting/exchange 页同步 HTTP 请求改 `FetchWorker`（QThread）后台执行，UI 不再阻塞（最坏 30s 冻结→0）；`_DaySubTable.draw` 改 get-or-create 复用 widget（30 天视图每次刷新从创建 ~300 个 Qt 对象降为 0）；calculator `_sorted_dates` 缓存（recent_records/summary/export_csv O(n log n)→O(1)）；`refresh_theme()` 解耦主题切换与数据刷新；kkrb_client 60s TTL 缓存；ProfitPage 制造产物预加载
+- **测试**：pytest **305/305** ✅
 
 - **项目更名（2026-08-07）**：正式更名为 **Delta Force Dashboard**（原「收益计算器 / Profit Calculator」）——窗口标题、应用名、`DATA_DIR`（`~/收益计算器` → `~/Delta Force Dashboard`，`_LEGACY_DATA_DIR` 一次性迁移旧数据）、spec 改名 `delta_force_dashboard.spec`（exe `Delta Force Dashboard.exe`）、README/PROJECT_REFERENCE/CODE_WIKI/CONSENSUS/CONTEXT/TO-TICKETS/ADR 文档、GitHub 仓库 `profit-calculator` → `delta-force-dashboard`；按「仅改身份标识」决策，`ProfitCalculatorLogic` 类名、日志文件名、单实例锁、user-agent 等内部标识保留
 
@@ -18,7 +22,7 @@
 
 - **M-01 修复**：暗色主题 `CHART_GRID` 色值 `rgba(255,255,255,.05)` 无法被 pyqtgraph 解析（`pg.mkColor` 只认十六进制/SVG 名，浮点 alpha 的 `rgba()` 抛 ValueError）→ 暗色主题下首次绘制图表即崩；改 `#RRGGBBAA` 八位十六进制（`#FFFFFF0D`，alpha 13≈5%，视觉一致）+ 回归测试
 - **L 系列完成**：Delta Force 游戏工具扩展全部 4 张工单已实现 — L-01 侧边栏导航（`app/sidebar.py` + main_window 重构为 sidebar | QStackedWidget 水平布局）、L-02 kkrb.net API 客户端（`app/kkrb_client.py`，纯 stdlib，CSRF 自动管理）、L-03 制造利润页面（`app/crafting_page.py`，4 台位卡片 2×2）、L-04 卡战备推荐页面（`app/gear_page.py`，输入匹配 + 方案表格）
-- **测试**：pytest **297/297** ✅（295 + 1 M-01 回归）
+- **测试**：pytest **297/297** ✅（296 + 1 M-01 回归）
 - **打包**：M-01 后主分支重新打包，`dist/Delta Force Dashboard/` **68M**（exe 6.67MB + `_internal/`），烟测通过（dark 主题 + 9 条记录 = M-01 修复前崩溃场景，直接验证修复）
 - **文档**：TO-TICKETS M-01/L 系列归档、CODE_WIKI 测试表补 test_kkrb_client.py、doc_sync 通过
 
@@ -29,6 +33,28 @@
 ---
 
 ## 日志正文
+
+### 2026-08-08 | 评审修复 | 多维度评审 → 4 子代理按优先级实现（P0/P1/P2）
+- P0: `FetchWorker.shutdown(timeout_ms=300)` + 逃生舱——`requestInterruption()` + `wait(超时)`，超时后 `setParent(None)` 脱离 + 模块级 `_detached_workers` 强引用 + `atexit` 兜底 join；`run()` 顶部检查中断标志；`MainWindow.closeEvent` 停 `_preload_timer` + 级联 `ProfitPage.shutdown()`；消除 "QThread: Destroyed while thread is still running" abort 路径（4 项新测试）
+- P1: `app/fetch_page_base.py`（179 行）——crafting/exchange 共享基类：`_client/_loading/_loaded_once/_worker/_data/_shut_down` 状态机、showEvent 懒加载、标题栏+状态标签构建、`_load_data/_on_fetch_done/_on_fetch_error` 三件套、`refresh/preload/shutdown`；crafting 210→122、exchange 256→178 行；`_error` 死状态（两页均只写不读）删除并有测试固化
+- P1: `preload()` 公开 seam——main_window `_preload_profit_page` 收缩为一行，删除对 `_loaded_once/_loading/_client/_on_fetch_done` 四处私有穿透与 `lambda e: None` 吞错（失败走 `_on_fetch_error` 记 warning + 状态标签「点击重试」）
+- P1: 硬编码颜色收敛——theme.py 新增 7 键（BTN_HOVER_FG/BADGE_FG/NAV_HOVER_BG/OVERLAY_BG/PACKAGE_COLOR_0~2，双主题定义）；table_widget PnLBadge/_ActionButtons hover、theme danger 按钮 hover、sidebar 导航 hover、chart 稀疏提示 overlay、exchange 剩余 3 包色收敛；dark NAV_HOVER_BG 由灰 overlay 改半透明白（暗底可见性），其余逐字保持
+- P2: 死代码清理——calculator `rotate_weekly` 不可达 `return self._window_delta(...)` + `import calendar`；config `SQLITE_FILE`（92f1a94 移除 SQLiteDataStore 后零引用）
+- P2: 更名收尾——`_LOG_FILE` `profit_calculator.log` → `delta_force_dashboard.log`（.gitignore 同步；推翻更名时「日志文件名保留」项，单实例锁/user-agent 仍保留）；main.py 经 `LOG_FILE` 常量引用无需改
+- 文档: doc_sync 新增 `tests_total` 机械标记（测试数入 pre-commit 保护）；测试数 6 处文档 + memory 统一；DEV_LOG 补记 `ded4a5d`/`762ef27`；CODE_WIKI 模块树补 3 模块/§4 编号重排/§7 表补齐
+- 测试：pytest 305/305 ✅（293 + 12 新：test_fetch_pages.py）
+
+### 2026-08-08 | 性能 | sorted_dates 缓存 + 主题刷新解耦 + kkrb TTL 缓存 + ProfitPage 预加载（`762ef27`）
+- P0: calculator.py 维护 `_sorted_dates` 缓存——recent_records/summary/export_csv 从 O(n log n) 降为 O(1)，save_record/delete_record/rotate_weekly 增量更新
+- P0: main_window.py 新增 `refresh_theme()` 解耦主题切换与数据刷新——主题切换只刷新视觉样式，不再触发 chart.draw 全量渲染
+- P1: kkrb_client.py 新增 60 秒 TTL 内存缓存，避免短时间内重复 HTTP 请求；`reset()` 同步清除缓存
+- P1: main_window.py QTimer.singleShot(500ms) 后台预加载 ProfitPage 制造产物数据；crafting_page/exchange_page `_on_fetch_done` 补设 `_loaded_once=True`，消除预加载完成后 showEvent 重复触发
+- 测试：pytest 293/293 ✅
+
+### 2026-08-07 | 性能 | 网络请求移至后台线程 + 表格 widget 复用（`ded4a5d`）
+- P0: crafting_page/exchange_page 的同步 HTTP 请求改用 `FetchWorker`（QThread，`app/fetch_worker.py`）后台执行，UI 线程不再阻塞（最坏情况从冻结 30s 降为 0）
+- P1: `_DaySubTable.draw` 重构为 get-or-create 模式——QTableWidgetItem/PnLBadge/_ActionButtons 首次创建后后续刷新只更新属性，不再重建；30 天视图每次刷新从创建 ~300 个 Qt 对象降为 0
+- 测试：pytest 293/293 ✅（纯性能改动，测试数不变）
 
 ### 2026-08-06 | 清理 | 移除 SQLiteDataStore 死代码（与 D-06 纪律对齐）
 - 删 `sqlite_store.py`（99 行）+ `tests/test_sqlite_store.py`（107 行）

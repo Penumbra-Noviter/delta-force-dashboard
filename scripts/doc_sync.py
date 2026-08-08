@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """F-01：CODE_WIKI 机械标记同步工具。
 
-从代码中生成三类「数字/签名」机械标记，写入 CODE_WIKI.md 的 HTML 注释标记内，
+从代码中生成四类「数字/签名」机械标记，写入 CODE_WIKI.md 的 HTML 注释标记内，
 防止文档与代码漂移：
 
     lines:<module>        §4 各模块标题的（~N 行）——非空行计数
     tests:<test_file>     §7 测试表用例数——解析 ``pytest --collect-only -q``
     sig:<module>:<symbol> §4 方法表签名——AST 提取函数/方法签名
+    tests_total:<key>     头部横幅/属性表/依赖表的测试总数——pytest 收集总和
 
 标记语法：``<!--AUTO:<kind>:<key>-->内容<!--/AUTO-->``（HTML 注释，渲染不可见）。
 工具只维护标记内的机械文本，绝不生成叙述性说明（F-01 规模悖论边界）。
@@ -21,6 +22,7 @@
   - tests：每个 pytest 收集的测试文件必须有标记；每个标记必须对应真实收集文件
   - lines：每个 §4 模块标题必须有标记；每个标记必须对应一个 §4 标题
   - sig：每个标记引用的符号必须存在于模块（删除/改名会被拦截）
+  - tests_total：文档中 tests_total 标记内容 = pytest 收集用例总数（防手工叙述测试数漂移）
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ __all__ = [
 # ── 常量 ──────────────────────────────────────────────────
 
 MARKER_RE = re.compile(
-    r"<!--AUTO:(?P<kind>lines|tests|sig):(?P<key>[^>]+)-->"
+    r"<!--AUTO:(?P<kind>tests_total|lines|tests|sig):(?P<key>[^>]+)-->"
     r"(?P<content>.*?)"
     r"<!--/AUTO-->",
     re.DOTALL,
@@ -249,6 +251,8 @@ def compute_content(
     """计算某标记当前的机械文本（不含 HTML 注释壳）。"""
     if kind == "lines":
         return f"~{count_nonblank_lines(root / key)} 行"
+    if kind == "tests_total":
+        return str(sum(test_counts.values()))
     if kind == "tests":
         count = test_counts.get(key)
         if count is None:
