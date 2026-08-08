@@ -60,7 +60,7 @@ class PnLBadge(QWidget):
     """盈亏标签 Badge：绿底"盈 +2.4%"/红底"亏 -1.3%"/灰底"—"。"""
 
     def __init__(
-        self, label: str, bg_color: str, fg_color: str = "#ffffff", parent=None
+        self, label: str, bg_color: str, fg_color: str | None = None, parent=None
     ) -> None:
         super().__init__(parent)
         self.setMinimumWidth(80)
@@ -73,12 +73,15 @@ class PnLBadge(QWidget):
         layout.addWidget(self._label)
         self._apply_style(bg_color, fg_color)
 
-    def update_content(self, label: str, bg_color: str, fg_color: str = "#ffffff") -> None:
+    def update_content(self, label: str, bg_color: str, fg_color: str | None = None) -> None:
         """复用：更新文本与配色，不重建 widget。"""
         self._label.setText(label)
         self._apply_style(bg_color, fg_color)
 
-    def _apply_style(self, bg_color: str, fg_color: str) -> None:
+    def _apply_style(self, bg_color: str, fg_color: str | None) -> None:
+        # 前景缺省时按当前主题解析（运行时求值，避免 import 期冻结）
+        if fg_color is None:
+            fg_color = get_color("BADGE_FG")
         self._label.setStyleSheet(
             f"""
             background-color: {bg_color};
@@ -127,6 +130,7 @@ class _ActionButtons(QWidget):
         """根据当前主题色更新按钮内联样式。"""
         btn_fg = get_color("BTN_BG")
         btn_hover = get_color("BTN_BG_HOVER")
+        btn_hover_fg = get_color("BTN_HOVER_FG")
         muted_bg = get_color("MUTED_BG")
         border_def = get_color("BORDER_DEFAULT")
         danger_bg = get_color("DANGER_BG")
@@ -146,7 +150,7 @@ class _ActionButtons(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {btn_fg};
-                color: #ffffff;
+                color: {btn_hover_fg};
                 border-color: {btn_hover};
             }}
         """)
@@ -162,7 +166,7 @@ class _ActionButtons(QWidget):
             }}
             QPushButton:hover {{
                 background-color: {danger_hover};
-                color: #ffffff;
+                color: {btn_hover_fg};
                 border-color: {danger_hover};
             }}
         """)

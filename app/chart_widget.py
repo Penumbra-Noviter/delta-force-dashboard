@@ -501,7 +501,7 @@ class ChartWidget(QWidget):
         hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setStyleSheet(
-            "background-color: rgba(0, 0, 0, 35);"
+            f"background-color: {get_color('OVERLAY_BG')};"
             f"color: {get_color('FG_MUTED')};"
             "font-size: 12px;"
         )

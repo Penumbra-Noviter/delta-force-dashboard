@@ -8,7 +8,6 @@ from pathlib import Path
 __all__ = [
     "DATA_DIR",
     "DATA_FILE",
-    "SQLITE_FILE",
     "SETTINGS_FILE",
     "DATE_FORMAT",
     "RETENTION_LIMIT",
@@ -33,10 +32,9 @@ DATA_DIR: Path = Path.home() / "Delta Force Dashboard"
 _LEGACY_DATA_DIR: Path = Path.home() / "收益计算器"
 
 DATA_FILE = DATA_DIR / "data.json"
-SQLITE_FILE = DATA_DIR / "data.db"
 _BACKUP_FILE = DATA_DIR / "data.json.bak"
 SETTINGS_FILE = DATA_DIR / "settings.json"
-_LOG_FILE = DATA_DIR / "profit_calculator.log"
+_LOG_FILE = DATA_DIR / "delta_force_dashboard.log"
 DATE_FORMAT = "%Y-%m-%d"
 
 # 视图默认窗口（沿用，启动默认 7）。与 VIEW_DAYS[0] 数值巧合但语义独立。

@@ -78,3 +78,8 @@ class ProfitPage(QWidget):
         """刷新所有子页面。"""
         self.crafting_page.refresh()
         self.exchange_page.refresh()
+
+    def shutdown(self) -> None:
+        """关闭时回收所有子页面后台线程（MainWindow.closeEvent 调用，T-01）。"""
+        self.crafting_page.shutdown()
+        self.exchange_page.shutdown()

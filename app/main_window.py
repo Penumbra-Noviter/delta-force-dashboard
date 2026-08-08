@@ -142,7 +142,10 @@ class MainWindow(QMainWindow):
         self.refresh_display()
 
         # 仪表盘渲染完成后，后台预加载利润页面数据
-        QTimer.singleShot(500, self._preload_profit_page)
+        self._preload_timer = QTimer(self)
+        self._preload_timer.setSingleShot(True)
+        self._preload_timer.timeout.connect(self._preload_profit_page)
+        self._preload_timer.start(500)
 
         # 恢复置顶状态
         if self._settings.get("pinned", False):
@@ -223,6 +226,9 @@ class MainWindow(QMainWindow):
             if reply != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
+        # T-01：请求在途时安全回收后台线程，避免运行中的 QThread 随窗口销毁 abort
+        self._preload_timer.stop()
+        self.profit_page.shutdown()
         self._save_settings()
         super().closeEvent(event)
 
@@ -570,22 +576,10 @@ class MainWindow(QMainWindow):
 
         用户导航到 ProfitPage 时制造产物数据已就绪，消除加载中闪烁。
         兑换利润数据由 ProfitPage 首次 showEvent 自行加载（不预加载）。
-        预加载失败时静默处理，用户手动刷新即可。
-        测试（offscreen 模式）下跳过预加载，避免后台线程冲突。
+        预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
+        offscreen 测试模式跳过预加载的守卫同样在 preload() 内部。
         """
-        import os
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
-            return
-
-        from app.fetch_worker import FetchWorker
-
-        crafting = self.profit_page.crafting_page
-        if crafting._loaded_once or crafting._loading:
-            return
-        worker = FetchWorker(crafting._client.fetch_ov_data)
-        worker.done.connect(crafting._on_fetch_done)
-        worker.error.connect(lambda e: None)
-        worker.start()
+        self.profit_page.crafting_page.preload()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。

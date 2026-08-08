@@ -34,6 +34,7 @@ THEMES = {
         "BTN_BG": "#2F6B4F",         # 森林绿主按钮
         "BTN_BG_HOVER": "#3C8A63",   # 悬停提亮
         "BTN_FG": "#ffffff",         # 按钮文字
+        "BTN_HOVER_FG": "#ffffff",   # 按钮 hover 前景（操作列/危险按钮，双主题同值）
         "BORDER_DEFAULT": "rgba(20,32,26,.07)",  # 半透明 hairline
         "BORDER_VALID": "#2C7A8C",
         "BORDER_INVALID": "#C0453C",
@@ -48,6 +49,7 @@ THEMES = {
         "CHART_TOTAL": "#2C7A8C",
         "CHART_GRID": "#e2e4df",
         "CHART_BG": "#f5f4f0",
+        "OVERLAY_BG": "rgba(0, 0, 0, 35)",    # 图表稀疏提示遮罩（双主题同值）
         "CHART_AXIS": "#6d7d74",
         "CHART_TEXT": "#3c4a43",
         "TABLE_TEXT": "#3c4a43",
@@ -67,6 +69,7 @@ THEMES = {
         "FOCUS_RING": "#4A8B6A",
         "SELECTION_BG": "#2F6B4F",
         "SELECTION_FG": "#ffffff",
+        "NAV_HOVER_BG": "rgba(128, 128, 128, 0.1)",  # 侧边栏导航 hover（浅色：中性灰 overlay）
         # 新增：表面层级
         "SURFACE_0": "#eef0ec",
         "SURFACE_1": "#ffffff",
@@ -88,11 +91,16 @@ THEMES = {
         "WARNING_FG": "#B77A16",
         "ERROR_BG": "#fef2f2",
         "ERROR_FG": "#C0453C",
+        "BADGE_FG": "#ffffff",         # 盈亏标签文字（双主题同值，保持既有白字）
         # 新增：图表序列色（扩展用）
         "CHART_SERIES_0": "#7B8CFF",
         "CHART_SERIES_1": "#C08A3E",
         "CHART_SERIES_2": "#6BA08A",
         "CHART_SERIES_3": "#D46A6A",
+        # 新增：兑换页包标签色（3 种无图表序列对应，双主题同值保持视觉不变）
+        "PACKAGE_COLOR_0": "#A58BFF",
+        "PACKAGE_COLOR_1": "#E8A33D",
+        "PACKAGE_COLOR_2": "#E8833D",
         # 新增：滚动条
         "SCROLLBAR_BG": "#f3f5f1",
         "SCROLLBAR_HANDLE": "#d6d3cc",
@@ -114,6 +122,7 @@ THEMES = {
         "BTN_BG": "#E8A33D",         # 琥珀主按钮
         "BTN_BG_HOVER": "#F0B555",   # 悬停提亮
         "BTN_FG": "#141008",         # 深底文字（琥珀色上显深字，AA）
+        "BTN_HOVER_FG": "#ffffff",   # 按钮 hover 前景（双主题同值，保持既有白字）
         "BORDER_DEFAULT": "rgba(255,255,255,.07)",  # 半透明白 hairline
         "BORDER_VALID": "#3FCB86",
         "BORDER_INVALID": "#FF5F56",
@@ -128,6 +137,7 @@ THEMES = {
         "CHART_TOTAL": "#3FCB86",
         "CHART_GRID": "#FFFFFF0D",        # RRGGBBAA（alpha 13≈5%）；pyqtgraph 不解析 rgba() 浮点 alpha
         "CHART_BG": "#0c0e16",
+        "OVERLAY_BG": "rgba(0, 0, 0, 35)",
         "CHART_AXIS": "#848aa0",
         "CHART_TEXT": "#a8adbd",
         "TABLE_TEXT": "#a8adbd",
@@ -147,6 +157,7 @@ THEMES = {
         "FOCUS_RING": "#F0B555",
         "SELECTION_BG": "#E8A33D",
         "SELECTION_FG": "#141008",
+        "NAV_HOVER_BG": "rgba(255, 255, 255, 0.1)",  # 侧边栏导航 hover（暗色：半透明白 overlay）
         # 新增：表面层级
         "SURFACE_0": "#08090f",
         "SURFACE_1": "#12141c",
@@ -168,11 +179,15 @@ THEMES = {
         "WARNING_FG": "#E8A33D",
         "ERROR_BG": "#1f1418",
         "ERROR_FG": "#FF5F56",
+        "BADGE_FG": "#ffffff",
         # 新增：图表序列色（扩展用）
         "CHART_SERIES_0": "#7B8CFF",
         "CHART_SERIES_1": "#C08A3E",
         "CHART_SERIES_2": "#3FCB86",
         "CHART_SERIES_3": "#FF5F56",
+        "PACKAGE_COLOR_0": "#A58BFF",
+        "PACKAGE_COLOR_1": "#E8A33D",
+        "PACKAGE_COLOR_2": "#E8833D",
         # 新增：滚动条
         "SCROLLBAR_BG": "#1a1d27",
         "SCROLLBAR_HANDLE": "rgba(255,255,255,.12)",
@@ -282,7 +297,7 @@ def button_style(role: str) -> str:
             f"}}"
             f"QPushButton:hover {{"
             f"background-color: {hover_bg};"
-            f"color: #ffffff;"
+            f"color: {get_color('BTN_HOVER_FG')};"
             f"}}"
         )
     return ""

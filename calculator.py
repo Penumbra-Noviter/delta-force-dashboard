@@ -8,7 +8,6 @@ import csv
 import io
 import logging
 from dataclasses import dataclass
-import calendar
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -266,8 +265,6 @@ class ProfitCalculatorLogic:
             self._sorted_dates.remove(old_date)
             logger.info("保留策略删除最旧记录（保留最近 %d 条）: %s", days, old_date)
         return deleted
-
-        return self._window_delta(days, "warehouse")
 
     @staticmethod
     def import_csv(text: str) -> dict[str, dict[str, float]]:

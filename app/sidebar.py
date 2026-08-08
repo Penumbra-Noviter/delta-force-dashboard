@@ -1,7 +1,7 @@
 """
 侧边栏导航组件：左侧导航项 + 底部操作按钮。
 
-- 导航项（记账 / 制造 / 战备）点击切换 QStackedWidget 页面
+- 导航项（记账 / 利润）点击切换 QStackedWidget 页面
 - 底部放置主题切换、置顶、导出 CSV 按钮
 """
 
@@ -79,6 +79,7 @@ class Sidebar(QWidget):
         fg = get_color("FG_LABEL")
         sel_bg = get_color("BTN_BG")
         sel_fg = get_color("BTN_FG")
+        nav_hover_bg = get_color("NAV_HOVER_BG")
 
         self.setStyleSheet(f"""
         #sidebar {{
@@ -94,6 +95,6 @@ class Sidebar(QWidget):
             background-color: {sel_bg}; color: {sel_fg}; font-weight: bold;
         }}
         QListWidget#sidebarNavList::item:hover:!selected {{
-            background-color: rgba(128, 128, 128, 0.1);
+            background-color: {nav_hover_bg};
         }}
         """)

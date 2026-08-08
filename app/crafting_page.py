@@ -2,90 +2,43 @@
 制造产物推荐页面：展示 4 个制造台位的最新推荐产物。
 
 数据来源于 kkrb.net API（KkrbClient.fetch_ov_data），手动刷新。
+懒加载/加载状态机/后台线程管理继承自 FetchPageBase。
 """
 
 from __future__ import annotations
 
 __all__ = ["CraftingPage"]
 
-import logging
-from typing import Any
-
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
-    QHBoxLayout,
     QLabel,
-    QPushButton,
     QVBoxLayout,
-    QWidget,
 )
 
-from app.fetch_worker import FetchWorker
-from kkrb_client import CraftingProduct, KkrbClient, KkrbError
+from app.fetch_page_base import FetchPageBase
+from kkrb_client import CraftingProduct
 from formatting import format_money
-
-logger = logging.getLogger(__name__)
 
 _EMPTY_STATION = CraftingProduct("—", "暂无数据", 0, 0, "")
 
 
-class CraftingPage(QWidget):
-    """制造产物推荐页面（QStackedWidget Page 1）。"""
+class CraftingPage(FetchPageBase):
+    """制造产物推荐页面（QStackedWidget Page 1 的子页面）。"""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._client = KkrbClient()
-        self._products: list[CraftingProduct] = []
-        self._loading = False
-        self._error: str | None = None
-        self._loaded_once = False
-        self._worker: FetchWorker | None = None
+    _title = "制造产物推荐"
+    _page_name = "制造产物"
 
-        self._build_ui()
+    # ── 数据获取 ────────────────────────────────────────
 
-    def showEvent(self, event: QShowEvent) -> None:
-        """首次显示时自动加载数据。"""
-        super().showEvent(event)
-        if not self._loaded_once:
-            self._loaded_once = True
-            self._load_data()
+    def _fetch(self) -> list[CraftingProduct]:
+        """后台线程执行的取数函数。"""
+        return self._client.fetch_ov_data()
 
     # ── UI 构建 ─────────────────────────────────────────
 
-    def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 24, 32, 16)
-        layout.setSpacing(16)
-
-        # 标题栏
-        title_bar = QWidget()
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-
-        title = QLabel("制造产物推荐")
-        title.setObjectName("titleLabel")
-        title_layout.addWidget(title)
-
-        title_layout.addStretch()
-
-        self._refresh_btn = QPushButton("🔄 刷新")
-        self._refresh_btn.setObjectName("refreshBtn")
-        self._refresh_btn.clicked.connect(self._load_data)
-        title_layout.addWidget(self._refresh_btn)
-
-        layout.addWidget(title_bar)
-
-        # 状态提示
-        self._status_label = QLabel("")
-        self._status_label.setObjectName("statusLabel")
-        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._status_label.setVisible(False)
-        layout.addWidget(self._status_label)
-
-        # 4 个台位卡片（2×2 网格）
+    def _build_body(self, layout: QVBoxLayout) -> None:
+        """构建 4 个台位卡片（2×2 网格）。"""
         self._card_grid = QGridLayout()
         self._card_grid.setSpacing(12)
         self._cards: list[QFrame] = []
@@ -94,8 +47,6 @@ class CraftingPage(QWidget):
             self._cards.append(card)
             self._card_grid.addWidget(card, i // 2, i % 2)
         layout.addLayout(self._card_grid)
-
-        layout.addStretch()
 
     def _build_card(self) -> QFrame:
         card = QFrame()
@@ -129,47 +80,11 @@ class CraftingPage(QWidget):
 
         return card
 
-    # ── 数据加载 ────────────────────────────────────────
+    # ── 渲染 ────────────────────────────────────────────
 
-    def _load_data(self) -> None:
-        if self._loading:
-            return
-        self._loading = True
-        self._error = None
-        self._status_label.setText("🔄 加载中…")
-        self._status_label.setVisible(True)
-        self._refresh_btn.setEnabled(False)
-
-        self._worker = FetchWorker(self._client.fetch_ov_data)
-        self._worker.done.connect(self._on_fetch_done)
-        self._worker.error.connect(self._on_fetch_error)
-        self._worker.start()
-
-    def _on_fetch_done(self, products: list[CraftingProduct]) -> None:
-        self._loaded_once = True
-        self._products = products
-        self._error = None
-        self._status_label.setVisible(False)
-        self._loading = False
-        self._refresh_btn.setEnabled(True)
-        self._render_cards()
-
-    def _on_fetch_error(self, e: Exception) -> None:
-        if isinstance(e, KkrbError):
-            logger.warning("制造产物数据获取失败: %s", e)
-            self._status_label.setText("⚠️ 数据获取失败，点击重试")
-        else:
-            logger.error("制造产物数据获取异常: %s", e)
-            self._status_label.setText("⚠️ 网络异常，请检查连接后重试")
-        self._error = str(e)
-        self._status_label.setVisible(True)
-        self._products = []
-        self._loading = False
-        self._refresh_btn.setEnabled(True)
-        self._render_cards()
-
-    def _render_cards(self) -> None:
-        products = self._products or []
+    def _render_data(self, data: list[CraftingProduct]) -> None:
+        """将产物数据渲染到 4 个卡片。"""
+        products = data or []
         # 确保 4 个卡片都有数据
         display = products[:4]
         while len(display) < 4:
@@ -205,7 +120,3 @@ class CraftingPage(QWidget):
             sell = layout.itemAt(4).widget()
             if isinstance(sell, QLabel):
                 sell.setText(f"建议出售时段：{product.sell_time}")
-
-    def refresh(self) -> None:
-        """公开刷新方法（供外部调用）。"""
-        self._load_data()
