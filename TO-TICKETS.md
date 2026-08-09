@@ -270,7 +270,7 @@
 
 | Ticket | 标题 | 类型 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| V-01 | kkrb_client 解析拆出 — `kkrb_models.py` 零依赖叶子（CraftingProduct/AmmoPackageItem/KkrbError）+ `kkrb_parsing.py` 纯函数解析（parse_ov_response/parse_ammo_package_response，畸形输入矩阵 28 用例）+ `kkrb_client.py` 收敛为会话/传输/缓存（删除类内私有解析方法，`__all__` 重新导出保持协议表面，调用方零改动） | 架构（深模块） | 2026-08-09 | `待填` |
+| V-01 | kkrb_client 解析拆出 — `kkrb_models.py` 零依赖叶子（CraftingProduct/AmmoPackageItem/KkrbError）+ `kkrb_parsing.py` 纯函数解析（parse_ov_response/parse_ammo_package_response，畸形输入矩阵 28 用例）+ `kkrb_client.py` 收敛为会话/传输/缓存（删除类内私有解析方法，`__all__` 重新导出保持协议表面，调用方零改动） | 架构（深模块） | 2026-08-09 | `4c0f590` |
 
 ### U 系列（2026-08-09，UI 视觉打磨）
 
