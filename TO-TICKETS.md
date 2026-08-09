@@ -278,6 +278,7 @@
 | U-07 | 交互小修批量 — 可点「重试」label（`_ClickableLabel` + 手型光标）/ QPushButton `:focus` outline 焦点态 / 今日未录入状态 pill（WARNING 系底+边框）/ 日期标签左对齐（消轴线错位）/ QStatusBar 死样式删除 / 中性 badge 浅底深字（MUTED_BG+TEXT_SECONDARY，AA ≥4.5:1） | 修复（UI） | 2026-08-09 | `7d5878c` |
 | U-08 | code-review 评审修复 — 动效全局开关（settings `animations=false`）+ fade_in 竞态防护（stop 旧动画）+ `animate_property` 类型收紧 QObject / exchangePackageLabel 内联 14→15px（U-02 归位失真修复）/ `EMOJI['ok']` 收敛 main_window CSV 提示 + 测试 regex 补 ✓、Path 绝对化 / 曲线动画 250→200ms（feedback-only 上限） | 修复（UI） | 2026-08-09 | `a77bcfb` |
 | U-09 | 用户实测反馈修复 — ①图表弹性回退：chart 固定小卡片 stretch 0、表格恢复 stretch 1（U-02 翻转挤压表格，用户要求全量展示）②30 天视图全量：行高固定 26px + 视图按钮 28→24 + 卡片边距压缩 ③「今日未录入」pill 亮色不可见 → #F1D9A0/#6E4A08 ④利润页亮色背景纯黑（全局 QWidget 字体族规则致 palette.window 背景）→ profitPage/profitContainer 显式主题 BG ⑤**方案 A 屏幕自适应**：`_window_preset(screen_h)` 纯函数——可用高 ≥1000 → 窗口 1020 + 图表 [160,240]（1080p 图表 +90px），小屏回退 920/[140,150]；两档表格全量参数一致 | 修复（UI） | 2026-08-09 | `a70d594` / `8b4661e` |
+| U-10 | 利润页启动预加载 — `_preload_profit_page` 同时预加载制造产物 + 兑换利润（此前兑换利润等首次点击才拉取 10s HTTP，点击卡顿）；各自后台线程 + kkrb 60s TTL 缓存复用；测试用轮询等待消除 qWait 固定时长与线程调度的竞态（首跑通过次跑失败问题） | 功能（性能） | 2026-08-09 | `待填` |
 
 ### M 系列（2026-08-05，修复）
 

@@ -178,6 +178,52 @@ def test_u02_type_scale(sample_window):
     assert win.table._left_table.rowHeight(0) == 26
 
 
+def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monkeypatch):
+    """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。"""
+    import os
+    import time
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+    from calculator import ProfitCalculatorLogic
+    from data_store import DataStore
+    from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
+
+    # offscreen-t 绕过 preload 的 offscreen 守卫；伪造网络数据避免真实 HTTP
+    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
+    monkeypatch.setattr(
+        KkrbClient,
+        "fetch_ov_data",
+        lambda self: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
+    )
+    monkeypatch.setattr(
+        KkrbClient,
+        "fetch_ammo_package_data",
+        lambda self: [AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)],
+    )
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+    )
+    win.show()
+
+    # 轮询等待两个页面预加载完成（固定 qWait 时长与后台线程调度存在竞态）
+    def wait_loaded(page, timeout_ms: int = 5000) -> bool:
+        deadline = time.monotonic() + timeout_ms / 1000
+        while time.monotonic() < deadline:
+            QTest.qWait(50)
+            qapp.processEvents()
+            if page._loaded_once:
+                return True
+        return False
+
+    assert wait_loaded(win.profit_page.crafting_page)
+    assert wait_loaded(win.profit_page.exchange_page)
+    win.close()
+
+
 def test_window_preset_screen_adaptive(qapp):
     """U-09 方案 A：屏幕可用高度 → (窗口宽, 窗口高, 图表区间) 两档自适应。"""
     from app.main_window import MainWindow

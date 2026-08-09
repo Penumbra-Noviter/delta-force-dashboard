@@ -614,14 +614,16 @@ class MainWindow(QMainWindow):
         self.chart.draw(records)
 
     def _preload_profit_page(self) -> None:
-        """仪表盘渲染完成后，后台预加载利润页面制造产物数据。
+        """仪表盘渲染完成后，后台并行预加载利润页两个子模块数据。
 
-        用户导航到 ProfitPage 时制造产物数据已就绪，消除加载中闪烁。
-        兑换利润数据由 ProfitPage 首次 showEvent 自行加载（不预加载）。
+        用户反馈：兑换利润此前等首次点击才拉取（10s 超时 HTTP），点击后
+        才有卡顿感——改为启动即预加载制造产物 + 兑换利润（各自后台线程，
+        kkrb 60s TTL 缓存复用）。导航到 ProfitPage 时数据已就绪，零闪烁。
         预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
         offscreen 测试模式跳过预加载的守卫同样在 preload() 内部。
         """
         self.profit_page.crafting_page.preload()
+        self.profit_page.exchange_page.preload()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。
