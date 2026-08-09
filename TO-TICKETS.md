@@ -270,10 +270,10 @@
 
 | Ticket | 标题 | 类型 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
-| W-01 | KPI 数字 count-up — `motion.animate_value`（数值插值动画，动效开关关闭直接落终态）+ `_set_kpi_value`（旧值→新值 300ms 滚动，复用 format_signed_money 逐帧格式化，数据不足/数值未变直接设置）+ `_last_summary_total/_last_cash_delta` 上一帧值 | 功能（UI） | 2026-08-09 | `待填` |
-| W-02 | 非法输入 shake — `MoneyLineEdit._shake`（QPropertyAnimation 150ms 水平平移 [-6,6,-4,4] 回原位，状态从非 invalid 变 invalid 时触发防抖） | 功能（UI） | 2026-08-09 | `待填` |
-| W-03 | 按钮 pressed 下沉反馈 — QSS 全局 `QPushButton:pressed` 1px 下沉（saveBtn/refreshBtn/queryBtn 各自 pressed padding 覆盖优先，补齐其余按钮一致） | 功能（UI） | 2026-08-09 | `待填` |
-| W-04 | 图表 hover 数据点高亮 — `_hover_markers`（仓库/现金各一 ScatterPlotItem，13px 大圆点 + 主题底填充 + 系列色描边），hover 时 setData 定位、离开隐藏、主题切换描边色跟随 | 功能（UI） | 2026-08-09 | `待填` |
+| W-01 | KPI 数字 count-up — `motion.animate_value`（数值插值动画，动效开关关闭直接落终态）+ `_set_kpi_value`（旧值→新值 300ms 滚动，复用 format_signed_money 逐帧格式化，数据不足/数值未变直接设置）+ `_last_summary_total/_last_cash_delta` 上一帧值 | 功能（UI） | 2026-08-09 | `03989ea` |
+| W-02 | 非法输入 shake — `MoneyLineEdit._shake`（QPropertyAnimation 150ms 水平平移 [-6,6,-4,4] 回原位，状态从非 invalid 变 invalid 时触发防抖） | 功能（UI） | 2026-08-09 | `03989ea` |
+| W-03 | 按钮 pressed 下沉反馈 — QSS 全局 `QPushButton:pressed` 1px 下沉（saveBtn/refreshBtn/queryBtn 各自 pressed padding 覆盖优先，补齐其余按钮一致） | 功能（UI） | 2026-08-09 | `03989ea` |
+| W-04 | 图表 hover 数据点高亮 — `_hover_markers`（仓库/现金各一 ScatterPlotItem，13px 大圆点 + 主题底填充 + 系列色描边），hover 时 setData 定位、离开隐藏、主题切换描边色跟随 | 功能（UI） | 2026-08-09 | `03989ea` |
 
 ### V 系列（2026-08-09，架构深化，来源：improve-codebase-architecture 报告候选 1）
 
