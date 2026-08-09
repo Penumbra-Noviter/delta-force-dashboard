@@ -77,7 +77,10 @@ def fade_in_widget(
     anim.setStartValue(0.0)
     anim.setEndValue(1.0)
     anim.setEasingCurve(easing)
+    # DeleteWhenStopped 自删动画后，dynamic property 里的 QObject 指针会悬空
+    # （下次读取访问已删对象可能崩溃）——finished 时同步清 property。
     anim.finished.connect(lambda: widget.setGraphicsEffect(None))
+    anim.finished.connect(lambda: widget.setProperty("_fade_anim", None))
     anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
     widget.setProperty("_fade_anim", anim)
     return anim

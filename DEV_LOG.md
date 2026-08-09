@@ -34,6 +34,13 @@
 
 ## 日志正文
 
+### 2026-08-09 | 修复 | U-11 切页崩溃（用户实测：点利润→切回→再点利润闪退，317/317）
+- **症状**：快速切页（利润→记账→利润）闪退无提示；日志无崩溃现场（无 crash 捕获）
+- **根因定位**：U-06 切页淡入动画（`fade_in_widget` → QGraphicsOpacityEffect + QPropertyAnimation 挂 QStackedWidget 页面）——QGraphicsEffect 挂在 QStackedWidget 页面上，动画进行中页面被 hide/show（快速切页），触发 Qt 已知崩溃路径（effect 与 stack 绘制交互）；Falsify 只测过「同 widget 连续 fade」，未覆盖「stack 切页中 hide/show」场景
+- **修复**：① 移除切页淡入动画（`_on_page_changed`/`_PAGE_FADE_MS` 删除；曲线绘制/保存指示动画保留——它们不在 hide/show 路径上）；② `fade_in_widget` 补 dynamic property 悬空指针清理（DeleteWhenStopped 自删动画后 `_fade_anim` 里的 QObject* 悬空，下次读取访问已删对象）——finished 时同步 `setProperty("_fade_anim", None)`；③ **崩溃现场捕获**入 main.py：faulthandler（crash.log，all_threads）+ sys.excepthook（未捕获异常写日志，PyInstaller 无 stderr 默认被吞）+ qInstallMessageHandler（Qt qWarning/qCritical/qFatal 落盘——"QThread destroyed" 等致命消息 abort 前先记录）——下次任何崩溃都有现场
+- 回归：`test_page_switch_loop_no_crash`（利润→记账×20 循环）+ U-06 测试改断言（切页动画断言移除、property 清空断言加入）
+- pytest 317/317 ✅；重新打包 + 烟测
+
 ### 2026-08-09 | 实现 | U-10 利润页启动预加载（316/316）
 - 用户反馈：利润页点击后才开始拉数据，有卡顿感。根因：`_preload_profit_page` 只预加载制造产物，兑换利润由首次 showEvent 才拉取（10s 超时 HTTP）
 - 改：启动 500ms 定时器同时预加载 crafting + exchange（各自 FetchWorker 后台线程，kkrb 60s TTL 缓存复用）；点击利润页时数据已就绪零闪烁；预加载失败仍走既有兜底（状态标签可点重试）

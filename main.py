@@ -31,6 +31,48 @@ from data_store import log_legacy_cleanup_hint, migrate_legacy_data
 _SERVER_NAME = "profit_calculator_singleton_lock"
 
 
+def _install_crash_handlers() -> None:
+    """崩溃现场捕获（DATA_DIR/crash.log + 日志文件）。
+
+    - faulthandler：Python 层 segfault/abort 时 dump 当前线程栈
+      （含 Qt abort 前若有 Python 帧的场景）
+    - sys.excepthook：未捕获 Python 异常写日志（PyInstaller 窗口化 exe
+      无 stderr，异常默认被吞）
+    - qInstallMessageHandler：捕获 Qt qWarning/qCritical/qFatal——
+      "QThread: Destroyed while thread is still running" 等致命消息
+      在 abort 前先落盘，崩溃现场不丢
+    """
+    import faulthandler
+    import traceback
+
+    crash_fp = open(LOG_FILE.with_name("crash.log"), "a", encoding="utf-8")
+    faulthandler.enable(file=crash_fp, all_threads=True)
+
+    def _excepthook(exc_type, exc, tb) -> None:
+        logging.getLogger("main").critical(
+            "未捕获异常（进程将退出）:\n%s",
+            "".join(traceback.format_exception(exc_type, exc, tb)),
+        )
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _excepthook
+
+    from PySide6.QtCore import QtMsgType, qInstallMessageHandler
+
+    def _qt_msg_handler(mode, context, message) -> None:
+        qt_logger = logging.getLogger("qt")
+        if mode == QtMsgType.QtFatalMsg:
+            qt_logger.critical("Qt FATAL: %s", message)
+        elif mode == QtMsgType.QtCriticalMsg:
+            qt_logger.error("Qt critical: %s", message)
+        elif mode == QtMsgType.QtWarningMsg:
+            qt_logger.warning("Qt warning: %s", message)
+        else:
+            qt_logger.info("Qt info: %s", message)
+
+    qInstallMessageHandler(_qt_msg_handler)
+
+
 
 def _icon_path() -> str:
     """定位应用图标路径。
@@ -92,6 +134,8 @@ def main() -> None:
         )
         root_logger.addHandler(handler)
         root_logger.setLevel(logging.INFO)
+    # 崩溃现场捕获（faulthandler/excepthook/Qt 消息钩子）
+    _install_crash_handlers()
     # 高 DPI 支持
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

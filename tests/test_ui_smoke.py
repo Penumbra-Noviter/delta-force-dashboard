@@ -224,6 +224,35 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
     win.close()
 
 
+def test_page_switch_loop_no_crash(sample_window, monkeypatch):
+    """U-11 回归：点利润 → 切回记账 → 再点利润 反复 20 次不崩溃。
+
+    用户报告此操作序列闪退（根因：切页淡入的 QGraphicsOpacityEffect 挂
+    QStackedWidget 页面，快速 hide/show 触发 Qt 崩溃路径——已移除切页动画）。
+    """
+    from PySide6.QtTest import QTest
+
+    from kkrb_client import KkrbClient
+
+    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
+    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
+
+    win = sample_window
+    win.show()
+    QTest.qWait(100)
+
+    for i in range(20):
+        win.sidebar.set_current_index(1)  # 利润
+        QTest.qWait(30)
+        win.sidebar.set_current_index(0)  # 记账
+        QTest.qWait(30)
+    QTest.qWait(200)
+    # 存活即通过（崩溃会直接终止进程）；再确认页面仍可切换
+    win.sidebar.set_current_index(1)
+    QTest.qWait(50)
+    assert win._stack.currentIndex() == 1
+
+
 def test_window_preset_screen_adaptive(qapp):
     """U-09 方案 A：屏幕可用高度 → (窗口宽, 窗口高, 图表区间) 两档自适应。"""
     from app.main_window import MainWindow
@@ -278,7 +307,11 @@ def test_u05_emoji_single_source(sample_window):
 
 
 def test_u06_motion_feedback(sample_window, monkeypatch):
-    """U-06：切页淡入 + 曲线绘制动画触发；动画结束 effect 移除（不常驻）。"""
+    """U-06：曲线绘制动画触发 + fade_in_widget 契约（effect 移除、竞态安全）。
+
+    注：页面切换淡入已移除（QStackedWidget + QGraphicsOpacityEffect 快速切页
+    崩溃风险，U-11）；曲线与保存指示动画保留。
+    """
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QFrame
 
@@ -293,11 +326,6 @@ def test_u06_motion_feedback(sample_window, monkeypatch):
     win.show()
     QTest.qWait(50)
 
-    # 页面切换 → 淡入动画触发（对象挂 self 防 GC）
-    win.sidebar.set_current_index(1)
-    assert win._page_fade_anim is not None
-    QTest.qWait(250)  # 等动画完成
-
     # 曲线绘制动画：draw 后启动，完成后 opacity 归 1
     records = win.logic.recent_records(7)
     win.chart.draw(records)
@@ -306,11 +334,12 @@ def test_u06_motion_feedback(sample_window, monkeypatch):
     if win.chart._warehouse_curve is not None:
         assert win.chart._warehouse_curve.opacity() == 1.0
 
-    # fade_in_widget 契约：结束后移除 QGraphicsOpacityEffect
+    # fade_in_widget 契约：结束后移除 QGraphicsOpacityEffect 且 property 清空
     box = QFrame()
     fade_in_widget(box, duration_ms=50)
     QTest.qWait(120)
     assert box.graphicsEffect() is None
+    assert box.property("_fade_anim") is None
 
 
 def test_u06_motion_global_switch(qapp):
