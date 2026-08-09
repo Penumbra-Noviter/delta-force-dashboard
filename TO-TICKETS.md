@@ -12,16 +12,11 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-09）：U 系列 — UI 视觉打磨（finesse-ui 审计，方向：**游戏感强一点**——保留多色点缀与 emoji 风格，只修层级/布局/动效，不收敛配色）。无阻塞依赖；U-07 小修可随时开工，U-01/U-02 是视觉骨架，U-06 建议排在 U-02 之后（样式稳定再叠动效）。
+> 活跃表（2026-08-09）：U-01~U-07 已归档，仅剩 U-03（色彩角色系统化）待办，等 U-01 完成后再评估是否要做。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| U-01 | KPI 磁贴 + 顶部两栏：总盈亏/现金总变化升级为卡片磁贴（大数字+信号色+迷你趋势），输入表单限宽与 KPI 并排 | 功能（UI） | 🔄 进行中 | 🟢 Strong |
-| U-02 | 排版刻度：三级字号体系（display 20-22 / section 15-16 / body 12-13 / meta 10-11）+ 按钮两级 + 应用名与页面标题层级区分 + 图表弹性分配翻转（min-height 200） | 功能（UI） | 🔄 进行中 | 🟢 Strong |
 | U-03 | 色彩角色系统化（不收敛单 accent）：多色保留，但统一明度/饱和度带 + 语义色与装饰色分离 + 兑换页/图表序列共用同一色板定义（去重复键） | 架构（UI） | 📝 已录入 | 🟡 Worth exploring |
-| U-04 | 侧边栏重做：图标+文字导航、选中态改浅底 pill + accent 指示条（替代全色块）、底部按钮统一 | 功能（UI） | 🔄 进行中 | 🟡 Worth exploring |
-| U-05 | emoji/图标一致性：固定 emoji 集 + 统一字号与字体族（避免基线错位）+ 状态提示前缀统一 | 功能（UI） | 🔄 进行中 | 🟡 Worth exploring |
-| U-06 | 反馈型动效：hover 150ms 过渡、页面切换淡入、图表曲线绘制动画、保存成功微动效 | 功能（UI） | 🔄 进行中 | 🟡 Worth exploring |
 
 ---
 
@@ -275,6 +270,11 @@
 
 | Ticket | 标题 | 类型 | 完成日期 | 提交 |
 |--------|------|------|----------|------|
+| U-01 | KPI 磁贴 + 顶部两栏 — 汇总拆「说明行 + 数值行」磁贴（summary_style 22px 信号色/16px 数据不足）、输入卡限宽 520 与 KPI 卡并排（`_split_kpi_text`） | 功能（UI） | 2026-08-09 | `b5d230e` |
+| U-02 | 排版刻度 — 按钮两级（primary 13/600、secondary 11/500）、页面标题 `pageTitleLabel` 16px 分层、字号归位（10→11/14→15/craftProduct 18→16）、图表弹性翻转（min 200 + 表格 vertical AsNeeded 滚动兜底） | 功能（UI） | 2026-08-09 | `251baec` |
+| U-04 | 侧边栏重做 — 宽度 130、选中态浅底 pill（NAV_SELECT_BG）+ 3px accent 指示条（border-left 透明占位零位移） | 功能（UI） | 2026-08-09 | `222787d` |
+| U-05 | emoji/图标一致性 — 新增 `app/ui_text.py` EMOJI 单一来源（9 键），4 文件散落字面量清零 + 全局 font-family 补 Segoe UI Emoji | 功能（UI） | 2026-08-09 | `f0741ff` |
+| U-06 | 反馈型动效 — 新增 `app/motion.py`（fade_in_widget/animate_property）：切页 120ms 淡入、曲线 opacity 0→1 揭示 250ms、保存指示 180ms 淡入；hover 过渡因 QSS 无 transition 跳过（DEV_LOG 记取舍） | 功能（UI） | 2026-08-09 | `d430cd7` |
 | U-07 | 交互小修批量 — 可点「重试」label（`_ClickableLabel` + 手型光标）/ QPushButton `:focus` outline 焦点态 / 今日未录入状态 pill（WARNING 系底+边框）/ 日期标签左对齐（消轴线错位）/ QStatusBar 死样式删除 / 中性 badge 浅底深字（MUTED_BG+TEXT_SECONDARY，AA ≥4.5:1） | 修复（UI） | 2026-08-09 | `7d5878c` |
 
 ### M 系列（2026-08-05，修复）

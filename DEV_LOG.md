@@ -34,6 +34,15 @@
 
 ## 日志正文
 
+### 2026-08-09 | 实现 | U-01~U-06 UI 视觉打磨（finesse-ui 审计落地，313/313）
+- **U-01 KPI 磁贴**（`b5d230e`）：汇总从裸 QLabel 升级为卡片磁贴——`_split_kpi_text` 拆「说明行（11px caption）+ 数值行（22px 信号色）」；`summary_style` 升级（正常 22px/700、数据不足 16px 灰）；输入卡限宽 520 与 KPI 卡并排（顶部两栏），宽窗口不再全宽拉伸
+- **U-02 排版刻度**（`251baec`）：QSS 顶部注释固化刻度（display 18-22 / section 15-16 / body 12-13 / meta 10-11）；按钮两级（QPushButton 默认 11px/500 = secondary，saveBtn/queryBtn 13px/600 = primary；themeBtn 等 10→11、refreshBtn 12→11）；页面标题 `pageTitleLabel` 16px 与应用名 18px 分层；craftProduct 18→16、tierLabel/exchangePackageLabel 14→15；**图表弹性翻转**——chart min 200、max 220 封顶移除、chart_card stretch 0→1、table_card 1→0（H-01「表格独占弹性」决策推翻：趋势图优先趋势阅读），30 天视图超高改 `_DaySubTable` vertical AsNeeded 内部滚动兜底（原 AlwaysOff 会裁剪行）
+- **U-04 侧边栏**（`222787d`）：宽度 100→130；选中态「整条实心 BTN_BG」→「浅底 pill（新键 NAV_SELECT_BG，light 森林绿 12% / dark 琥珀 14% 透明）+ 3px accent 指示条」——border-left 选中/未选中同宽（transparent vs accent）保证文字零位移；选中文字改 accent 色
+- **U-05 emoji 一致性**（`f0741ff`）：新增 `app/ui_text.py` EMOJI 单一来源（9 键：导航/主题/置顶/加载/警告/保存），sidebar/main_window/fetch_page_base/chart_widget 4 文件散落字面量清零（AST 测试断言无残留）；全局 QWidget font-family 补 "Segoe UI Emoji" 消 Windows 基线错位
+- **U-06 反馈型动效**（`d430cd7`）：新增 `app/motion.py`——`fade_in_widget`（QGraphicsOpacityEffect + QPropertyAnimation，结束后移除 effect 防常驻）+ `animate_property`（QVariantAnimation 驱动非 QObject property，如 pyqtgraph 曲线 opacity）；接入三处：切页 120ms 淡入（`_on_page_changed`）、曲线绘制揭示 250ms（opacity 0→1）、保存指示 180ms 淡入
+- **U-06 取舍**：hover 背景平滑过渡**未做**——Qt Widgets QSS 无 transition，背景色动画需自定义样式委托（QStyle 子类或事件过滤器逐帧重绘），成本显著高于收益，且 QSS 跳变 + 光标已是可接受的反馈；若用户要平滑 hover 需单独立项
+- 测试 305→313（+8：可点重试/中性 badge/U-07 聚合/U-01 拆分/U-02 刻度/U-04 侧边栏/U-05 emoji 来源/U-06 动效），doc_sync 标记同步，每工单独立提交
+
 ### 2026-08-09 | 实现 | U-07 交互小修批量（交互反馈闭环）
 - **可点「重试」**：`fetch_page_base.py` 新增 `_ClickableLabel`（clicked 信号 + mousePressEvent），错误态设手型光标、点击重新 `_load_data`；文案「点击重试」从骗人变真实（T-02 旧文案回归测试保持通过）
 - **按钮焦点态**：`generate_qss` 加 `QPushButton:focus { outline: 2px solid FOCUS_RING }`（Qt 6 QSS outline 不占布局，避免像 QLineEdit 那样 padding 补偿）；Tab 键流可见
