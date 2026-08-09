@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.motion import fade_in_widget
-from app.theme import button_style, get_color
+from app.theme import get_color
 from calculator import ProfitCalculatorLogic
 from formatting import (
     format_input_value,
@@ -283,7 +283,6 @@ class InputPanel(QWidget):
         self.warehouse_entry.set_value(f"{warehouse:.2f}")
 
         self.save_btn.setText(f"更新数据（{format_short_date(date_str)}）")
-        self.save_btn.setStyleSheet(button_style("edit_save"))
         self.cancel_edit_btn.show()
         self.reuse_btn.hide()
         self.saved_indicator.setText("")
@@ -298,8 +297,6 @@ class InputPanel(QWidget):
         self.warehouse_entry.setText("")
 
         self.save_btn.setText("保存今日数据")
-        # 清除内联样式以恢复 QSS
-        self.save_btn.setStyleSheet("")
         self.cancel_edit_btn.hide()
         self.reuse_btn.show()
         self.saved_indicator.setText("")
@@ -326,14 +323,18 @@ class InputPanel(QWidget):
         self._reusing = True
         self.reuse_btn.setText("取消复用")
         self.reuse_btn.setToolTip("清除已复用的数据")
-        self.reuse_btn.setStyleSheet(button_style("danger"))
+        self.reuse_btn.setProperty("state", "danger")
+        self.reuse_btn.style().unpolish(self.reuse_btn)
+        self.reuse_btn.style().polish(self.reuse_btn)
 
     def cancel_reuse(self) -> None:
         """退出复用模式，恢复按钮为「复用昨日」。"""
         self._reusing = False
         self.reuse_btn.setText("复用昨日")
         self.reuse_btn.setToolTip("填入最近一条记录的数据，便于微调")
-        self.reuse_btn.setStyleSheet("")
+        self.reuse_btn.setProperty("state", "")
+        self.reuse_btn.style().unpolish(self.reuse_btn)
+        self.reuse_btn.style().polish(self.reuse_btn)
 
     def is_reusing(self) -> bool:
         return self._reusing

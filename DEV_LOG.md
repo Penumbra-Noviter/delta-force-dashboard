@@ -34,6 +34,13 @@
 
 ## 日志正文
 
+### 2026-08-09 | 重构 | V-02/V-03/V-04 架构深化候选 2/3/5（子代理并行实现 + 主 session 合并，354/354）
+- 来源：improve-codebase-architecture 报告候选 2/3/5，grilling 设计树 11 问全按推荐；三子代理并行实现，主 session 审查合并
+- **V-02 状态机拆分**（`app/load_state.py` 新，LoadState 四态）：fetch_page_base 删 `_loaded_once`/`_loading` 私有字段改持 `_load_state`；`is_loaded` 公开 property（测试不再窥视私有）；**子代理实现暴露真实回归**——`can_load()` 原设计排除 loaded 态导致「加载成功后点刷新 = no-op」（刷新是核心操作）→ 主 session 修正：`can_load()` 仅挡 loading 防重入，loaded 可手动刷新；`preload()` 补 `is_loaded` 守卫（预加载只做一次）；新增 loaded→loading 刷新转移用例 + 页面级刷新回归测试
+- **V-03 SettingsCodec**：`settings_store.py` 增 `decode_geometry_hex`/`decode_legacy_geometry`（旧格式含负坐标，正则 fullmatch 处理 `"820x880-100+50"` 粘连段）/`encode_settings`，保持零 Qt 依赖（bytes 层）；main_window 几何双格式解析 -25 行手写分支改走 codec；`_save_settings` 委托 encode；10 新用例
+- **V-04 主题双轨收敛**：删 `button_style()`（edit_save 与 QSS #saveBtn 内容重复——QSS 单一来源；danger 改 QSS 属性选择器 `reuseBtn[state="danger"]`，input_panel setProperty+repolish 切换——与 MoneyLineEdit validity 模式一致）；exchange 包标签内联字号收敛（QSS exchangePackageLabel 15px/700 单一来源，内联只留动态色）；`tests/test_theme_qss.py` 4 用例（选择器/双主题色值/删除守卫/属性切换）
+- 测试 331→354（+23：LoadState 8 + 刷新回归 1 + SettingsCodec 10 + theme_qss 4）；CODE_WIKI 新文件标记手补；pytest 354/354 ✅；重新打包 + 烟测
+
 ### 2026-08-09 | 重构 | V-01 kkrb_client 解析拆出（架构深化候选 1，331/331）
 - 来源：improve-codebase-architecture 报告 + grilling 共识（6 问全按推荐）
 - `kkrb_models.py`（新，零依赖叶子，仿 signals.py 先例）：CraftingProduct / AmmoPackageItem / KkrbError——模型被解析、客户端、UI 三方引用，独立避免循环 import

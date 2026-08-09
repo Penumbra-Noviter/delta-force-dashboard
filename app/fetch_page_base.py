@@ -3,7 +3,7 @@
 
 制造产物（CraftingPage）与兑换利润（ExchangePage）两页共享的
 showEvent 懒加载、加载/成功/错误三件套、refresh/preload/shutdown
-与 _loaded_once/_loading/_worker/_client 状态机全部收敛于此；
+与 _load_state/_worker/_client 状态机全部收敛于此；
 子类只需提供数据获取函数、页面主体构建与数据渲染。
 """
 
@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.fetch_worker import FetchWorker
+from app.load_state import LoadState
 from app.ui_text import EMOJI
 from kkrb_client import KkrbClient, KkrbError
 
@@ -60,8 +61,7 @@ class FetchPageBase(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._client = KkrbClient()
-        self._loading = False
-        self._loaded_once = False
+        self._load_state = LoadState()
         self._shut_down = False
         self._worker: FetchWorker | None = None
         self._data: list[Any] = []
@@ -69,10 +69,13 @@ class FetchPageBase(QWidget):
         self._build_ui()
 
     def showEvent(self, event: QShowEvent) -> None:
-        """首次显示时自动加载数据。"""
+        """未加载成功时自动加载数据。
+
+        幂等由状态机 can_load() 守卫：加载中重复显示直接返回，
+        预加载失败后首次显示会自动重试。
+        """
         super().showEvent(event)
-        if not self._loaded_once:
-            self._loaded_once = True
+        if not self._load_state.is_loaded:
             self._load_data()
 
     # ── UI 构建 ─────────────────────────────────────────
@@ -129,9 +132,9 @@ class FetchPageBase(QWidget):
     # ── 数据加载 ────────────────────────────────────────
 
     def _load_data(self) -> None:
-        if self._loading:
+        if self._shut_down or not self._load_state.can_load():
             return
-        self._loading = True
+        self._load_state.start()
         self._status_label.setText(f"{EMOJI['loading']} 加载中…")
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
@@ -143,14 +146,14 @@ class FetchPageBase(QWidget):
         self._worker.start()
 
     def _on_fetch_done(self, data: list[Any]) -> None:
-        self._loaded_once = True
+        self._load_state.succeed()
         self._data = data
         self._status_label.setVisible(False)
-        self._loading = False
         self._refresh_btn.setEnabled(True)
         self._render_data(data)
 
     def _on_fetch_error(self, e: Exception) -> None:
+        self._load_state.fail()
         if isinstance(e, KkrbError):
             logger.warning("%s数据获取失败: %s", self._page_name, e)
             self._status_label.setText(f"{EMOJI['warn']} 数据获取失败，点击重试")
@@ -161,11 +164,15 @@ class FetchPageBase(QWidget):
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._data = []
-        self._loading = False
         self._refresh_btn.setEnabled(True)
         self._render_data([])
 
     # ── 公开接口 ────────────────────────────────────────
+
+    @property
+    def is_loaded(self) -> bool:
+        """页面数据是否已成功加载（只读）。"""
+        return self._load_state.is_loaded
 
     def refresh(self) -> None:
         """公开刷新方法（供外部调用）。"""
@@ -174,14 +181,17 @@ class FetchPageBase(QWidget):
     def preload(self) -> None:
         """后台预加载数据（启动时调用，消除首次展示的加载闪烁）。
 
-        幂等：测试（offscreen）模式、已加载、加载中或已关闭均直接返回；
-        预加载失败不弹窗，仅记录日志，用户可手动刷新重试。
+        幂等：测试（offscreen）模式、不可加载态（加载中/已加载）或已关闭
+        均直接返回；预加载失败不弹窗，仅记录日志，用户可手动刷新重试。
         """
         import os
 
+        # offscreen 守卫：测试模式（QT_QPA_PLATFORM=offscreen）不启动后台
+        # 线程，避免测试环境出现真实网络请求与线程泄漏。
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return
-        if self._shut_down or self._loaded_once or self._loading:
+        # 幂等：已关闭 / 已加载（预加载只做一次）/ 加载中（can_load 挡重入）
+        if self._shut_down or self._load_state.is_loaded or not self._load_state.can_load():
             return
         self._load_data()
 

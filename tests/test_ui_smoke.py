@@ -215,7 +215,7 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
         while time.monotonic() < deadline:
             QTest.qWait(50)
             qapp.processEvents()
-            if page._loaded_once:
+            if page.is_loaded:
                 return True
         return False
 

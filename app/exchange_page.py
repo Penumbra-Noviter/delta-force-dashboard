@@ -89,12 +89,11 @@ class ExchangePage(FetchPageBase):
         cl.setContentsMargins(14, 12, 14, 12)
         cl.setSpacing(6)
 
-        # 包名标签（带颜色）；内联字号须与 theme.py exchangePackageLabel 同步（U-02）
+        # 包名标签（带颜色）；字号/字重由 QSS exchangePackageLabel 统一
+        # （15px/700），内联只留运行期解析的动态色（主题双轨收敛）
         pkg_label = QLabel(short_name)
         pkg_label.setObjectName("exchangePackageLabel")
-        pkg_label.setStyleSheet(
-            f"font-size: 15px; font-weight: 700; color: {color};"
-        )
+        pkg_label.setStyleSheet(f"color: {color};")
         cl.addWidget(pkg_label)
 
         # 子弹名

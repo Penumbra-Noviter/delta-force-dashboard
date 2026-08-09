@@ -167,11 +167,34 @@ def test_preload_idempotent(qapp, monkeypatch) -> None:
     assert page._worker is first
 
     assert first.wait(5000)
-    qapp.processEvents()  # 投递 done → _loaded_once = True
-    assert page._loaded_once is True
+    qapp.processEvents()  # 投递 done → 状态机转入 loaded
+    assert page.is_loaded is True
 
     page.preload()  # 已加载 → 直接返回
     assert page._worker is first
+
+
+def test_refresh_after_loaded_starts_new_worker(qapp, monkeypatch) -> None:
+    """候选 2 回归：loaded 态点刷新（refresh）重新加载——新 worker，状态回 loading。"""
+    from app.crafting_page import CraftingPage
+
+    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
+    page = CraftingPage()
+    page._client.fetch_ov_data = lambda: []
+
+    page.preload()
+    first = page._worker
+    assert first is not None
+    assert first.wait(5000)
+    qapp.processEvents()
+    assert page.is_loaded is True
+
+    page.refresh()  # 手动刷新：loaded → loading（新 worker）
+    assert page._load_state.is_loading is True
+    assert page._worker is not None and page._worker is not first
+    assert page._worker.wait(5000)
+    qapp.processEvents()
+    assert page.is_loaded is True
 
 
 def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None:
@@ -192,7 +215,7 @@ def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None
 
     assert any("制造产物数据获取失败" in r.message for r in caplog.records)
     assert page._status_label.text() == "⚠️ 数据获取失败，点击重试"
-    assert page._loading is False
+    assert page._load_state.is_loading is False
     assert page._refresh_btn.isEnabled()
 
 
@@ -220,9 +243,9 @@ def test_error_label_click_retries(qapp, monkeypatch) -> None:
     assert page._status_label.isVisible()
     assert page._status_label.cursor().shape() == Qt.CursorShape.PointingHandCursor
 
-    # 点击 label → 重新加载（新 worker 启动，_loading 置真）
+    # 点击 label → 重新加载（新 worker 启动，状态机回到 loading）
     QTest.mouseClick(page._status_label, Qt.MouseButton.LeftButton)
-    assert page._loading is True
+    assert page._load_state.is_loading is True
     assert page._worker is not None and page._worker is not worker
 
 
@@ -251,14 +274,14 @@ def test_crafting_page_lazy_loads_on_show(qapp) -> None:
     ]
 
     page.show()  # 触发 showEvent → 懒加载
-    assert page._loading is True
+    assert page._load_state.is_loading is True
     worker = page._worker
     assert worker is not None
     assert worker.wait(5000)
     qapp.processEvents()
 
-    assert page._loaded_once is True
-    assert page._loading is False
+    assert page.is_loaded is True
+    assert page._load_state.is_loading is False
     assert page._refresh_btn.isEnabled()
     assert page._status_label.isHidden()
     # 第一张卡片已渲染

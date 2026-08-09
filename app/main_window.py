@@ -62,7 +62,12 @@ from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
 from presentation import format_saved_indicator, format_window_text
-from settings_store import SettingsStore
+from settings_store import (
+    SettingsStore,
+    decode_geometry_hex,
+    decode_legacy_geometry,
+    encode_settings,
+)
 from signals import RateSignal
 
 logger = logging.getLogger(__name__)
@@ -194,27 +199,23 @@ class MainWindow(QMainWindow):
         )
         self.setMinimumSize(680, 650)
 
-        # 恢复上次几何
+        # 恢复上次几何（候选 3：解析收敛到 settings_store 纯函数）
         saved_geo = self._settings.get("geometry", "")
         geo_ok = False
-        if saved_geo:
-            try:
-                # 新格式：hex-encoded QByteArray
-                if isinstance(saved_geo, str):
-                    raw = bytes.fromhex(saved_geo)
-                    if raw and len(raw) > 4:
-                        geo_ok = self.restoreGeometry(raw)
-            except Exception:
-                logger.warning("几何恢复（新格式 hex）失败")
-            if not geo_ok and isinstance(saved_geo, str) and "+" in saved_geo:
+        if isinstance(saved_geo, str) and saved_geo:
+            raw = decode_geometry_hex(saved_geo)
+            if raw is not None:
                 try:
-                    parts = saved_geo.replace("+", " ").replace("x", " ").split()
-                    if len(parts) == 4:
-                        self.resize(int(parts[0]), int(parts[1]))
-                        self.move(int(parts[2]), int(parts[3]))
-                        geo_ok = True
+                    geo_ok = self.restoreGeometry(raw)
                 except Exception:
-                    logger.warning("几何恢复（旧格式 Tkinter）失败")
+                    logger.warning("几何恢复（hex 格式）失败")
+            if not geo_ok:
+                legacy = decode_legacy_geometry(saved_geo)
+                if legacy is not None:
+                    w, h, x, y = legacy
+                    self.resize(w, h)
+                    self.move(x, y)
+                    geo_ok = True
 
         if not geo_ok:
             self.resize(base_w, base_h)
@@ -232,14 +233,12 @@ class MainWindow(QMainWindow):
         """编码当前窗口状态并委托 SettingsStore 原子落盘（D-02）。
 
         MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
-        self.settings_store（容错读 + 原子写）。
+        self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
+        编码收敛到 settings_store.encode_settings 纯函数（候选 3）。
         """
-        geo_bytes = self.saveGeometry()
-        settings = {
-            "geometry": bytes(geo_bytes).hex(),
-            "pinned": self._pinned,
-            "theme": self._theme,
-        }
+        settings = encode_settings(
+            bytes(self.saveGeometry()), self._pinned, self._theme
+        )
         self.settings_store.save(settings)
 
     def closeEvent(self, event) -> None:

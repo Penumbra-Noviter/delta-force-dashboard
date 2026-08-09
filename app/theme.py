@@ -260,52 +260,6 @@ def summary_style(signal: RateSignal) -> str:
     return f"color: {signal_color(signal)}; font-size: 22px; font-weight: 700;"
 
 
-def button_style(role: str) -> str:
-    """按角色返回按钮 QSS 样式字符串（运行时解析，避免 import 期冻结）。
-
-    角色：
-    - ``edit_save``：编辑模式保存按钮（BTN_BG 色）
-    - ``danger``：取消复用/危险操作按钮（DANGER_BG 色）
-    """
-    if role == "edit_save":
-        bg = get_color("BTN_BG")
-        fg = get_color("BTN_FG")
-        hover_bg = get_color("BTN_BG_HOVER")
-        return (
-            f"QPushButton#saveBtn {{"
-            f"background-color: {bg};"
-            f"color: {fg};"
-            f"padding: 10px 32px;"
-            f"font-weight: 600;"
-            f"border-radius: 8px;"
-            f"}}"
-            f"QPushButton#saveBtn:hover {{"
-            f"background-color: {hover_bg};"
-            f"}}"
-        )
-    if role == "danger":
-        bg = get_color("DANGER_BG")
-        fg = get_color("DANGER_FG")
-        border = get_color("DANGER_BORDER")
-        hover_bg = get_color("DANGER_HOVER_BG")
-        return (
-            f"QPushButton {{"
-            f"background-color: {bg};"
-            f"color: {fg};"
-            f"border: 1px solid {border};"
-            f"border-radius: 8px;"
-            f"padding: 8px 18px;"
-            f"font-size: 11px;"
-            f"font-weight: bold;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"background-color: {hover_bg};"
-            f"color: {get_color('BTN_HOVER_FG')};"
-            f"}}"
-        )
-    return ""
-
-
 def generate_qss(theme_name: str) -> str:
     """根据主题名称生成完整 QSS 样式表。"""
     t = THEMES.get(theme_name, THEMES["light"])
@@ -519,6 +473,19 @@ QPushButton#reuseBtn {{
 QPushButton#reuseBtn:hover {{
     background-color: {separator};
     color: {table_text_bold};
+}}
+QPushButton#reuseBtn[state="danger"] {{
+    background-color: {t["DANGER_BG"]};
+    color: {t["DANGER_FG"]};
+    border: 1px solid {t["DANGER_BORDER"]};
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 11px;
+    font-weight: bold;
+}}
+QPushButton#reuseBtn[state="danger"]:hover {{
+    background-color: {t["DANGER_HOVER_BG"]};
+    color: {t["BTN_HOVER_FG"]};
 }}
 QPushButton#themeBtn, QPushButton#pinBtn, QPushButton#exportBtn {{
     background-color: {muted_bg};
