@@ -139,6 +139,7 @@ class ExchangePage(FetchPageBase):
         cl.addStretch()
 
         # 存储子控件引用
+        card._pkg_label = pkg_label
         card._item_name = item_name
         card._grade_label = grade_label
         card._profit = profit
@@ -146,6 +147,20 @@ class ExchangePage(FetchPageBase):
         card._total = total
 
         return card
+
+    def apply_theme(self) -> None:
+        """主题切换后重解析 7 个包标签色（运行期 get_color，防构建期冻结）。
+
+        包标签色是内联样式，构建期解析会冻结在构建时主题；亮暗色板分离后
+        残留即失效（评审修复，U-03）。由 main_window.refresh_theme 调用，
+        模式同 chart_widget.apply_theme：增量更新，不销毁重建。
+        """
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
+            if i >= len(self._cards):
+                break
+            self._cards[i]._pkg_label.setStyleSheet(
+                f"color: {_resolve_color(cfg.color)};"
+            )
 
     def _update_card(self, card: QFrame, item: AmmoPackageItem | None) -> None:
         """更新卡片内容。"""

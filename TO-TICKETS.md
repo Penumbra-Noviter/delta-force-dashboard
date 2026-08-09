@@ -75,6 +75,8 @@
 
 **影响范围**：`app/theme.py`、`app/exchange_page.py`、`tests/test_fetch_pages.py`（键元组断言随映射同步）；`app/chart_widget.py` 已核实不引用 CHART_SERIES_*，无需改
 
+**评审修复（2026-08-09，code-review）**：包标签色构建期冻结 → `ExchangePage.apply_theme()` 运行期重解析，挂入 `main_window.refresh_theme` 链路（亮暗色板分离后残留即失效）；另修 test_theme_roles 主题状态泄漏、补 6 位 hex 格式断言。
+
 **验收标准**（全部可机器证伪，目检仅辅助）：
 - [ ] 键名如实：7 包色收敛为单一角色命名一套键（如 PACKAGE_COLOR_0~6），删除 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；亮暗同值键**不抽常亮色**（保留双主题定义防 Locality 坑），随主题变化/固定键清单显式化并注释规则
 - [ ] 键引用完整：exchange_page 引用的全部色键在 THEMES 双主题下存在且非空（测试断言，防 `get_color` 静默返回 `""` 漏改不报错）

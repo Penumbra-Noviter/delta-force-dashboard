@@ -604,6 +604,31 @@ def test_theme_toggle(sample_window):
     assert win.sidebar.theme_btn.text() == initial_text
 
 
+def test_theme_toggle_updates_exchange_labels(sample_window):
+    """U-03 评审修复：主题切换后兑换页 7 包标签色随主题重解析。
+
+    包标签为内联样式，构建期冻结；refresh_theme 链路必须调用
+    exchange_page.apply_theme()，否则亮→暗切换残留 light 深墨色（对比度跌破 AA）。
+    """
+    from app.exchange_page import _PACKAGE_CONFIG
+    from app.theme import get_color
+
+    win = sample_window
+    exchange = win.profit_page.exchange_page
+
+    win.sidebar.theme_btn.click()  # light → dark
+    for i, cfg in enumerate(_PACKAGE_CONFIG):
+        assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
+            f"dark 下第 {i} 卡标签残留构建期色（apply_theme 链路未生效）"
+        )
+
+    win.sidebar.theme_btn.click()  # 切回 light
+    for i, cfg in enumerate(_PACKAGE_CONFIG):
+        assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
+            f"light 下第 {i} 卡标签未随主题重解析"
+        )
+
+
 # ── 9. 窗口置顶 ──────────────────────────────────────────
 
 

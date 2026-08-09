@@ -378,6 +378,8 @@ class MainWindow(QMainWindow):
         self._update_pin_btn_style()
         self.input_panel.apply_theme()
         self.chart.apply_theme()
+        # 兑换页包标签为内联样式，构建期冻结——主题切换后需重解析（U-03 评审修复）
+        self.profit_page.exchange_page.apply_theme()
         # 表格用当前数据重绘（get_color 自动取新主题色）
         records = self._get_records()
         self._update_summary()
