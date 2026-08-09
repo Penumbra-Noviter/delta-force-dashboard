@@ -18,9 +18,20 @@ from __future__ import annotations
 
 import colorsys
 
+import pytest
+
 from app import theme as theme_mod
 
 __all__ = []
+
+
+@pytest.fixture
+def theme_guard():
+    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值（防状态泄漏）。"""
+    saved = theme_mod._current_theme
+    theme_mod.set_theme("light")
+    yield
+    theme_mod._current_theme = saved
 
 
 # ── 角色规则阈值（U-03 验收标准量化） ─────────────────────
@@ -114,10 +125,11 @@ def test_chart_series_and_old_package_keys_removed() -> None:
 # ── 键引用完整：exchange_page 引用的键全部可解析 ───────────
 
 
-def test_exchange_referenced_keys_resolve_in_both_themes() -> None:
+def test_exchange_referenced_keys_resolve_in_both_themes(theme_guard) -> None:
     """兑换页 _PACKAGE_CONFIG 引用的全部色键，双主题下 get_color 均非空。
 
     防 get_color() 缺失键静默返回 ""（漏改不报错 → 标签色直接失效）。
+    theme_guard：循环以 dark 结束时恢复原主题，防全局状态泄漏给后续测试。
     """
     from app.exchange_page import _PACKAGE_CONFIG
 
@@ -129,6 +141,22 @@ def test_exchange_referenced_keys_resolve_in_both_themes() -> None:
         for key in referenced:
             resolved = theme_mod.get_color(key)
             assert resolved, f"{theme} 下 get_color({key}) 返回空——键缺失漏改"
+
+
+def test_decorative_values_are_six_digit_hex() -> None:
+    """装饰键值必须为 6 位 hex——格式先于解析。
+
+    _hex_to_rgb 对 8 位 hex 会静默丢弃 alpha（断言全过但 Qt 渲染不同），
+    rgba() 值则直接崩溃；先显式断言格式，颜色计算才有意义。
+    """
+    import re
+
+    for theme in theme_mod.THEMES:
+        palette = theme_mod.THEMES[theme]
+        for key in DECORATIVE_KEYS:
+            assert re.fullmatch(r"#[0-9A-Fa-f]{6}", palette[key]), (
+                f"{theme}/{key} 非 6 位 hex：{palette[key]!r}"
+            )
 
 
 # ── 装饰 ≠ 语义：与涨跌色分离 ─────────────────────────────
@@ -212,4 +240,25 @@ def test_decorative_label_contrast_against_card() -> None:
             ratio = _contrast_ratio(palette[key], card_bg)
             assert ratio >= CONTRAST_MIN, (
                 f"{theme}/{key} 标签文字对比度 {ratio:.2f}:1 < {CONTRAST_MIN}:1"
+            )
+
+
+# ── 评审修复：主题切换后包标签色重解析 ────────────────────
+
+
+def test_exchange_apply_theme_reresolves_labels(qapp, theme_guard) -> None:
+    """apply_theme() 用当前主题 PACKAGE_COLOR_* 重绘 7 个包标签。
+
+    评审发现：包标签色在 _build_body 构建期解析冻结（无 apply_theme），
+    亮暗色板分离后亮→暗切换残留 light 深墨色于 dark 卡面（对比度跌破 AA）。
+    """
+    from app.exchange_page import ExchangePage, _PACKAGE_CONFIG
+
+    page = ExchangePage()
+    for theme in theme_mod.THEMES:
+        theme_mod.set_theme(theme)
+        page.apply_theme()
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
+            assert theme_mod.get_color(cfg.color) in page._cards[i]._pkg_label.styleSheet(), (
+                f"{theme} 下 apply_theme 后第 {i} 卡标签未用当前主题色"
             )

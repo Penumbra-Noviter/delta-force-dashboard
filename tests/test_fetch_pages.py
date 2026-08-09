@@ -325,8 +325,9 @@ def test_exchange_colors_resolve_from_theme(qapp) -> None:
 
     page = ExchangePage()
 
-    # 7 张卡按 _PACKAGE_CONFIG 映射到 PACKAGE_COLOR_2/1/3/0/4/5/6（U-03 键名如实，
-    # 色相语义沿用历史：3 级青绿 / 4 级金 / 5 级红 / 通行证基础蓝紫 / 通行证高级紫 / 物流橙褐 / 物流粉红）
+    # 7 张卡按 _PACKAGE_CONFIG 映射到 PACKAGE_COLOR_2/1/3/0/4/5/6（U-03 键名如实）；
+    # 色相沿用历史：3 级青绿 / 4 级金 / 5 级红 / 通行证基础蓝紫 / 通行证高级紫 /
+    # 进阶物流橙褐 / 特级物流粉红（后两者原为橙/橙红，为满足两两 ΔE 下限向橙褐/粉红漂移）
     keys = (
         "PACKAGE_COLOR_2",
         "PACKAGE_COLOR_1",
