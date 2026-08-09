@@ -34,6 +34,14 @@
 
 ## 日志正文
 
+### 2026-08-09 | 测试 | kkrb_client 传输层补测（V-01 收尾，379/379）
+- **背景**：V-01 拆分后传输层（CSRF 握手 / `_post_json` / TTL 缓存 / 错误路径）覆盖率仅 36%，是测试体系唯一盲区（D-04 教训在传输层未落地）
+- **FakeOpener 注入**：脚本式 fake opener 替换 `client._opener` seam——握手/缓存/错误路径走真实代码，仅网络层被替换；script 条目支持 bytes 响应 / Exception 抛出 / `(bytes, cookie名, cookie值)` 向 cookie jar 注入 csrf cookie
+- **22 新用例**：握手成功 + token 缓存复用（二次 fetch 零握手）、首页/getMenu/ValueError 失败降级空 token、cookie 缺 token 每次重握手；TTL 缓存命中零网络、过期重拉（握手复用）、OSError/ValueError→KkrbError、畸形 JSON/空响应→KkrbError、POST 请求头完整性（CSRF/UA/Content-Type/method）；`_parse_json` BOM 剥离/空/畸形/list；UA 匹配产品名；reset 清会话后完整重握手；两 `fetch_*` 端到端真实传输+解析
+- **发现并固化**：①握手失败空 token **不缓存**（`_csrf_token` 保持 None → 每次 fetch 重新握手）；②urllib `Request.add_header` 会 `key.capitalize()` 头键（`X-CSRF-Token`→`X-csrf-token`），测试断言需 `header_items()` 大小写不敏感取值（helper `_header_value`）
+- 顺带修复：`_user_agent()` 残留 `ProfitCalculator/1.0` → `DeltaForceDashboard/1.0`（更名遗漏项，无测试断言受影响）
+- kkrb_client.py 覆盖率 **36%→100%**（总 91%→93%）；pytest **379/379** ✅；doc_sync 同步（测试数 357→379）
+
 ### 2026-08-09 | 实现 | W 系列微交互打磨（U-06 遗留方向落地，357/357）
 - **W-01 KPI count-up**：`motion.animate_value`（数值插值动画：old→new 逐帧回调，动效开关关闭直接落终态）+ `MainWindow._set_kpi_value`（保存/刷新时总盈亏与现金总变化数字 300ms 从旧值滚动到新值，逐帧复用 format_signed_money 格式化——终态与直接设置完全一致；数据不足/数值未变直接设置）；`_last_summary_total/_last_cash_delta` 上一帧值
 - **W-02 非法输入 shake**：`MoneyLineEdit._shake`（QPropertyAnimation 150ms 水平平移 [-6,6,-4,4] 回原位；状态从非 invalid 变 invalid 时触发防抖——连续非法不重复；仅用户输入/失焦校验路径，动效开关尊重）

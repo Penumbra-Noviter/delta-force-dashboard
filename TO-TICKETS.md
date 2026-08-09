@@ -283,6 +283,7 @@
 | V-02 | fetch_page_base 状态机拆分 — `app/load_state.py` LoadState 四态状态机（idle/loading/loaded/failed，`can_load()` 仅挡 loading 防重入不挡手动刷新 + preload 补 is_loaded 守卫）+ `is_loaded` 公开 property（测试不再访问 `_loaded_once`/`_loading` 私有字段）+ 转移矩阵 8 用例 + 刷新回归测试；worker 生命周期与 client 注入点保留 | 架构（深模块） | 2026-08-09 | `11858da` |
 | V-03 | SettingsCodec 纯函数 — `settings_store.py` 增 `decode_geometry_hex`（hex→bytes，损坏/过短兜底 None）/`decode_legacy_geometry`（旧 Tkinter 格式含负坐标，正则 fullmatch）/`encode_settings`（bytes hex 编码），保持零 Qt 依赖；`main_window._setup_window` 双格式解析与 `_save_settings` 改走 codec（-25 行手写分支）+ 编解码 10 用例 | 架构（深模块） | 2026-08-09 | `11858da` |
 | V-04 | 主题双轨收敛 — 删除 `button_style()`（edit_save 与 QSS #saveBtn 重复、danger 改 QSS 属性选择器 `QPushButton#reuseBtn[state="danger"]`，input_panel 用 setProperty+repolish 切换）+ exchange 包标签内联字号收敛进 QSS（只留动态色）+ `tests/test_theme_qss.py` 4 用例（选择器/色值/删除守卫/属性切换） | 架构（深模块） | 2026-08-09 | `11858da` |
+| V-05 | kkrb_client 传输层补测（V-01 收尾）— `tests/test_kkrb_client.py` FakeOpener 脚本式注入（替换 `client._opener` seam）：CSRF 握手成功+缓存复用/首页/getMenu/ValueError 降级/cookie 缺 token 重握手、TTL 缓存命中/过期、OSError/ValueError/畸形 JSON/空响应→KkrbError、请求头完整性、reset 清会话、两 fetch_* 端到端真实传输共 22 用例；模块覆盖率 36%→100%（总 93%）；附 `_user_agent` 残留 `ProfitCalculator/1.0`→`DeltaForceDashboard/1.0` | 测试（补强） | 2026-08-09 | 随本提交 |
 
 ### U 系列（2026-08-09，UI 视觉打磨）
 

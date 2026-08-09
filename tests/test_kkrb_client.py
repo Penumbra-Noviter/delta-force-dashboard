@@ -7,6 +7,12 @@ KkrbClient 的网络/缓存行为。
 
 from __future__ import annotations
 
+import json
+import time
+from http.cookiejar import Cookie, CookieJar
+from typing import Any
+from urllib.request import Request
+
 import pytest
 
 from kkrb_client import (
@@ -85,3 +91,317 @@ class TestKkrbClient:
         client = KkrbClient()
         with pytest.raises(KkrbError):
             client.fetch_ov_data()
+
+
+# ── 传输层 fake（fake opener 注入）──────────────────────
+
+# 端到端用例的真实响应样例（与 kkrb_parsing 契约一致）
+_OV_URL = "https://www.kkrb.net/getOVData"
+_OV_PAYLOAD = {
+    "code": 1,
+    "data": {
+        "spData": {
+            "tech": {
+                "placeName": "技术中心",
+                "itemName": "复合弓",
+                "profit": 24669,
+                "singlePrice": 39077,
+                "yesterdayHighestTime": "晚上8点",
+            }
+        }
+    },
+}
+_AMMO_PAYLOAD = {
+    "code": 1,
+    "data": {
+        "cn": [
+            {
+                "packageName": "3级子弹自选包",
+                "itemName": "5.7x28mm L191",
+                "itemGrade": 3,
+                "itemCount": 200,
+                "singlePrice": 555,
+                "totalPrice": 111000,
+                "profit": 98790,
+            }
+        ]
+    },
+}
+
+
+class _FakeResponse:
+    """urllib response 的最小实现（read + 上下文管理）。"""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+
+def _make_cookie(name: str, value: str) -> Cookie:
+    """构造 kkrb.net 域下的会话 cookie（供 FakeOpener 注入 csrf_token）。"""
+    return Cookie(
+        version=0,
+        name=name,
+        value=value,
+        port=None,
+        port_specified=False,
+        domain="kkrb.net",
+        domain_specified=True,
+        domain_initial_dot=False,
+        path="/",
+        path_specified=True,
+        secure=False,
+        expires=None,
+        discard=True,
+        comment=None,
+        comment_url=None,
+        rest={},
+        rfc2109=False,
+    )
+
+
+class FakeOpener:
+    """脚本式 fake opener：open 按顺序消费 script 条目，记录全部请求。
+
+    script 条目：
+      - bytes              → 作为响应体返回
+      - Exception 实例     → 原样抛出（模拟网络/协议错误）
+      - (bytes, str, str)  → 响应体 + 向 cookie jar 注入 cookie（握手成功路径）
+
+    用法：`client._opener = FakeOpener(client._cookie_jar, script)`——
+    `_opener` 是传输 seam，替换后 KkrbClient 的 CSRF 握手 / TTL 缓存 /
+    错误路径全部走真实代码，仅网络层被替换（D-04：被测试的路径=真实路径）。
+    """
+
+    def __init__(self, cookie_jar: CookieJar, script: list[Any]) -> None:
+        self._jar = cookie_jar
+        self._script = list(script)
+        self.requests: list[Request] = []
+
+    def open(self, req: Request, timeout: float | None = None) -> _FakeResponse:
+        self.requests.append(req)
+        step = self._script.pop(0) if self._script else b""
+        if isinstance(step, Exception):
+            raise step
+        if isinstance(step, tuple):
+            body, name, value = step
+            self._jar.set_cookie(_make_cookie(name, value))
+        else:
+            body = step
+        return _FakeResponse(body)
+
+
+def _header_value(req: Request, name: str) -> str | None:
+    """大小写不敏感取 urllib Request 头（add_header 会 capitalize 键）。"""
+    for key, value in req.header_items():
+        if key.lower() == name.lower():
+            return value
+    return None
+
+
+@pytest.fixture
+def transport_client():
+    """返回 (client, opener)：client 的 _opener 替换为脚本式 FakeOpener。"""
+
+    def _make(script: list[Any]) -> tuple[KkrbClient, FakeOpener]:
+        client = KkrbClient()
+        opener = FakeOpener(client._cookie_jar, script)
+        client._opener = opener
+        return client, opener
+
+    return _make
+
+
+class TestCsrfHandshake:
+    """CSRF 三步握手：首页 → getMenu → cookie 提取，含全部降级路径。"""
+
+    def test_extracts_token_and_caches_handshake(self, transport_client) -> None:
+        """握手成功后 token 缓存复用：第二次 fetch 不再发握手请求。"""
+        client, opener = transport_client(
+            [b"home", (b"menu", "csrf_token", "tok123"), json.dumps(_OV_PAYLOAD).encode()]
+        )
+        client.fetch_ov_data()
+        assert len(opener.requests) == 3  # 首页 + getMenu + POST
+
+        # 第二次 fetch：数据缓存命中，0 新请求（握手也复用）
+        client.fetch_ov_data()
+        assert len(opener.requests) == 3
+
+    def test_homepage_failure_falls_back_to_empty_token(self, transport_client) -> None:
+        """首页失败 → 不抛异常，空 token 继续 POST。"""
+        client, opener = transport_client(
+            [OSError("net down"), json.dumps(_OV_PAYLOAD).encode()]
+        )
+        products = client.fetch_ov_data()
+        assert products[0].station == "技术中心"
+        post = [r for r in opener.requests if "getOVData" in r.full_url][0]
+        assert _header_value(post, "X-CSRF-Token") == ""
+
+    def test_getmenu_failure_falls_back_to_empty_token(self, transport_client) -> None:
+        """getMenu 失败 → 降级为空 token，请求链路不中断。"""
+        client, opener = transport_client(
+            [b"home", OSError("menu down"), json.dumps(_OV_PAYLOAD).encode()]
+        )
+        client.fetch_ov_data()
+        assert len(opener.requests) == 3  # 首页成功 + getMenu 失败 + POST
+
+    def test_valueerror_in_handshake_tolerated(self, transport_client) -> None:
+        """握手层 (OSError, ValueError) 双分支均降级为空 token。"""
+        client, opener = transport_client(
+            [ValueError("bad header"), json.dumps(_OV_PAYLOAD).encode()]
+        )
+        client.fetch_ov_data()
+        assert len(opener.requests) == 2
+
+    def test_missing_csrf_cookie_retries_handshake(self, transport_client) -> None:
+        """cookie 中无 csrf_token → 每次 fetch 都重新握手（不缓存空值）。"""
+        client, opener = transport_client(
+            [
+                b"home", b"menu", json.dumps(_OV_PAYLOAD).encode(),
+                b"home", b"menu", json.dumps(_AMMO_PAYLOAD).encode(),
+            ]
+        )
+        client.fetch_ov_data()
+        client.fetch_ammo_package_data()
+        assert len(opener.requests) == 6  # 2×(首页+getMenu) + 2×POST
+
+
+class TestPostJsonTransport:
+    """_post_json 传输 + TTL 缓存 + 请求头。"""
+
+    def test_cache_hit_skips_network(self, transport_client) -> None:
+        """TTL 内缓存命中：同一 URL 二次 fetch 零网络请求。"""
+        client, opener = transport_client(
+            [b"home", b"menu", json.dumps(_OV_PAYLOAD).encode()]
+        )
+        client.fetch_ov_data()
+        client.fetch_ov_data()
+        assert len(opener.requests) == 3
+
+    def test_cache_expiry_triggers_refetch(self, transport_client) -> None:
+        """缓存过期（TTL 60s）→ 重新请求，但 CSRF 握手仍复用。"""
+        client, opener = transport_client(
+            [
+                b"home", (b"menu", "csrf_token", "tok123"),
+                json.dumps(_OV_PAYLOAD).encode(), json.dumps(_OV_PAYLOAD).encode(),
+            ]
+        )
+        client.fetch_ov_data()
+        # 注入 61s 前的过期时间戳
+        client._cache[_OV_URL] = (time.monotonic() - 61, _OV_PAYLOAD)
+        client.fetch_ov_data()
+        assert len(opener.requests) == 4  # 握手 2 + POST 2
+
+    def test_network_error_raises_kkrb_error(self, transport_client) -> None:
+        client, _ = transport_client([b"home", b"menu", OSError("timeout")])
+        with pytest.raises(KkrbError, match="POST"):
+            client.fetch_ov_data()
+
+    def test_valueerror_raises_kkrb_error(self, transport_client) -> None:
+        client, _ = transport_client([b"home", b"menu", ValueError("bad")])
+        with pytest.raises(KkrbError):
+            client.fetch_ov_data()
+
+    def test_invalid_json_body_raises(self, transport_client) -> None:
+        client, _ = transport_client([b"home", b"menu", b"<html>oops</html>"])
+        with pytest.raises(KkrbError, match="JSON"):
+            client.fetch_ov_data()
+
+    def test_empty_body_raises(self, transport_client) -> None:
+        client, _ = transport_client([b"home", b"menu", b""])
+        with pytest.raises(KkrbError, match="空响应"):
+            client.fetch_ov_data()
+
+    def test_request_headers_carry_token_and_ua(self, transport_client) -> None:
+        """POST 头完整：X-CSRF-Token / User-Agent / X-Requested-With / Content-Type。"""
+        client, opener = transport_client(
+            [b"home", (b"menu", "csrf_token", "tok123"), b"{}"]
+        )
+        client.fetch_ov_data()
+        post = [r for r in opener.requests if "getOVData" in r.full_url][0]
+        assert _header_value(post, "X-CSRF-Token") == "tok123"
+        assert _header_value(post, "User-Agent") == "DeltaForceDashboard/1.0"
+        assert _header_value(post, "X-Requested-With") == "XMLHttpRequest"
+        assert _header_value(post, "Content-Type") == "application/x-www-form-urlencoded"
+        assert post.get_method() == "POST"
+
+
+class TestParseJson:
+    """_parse_json 安全解析：BOM / 空响应 / 畸形 JSON。"""
+
+    def test_strips_bom(self) -> None:
+        assert KkrbClient._parse_json('\ufeff{"a": 1}') == {"a": 1}
+
+    def test_empty_raises(self) -> None:
+        with pytest.raises(KkrbError, match="空响应"):
+            KkrbClient._parse_json("")
+
+    def test_whitespace_only_raises(self) -> None:
+        with pytest.raises(KkrbError, match="空响应"):
+            KkrbClient._parse_json("\ufeff  \n  ")
+
+    def test_malformed_raises(self) -> None:
+        with pytest.raises(KkrbError, match="JSON"):
+            KkrbClient._parse_json('{"a": ')
+
+    def test_list_passthrough(self) -> None:
+        assert KkrbClient._parse_json("[1, 2]") == [1, 2]
+
+
+class TestUserAgent:
+    def test_matches_current_product_name(self) -> None:
+        assert KkrbClient._user_agent() == "DeltaForceDashboard/1.0"
+
+
+class TestReset:
+    def test_clears_token_cache_and_session(self, transport_client) -> None:
+        """reset 后 CSRF token / 数据缓存 / cookie 会话清空，重新完整握手。"""
+        client, opener = transport_client(
+            [
+                b"home", (b"menu", "csrf_token", "tok123"),
+                json.dumps(_OV_PAYLOAD).encode(),
+                b"home", b"menu", json.dumps(_OV_PAYLOAD).encode(),
+            ]
+        )
+        client.fetch_ov_data()
+        assert len(opener.requests) == 3
+        client.reset()
+        client.fetch_ov_data()
+        assert len(opener.requests) == 6  # 重新握手 2 + 重新 POST 1
+
+
+class TestEndToEnd:
+    """真实传输链路：FakeOpener 网络层 + 真实握手/缓存/解析全走。"""
+
+    def test_fetch_ov_data_full_transport(self, transport_client) -> None:
+        client, _ = transport_client(
+            [b"home", b"menu", json.dumps(_OV_PAYLOAD).encode()]
+        )
+        products = client.fetch_ov_data()
+        assert len(products) == 1
+        assert products[0].station == "技术中心"
+        assert products[0].profit == 24669
+
+    def test_fetch_ammo_package_full_transport(self, transport_client) -> None:
+        client, _ = transport_client(
+            [b"home", b"menu", json.dumps(_AMMO_PAYLOAD).encode()]
+        )
+        items = client.fetch_ammo_package_data()
+        assert len(items) == 1
+        assert items[0].item_name == "5.7x28mm L191"
+        assert items[0].profit == 98790
+
+    def test_transport_error_bubbles_to_caller(self, transport_client) -> None:
+        client, _ = transport_client(
+            [b"home", b"menu", OSError("connection refused")]
+        )
+        with pytest.raises(KkrbError):
+            client.fetch_ammo_package_data()

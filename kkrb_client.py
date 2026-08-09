@@ -167,7 +167,7 @@ class KkrbClient:
 
     @staticmethod
     def _user_agent() -> str:
-        return "ProfitCalculator/1.0"
+        return "DeltaForceDashboard/1.0"
 
     def reset(self) -> None:
         """重置 CSRF token、cookie jar 和缓存（强制下次请求重新认证）。"""

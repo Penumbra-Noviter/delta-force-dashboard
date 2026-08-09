@@ -63,3 +63,6 @@ python-arch-review-*.html
 
 # Runtime log (O-01: delta_force_dashboard.log 文件日志)
 delta_force_dashboard.log
+
+# pytest-cov cache
+.coverage
