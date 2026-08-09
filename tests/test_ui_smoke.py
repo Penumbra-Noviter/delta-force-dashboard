@@ -170,13 +170,22 @@ def test_u02_type_scale(sample_window):
     assert "QLabel#pageTitleLabel" in qss
     assert "font-size: 16px" in qss
 
-    # 图表弹性回退（U 系列实测：用户要求表格全量展示优先）：
-    # 固定小卡片 [140, 150]，不随窗口扩张
-    assert win.chart.minimumHeight() == 140
-    assert win.chart.maximumHeight() == 150
+    # 图表高度随屏幕自适应档位（U-09 方案 A）：与窗口实际使用的区间一致
+    assert win.chart.minimumHeight() == win._chart_min_h
+    assert win.chart.maximumHeight() == win._chart_max_h
 
     # 表格固定行高 26px（30 天 15+15 行全量展示的关键参数）
     assert win.table._left_table.rowHeight(0) == 26
+
+
+def test_window_preset_screen_adaptive(qapp):
+    """U-09 方案 A：屏幕可用高度 → (窗口宽, 窗口高, 图表区间) 两档自适应。"""
+    from app.main_window import MainWindow
+
+    assert MainWindow._window_preset(1200) == (820, 1020, 160, 240)  # 1080p 大档
+    assert MainWindow._window_preset(1000) == (820, 1020, 160, 240)  # 边界含 1000
+    assert MainWindow._window_preset(999) == (820, 920, 140, 150)    # 小屏紧凑档
+    assert MainWindow._window_preset(0) == (820, 920, 140, 150)      # 无屏幕兜底
 
 
 def test_u04_sidebar_selection_pill(sample_window):

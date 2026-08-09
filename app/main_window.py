@@ -171,11 +171,27 @@ class MainWindow(QMainWindow):
     # 窗口设置
     # ═══════════════════════════════════════════════════════
 
+    @staticmethod
+    def _window_preset(screen_h: int) -> tuple[int, int, int, int]:
+        """按屏幕可用高度返回 (默认窗口宽, 默认窗口高, 图表最小高, 图表最大高)。
+
+        U-09 实测反馈后：表格全量展示 + 图表不能太小，空间只能从屏幕高度找。
+        屏幕可用高度 ≥1000（1080p 主流）→ 大档：窗口 1020 + 图表 [160,240]；
+        小屏 → 紧凑档：窗口 920 + 图表 [140,150]。两档表格全量参数一致。
+        """
+        if screen_h >= 1000:
+            return 820, 1020, 160, 240
+        return 820, 920, 140, 150
+
     def _setup_window(self) -> None:
         self.setWindowTitle("Delta Force Dashboard")
 
-        # 基础大小（双栏表格需更宽；30 天视图全量展示需更高，U 系列实测调优）
-        base_w, base_h = 820, 920
+        # 基础大小（双栏表格需更宽；高度按屏幕可用空间自适应，U-09）
+        screen = QApplication.primaryScreen()
+        screen_h = screen.availableGeometry().height() if screen else 0
+        base_w, base_h, self._chart_min_h, self._chart_max_h = self._window_preset(
+            screen_h
+        )
         self.setMinimumSize(680, 650)
 
         # 恢复上次几何
@@ -202,7 +218,6 @@ class MainWindow(QMainWindow):
 
         if not geo_ok:
             self.resize(base_w, base_h)
-            screen = QApplication.primaryScreen()
             if screen:
                 rect = screen.availableGeometry()
                 x = (rect.width() - base_w) // 2
@@ -758,10 +773,10 @@ class MainWindow(QMainWindow):
             ccl = QVBoxLayout(chart_card)
             ccl.setContentsMargins(10, 8, 10, 8)
             ccl.addWidget(chart)
-            # 折线图固定小卡片（H-01 语义）：不随窗口扩张，为表格全量展示让位
-            # （U-02 曾改 min 200 + stretch 1，用户实测挤压表格 → 回退）
-            chart.setMinimumHeight(140)
-            chart.setMaximumHeight(150)
+            # 折线图固定小卡片（H-01 语义）：不随窗口扩张，为表格全量展示让位；
+            # 高度区间按屏幕可用空间自适应（_window_preset，U-09 方案 A）
+            chart.setMinimumHeight(mw._chart_min_h)
+            chart.setMaximumHeight(mw._chart_max_h)
             root_layout.addWidget(chart_card, 0)
             root_layout.addSpacing(8)
 
