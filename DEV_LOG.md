@@ -34,6 +34,13 @@
 
 ## 日志正文
 
+### 2026-08-09 | 实现 | W 系列微交互打磨（U-06 遗留方向落地，357/357）
+- **W-01 KPI count-up**：`motion.animate_value`（数值插值动画：old→new 逐帧回调，动效开关关闭直接落终态）+ `MainWindow._set_kpi_value`（保存/刷新时总盈亏与现金总变化数字 300ms 从旧值滚动到新值，逐帧复用 format_signed_money 格式化——终态与直接设置完全一致；数据不足/数值未变直接设置）；`_last_summary_total/_last_cash_delta` 上一帧值
+- **W-02 非法输入 shake**：`MoneyLineEdit._shake`（QPropertyAnimation 150ms 水平平移 [-6,6,-4,4] 回原位；状态从非 invalid 变 invalid 时触发防抖——连续非法不重复；仅用户输入/失焦校验路径，动效开关尊重）
+- **W-03 按钮 pressed 下沉**：QSS 全局 `QPushButton:pressed { padding-top: 7px; padding-bottom: 5px }`（1px 下沉；saveBtn/refreshBtn/queryBtn 各自 pressed padding 覆盖优先，补齐其余按钮按压缩放一致性）
+- **W-04 图表 hover 数据点高亮**：`_hover_markers`（仓库/现金各一 ScatterPlotItem：13px 大圆点 + 主题底填充 + 系列色描边），hover 时 setData 定位当前点、离开隐藏、主题切换描边色跟随（apply_theme）
+- 测试 +3（count-up 终态/数值未变/开关 + shake 触发/防抖 + hover marker 就位/主题切换）；pytest 357/357 ✅；doc_sync 同步
+
 ### 2026-08-09 | 重构 | V-02/V-03/V-04 架构深化候选 2/3/5（子代理并行实现 + 主 session 合并，354/354）
 - 来源：improve-codebase-architecture 报告候选 2/3/5，grilling 设计树 11 问全按推荐；三子代理并行实现，主 session 审查合并
 - **V-02 状态机拆分**（`app/load_state.py` 新，LoadState 四态）：fetch_page_base 删 `_loaded_once`/`_loading` 私有字段改持 `_load_state`；`is_loaded` 公开 property（测试不再窥视私有）；**子代理实现暴露真实回归**——`can_load()` 原设计排除 loaded 态导致「加载成功后点刷新 = no-op」（刷新是核心操作）→ 主 session 修正：`can_load()` 仅挡 loading 防重入，loaded 可手动刷新；`preload()` 补 `is_loaded` 守卫（预加载只做一次）；新增 loaded→loading 刷新转移用例 + 页面级刷新回归测试

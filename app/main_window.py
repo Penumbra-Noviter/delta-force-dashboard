@@ -46,22 +46,19 @@ from app.theme import (
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
-from app.motion import set_animations_enabled
+from app.motion import animate_value, set_animations_enabled
 from app.profit_page import ProfitPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
-from app.theme import (
-    generate_qss,
-    get_color,
-    set_theme,
-    signal_color,
-    summary_style,
-)
 from app.ui_text import EMOJI
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
-from presentation import format_saved_indicator, format_window_text
+from presentation import (
+    format_saved_indicator,
+    format_signed_money,
+    format_window_text,
+)
 from settings_store import (
     SettingsStore,
     decode_geometry_hex,
@@ -145,6 +142,9 @@ class MainWindow(QMainWindow):
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
         self._view_n = VIEW_DAYS[0]
         self._pinned = False
+        # W-01：KPI count-up 的上一帧数值（None = 尚未渲染过/数据不足）
+        self._last_summary_total: float | None = None
+        self._last_cash_delta: float | None = None
         self._settings = self.settings_store.load()
         self._theme = self._settings.get("theme", "light")
         set_theme(self._theme)
@@ -642,12 +642,15 @@ class MainWindow(QMainWindow):
         本方法只做信号→颜色映射与样式落地（颜色映射留 UI）。
         总盈亏（_summary_label）与现金总变化（_cash_summary_label）双磁贴，
         同源 recent_records(_view_n)，随视图 7/30 联动。
+        W-01：数值变化时数字从旧值滚动到新值（count-up，300ms），
+        数据不足（total 为 None）或数值未变时直接落终态。
         """
         count, total = self.logic.summary(self._view_n)
         text, signal = format_window_text(count, total, "总盈亏", self._view_n)
         caption, value = self._split_kpi_text(text)
         self._summary_caption.setText(caption)
-        self._summary_label.setText(value)
+        self._set_kpi_value(self._summary_label, value, self._last_summary_total, total)
+        self._last_summary_total = total
         self._summary_label.setStyleSheet(summary_style(signal))
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
@@ -656,8 +659,35 @@ class MainWindow(QMainWindow):
         )
         caption, value = self._split_kpi_text(cash_text)
         self._cash_summary_caption.setText(caption)
-        self._cash_summary_label.setText(value)
+        self._set_kpi_value(
+            self._cash_summary_label, value, self._last_cash_delta, cash_delta
+        )
+        self._last_cash_delta = cash_delta
         self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
+
+    def _set_kpi_value(
+        self, label: QLabel, value: str, old: float | None, new: float | None
+    ) -> None:
+        """KPI 磁贴数字落值：数值变化时 count-up 滚动（W-01），否则直接设置。
+
+        动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致；
+        动画对象挂 MainWindow 防 GC，动画中重复触发会替换旧动画。
+        """
+        if (
+            old is not None
+            and new is not None
+            and old != new
+            and value != "数据不足"
+        ):
+            self._kpi_countup_anim = animate_value(
+                self,
+                old,
+                new,
+                lambda v: label.setText(format_signed_money(v)[0]),
+                duration_ms=300,
+            )
+        else:
+            label.setText(value)
 
     # ═══════════════════════════════════════════════════════
     # 默认注册表

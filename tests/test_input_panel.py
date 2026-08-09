@@ -112,6 +112,25 @@ def test_validation_via_real_event_chain(qapp, type_and_settle):
     assert ip.cash_entry.property("validity") == "invalid"
 
 
+def test_w02_shake_on_invalid_input(qapp, type_and_settle):
+    """W-02：非法输入触发抖动动画（状态从 valid 变 invalid），防抖不重复。"""
+    from PySide6.QtTest import QTest
+
+    ip = InputPanel()
+    ip.show()
+    QTest.qWait(30)
+
+    type_and_settle(ip.cash_entry, "100")  # valid
+    type_and_settle(ip.cash_entry, "abc")  # valid → invalid：抖动触发
+    assert ip.cash_entry._shake_anim is not None
+    first = ip.cash_entry._shake_anim
+    QTest.qWait(200)  # 动画结束，pos 恢复原位
+    # 连续非法（已 invalid）→ 不重复抖动（防抖）
+    type_and_settle(ip.cash_entry, "xyz")
+    assert ip.cash_entry._shake_anim is first
+    ip.close()
+
+
 def test_invariant_warning_border_on_cash_over_warehouse(qapp, type_and_settle):
     """现金 > 仓库 → 两个输入框进入 warning 态（越界红边，O-08）。"""
     ip = InputPanel()

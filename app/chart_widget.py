@@ -126,6 +126,7 @@ class ChartWidget(QWidget):
         self._hover_labels: list[pg.TextItem] = []
         self._hover_views: list[pg.ViewBox] = []   # 每个 hover 标签所属 ViewBox（定位坐标系）
         self._hover_series: list[dict] = []        # 每个 hover 标签所属系列配置（短名/颜色键）
+        self._hover_markers: list[pg.ScatterPlotItem] = []  # W-04：当前数据点高亮标记
         self._proxy = None
 
         # 缓存数据
@@ -249,6 +250,10 @@ class ChartWidget(QWidget):
         for label, s in zip(self._hover_labels, self._hover_series):
             label.setColor(get_color(s["color_key"]))
             label.fill = pg.mkBrush(chart_bg)
+        # W-04：hover 高亮标记描边色随主题
+        for marker, s in zip(self._hover_markers, self._hover_series):
+            marker.setPen(pg.mkPen(color=get_color(s["color_key"]), width=2))
+            marker.setBrush(pg.mkBrush(chart_bg))
 
         # 图例文字色
         if self._plot_item is not None and self._plot_item.legend is not None:
@@ -421,6 +426,25 @@ class ChartWidget(QWidget):
         self._hover_views = [p1.vb, p2]
         self._hover_series = [self._LEFT_SERIES, self._RIGHT_SERIES]
 
+        # W-04：hover 当前数据点高亮标记（大圆点 + 主题底填充 + 系列色描边）
+        w_marker = pg.ScatterPlotItem(
+            size=13,
+            pen=pg.mkPen(color=w_color, width=2),
+            brush=pg.mkBrush(chart_bg),
+            symbol="o",
+        )
+        w_marker.setVisible(False)
+        p1.addItem(w_marker)
+        c_marker = pg.ScatterPlotItem(
+            size=13,
+            pen=pg.mkPen(color=c_color, width=2),
+            brush=pg.mkBrush(chart_bg),
+            symbol="o",
+        )
+        c_marker.setVisible(False)
+        p2.addItem(c_marker)
+        self._hover_markers = [w_marker, c_marker]
+
     def _bind_hover_signal(self) -> None:
         """绑定 hover 鼠标移动信号。"""
         self._proxy = pg.SignalProxy(
@@ -480,6 +504,8 @@ class ChartWidget(QWidget):
                 self._vline.setVisible(False)
             for label in self._hover_labels:
                 label.setVisible(False)
+            for marker in self._hover_markers:
+                marker.setVisible(False)
             return
 
         idx = max(0, min(n - 1, round(mouse_x)))
@@ -488,6 +514,14 @@ class ChartWidget(QWidget):
         if self._vline is not None:
             self._vline.setPos(idx)
             self._vline.setVisible(True)
+
+        # W-04：当前数据点高亮标记（各自坐标系）
+        for marker, view, series_vals in zip(
+            self._hover_markers, self._hover_views, (self._warehouse_vals, self._cash_vals)
+        ):
+            if view is not None and idx < len(series_vals):
+                marker.setData([idx], [series_vals[idx]])
+                marker.setVisible(True)
 
         vals = (self._warehouse_vals[idx], self._cash_vals[idx])
         # 各自量纲 + 极端值下 scale 归零的兜底（与原型 _attach_crosshair 同款 span）
@@ -629,6 +663,7 @@ class ChartWidget(QWidget):
         self._hover_labels = []
         self._hover_views = []
         self._hover_series = []
+        self._hover_markers = []
         self._proxy = None
         self._created = False
         self._dates = []

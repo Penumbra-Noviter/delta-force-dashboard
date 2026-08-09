@@ -19,8 +19,9 @@ Qt Widgets 的 QSS 不支持 transition（hover 背景色无法平滑过渡—�
 from __future__ import annotations
 
 __all__ = [
-    "animations_enabled",
     "animate_property",
+    "animate_value",
+    "animations_enabled",
     "fade_in_widget",
     "set_animations_enabled",
 ]
@@ -113,5 +114,39 @@ def animate_property(
     anim.setEndValue(1.0)
     anim.setEasingCurve(easing)
     anim.valueChanged.connect(setter)
+    anim.start()
+    return anim
+
+
+def animate_value(
+    parent: QObject,
+    old_value: float,
+    new_value: float,
+    setter: Callable[[float], None],
+    duration_ms: int = 300,
+    easing: QEasingCurve.Type = QEasingCurve.Type.OutCubic,
+) -> QVariantAnimation | None:
+    """数值插值动画：old_value → new_value 逐帧回调 setter(value)。
+
+    用于 KPI 数字 count-up 等「数值滚动」反馈（W-01）。
+
+    Args:
+        parent: 持有动画的 QObject（防 GC，通常传 self）
+        old_value: 起始数值
+        new_value: 目标数值
+        setter: 每帧接收插值后的 float
+        duration_ms: 动画时长
+        easing: 缓动曲线
+    """
+    if not _animations_enabled:
+        setter(new_value)  # 关闭动效时直接落终态
+        return None
+
+    anim = QVariantAnimation(parent)
+    anim.setDuration(duration_ms)
+    anim.setStartValue(float(old_value))
+    anim.setEndValue(float(new_value))
+    anim.setEasingCurve(easing)
+    anim.valueChanged.connect(lambda v: setter(float(v)))
     anim.start()
     return anim

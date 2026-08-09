@@ -435,6 +435,12 @@ QPushButton:focus {{
     outline: 2px solid {t["FOCUS_RING"]};
     outline-offset: 1px;
 }}
+/* W-03：全局按下 1px 下沉反馈（saveBtn/refreshBtn/queryBtn 有各自的
+   pressed padding 覆盖，此处补齐其余按钮的按压缩放一致性） */
+QPushButton:pressed {{
+    padding-top: 7px;
+    padding-bottom: 5px;
+}}
 QPushButton#saveBtn {{
     background-color: {btn_bg};
     color: {btn_fg};

@@ -253,6 +253,54 @@ def test_page_switch_loop_no_crash(sample_window, monkeypatch):
     assert win._stack.currentIndex() == 1
 
 
+def test_w01_kpi_countup(sample_window):
+    """W-01：KPI 数值变化时 count-up 动画触发，结束后落新值；数值未变直接设置。"""
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QFrame, QLabel
+
+    from app import motion
+    from presentation import format_signed_money
+
+    win = sample_window
+    label = QLabel()
+
+    # 数值变化（100 → 200）→ 动画触发，结束后文本 == 新值格式化
+    win._set_kpi_value(label, "+¥100", 100.0, 200.0)
+    assert win._kpi_countup_anim is not None
+    QTest.qWait(400)
+    assert label.text() == format_signed_money(200.0)[0]
+
+    # 数值未变 → 直接设置，无动画
+    win._set_kpi_value(label, "+¥200", 200.0, 200.0)
+    assert label.text() == "+¥200"
+
+    # 动效关闭 → animate_value 直接落终态
+    motion.set_animations_enabled(False)
+    try:
+        seen: list[float] = []
+        anim = motion.animate_value(QFrame(), 10.0, 20.0, seen.append)
+        assert anim is None
+        assert seen == [20.0]
+    finally:
+        motion.set_animations_enabled(True)
+
+
+def test_w04_chart_hover_markers(sample_window):
+    """W-04：图表创建后 hover 高亮标记就位（仓库/现金各一，13px 大圆点）。"""
+    win = sample_window
+    records = win.logic.recent_records(7)
+    win.chart.draw(records)
+
+    assert len(win.chart._hover_markers) == 2
+    for marker in win.chart._hover_markers:
+        assert marker.opts["size"] == 13
+        assert marker.opts["symbol"] == "o"
+
+    # 主题切换标记描边色更新不崩（apply_theme 路径覆盖）
+    win._toggle_theme()
+    win._toggle_theme()
+
+
 def test_window_preset_screen_adaptive(qapp):
     """U-09 方案 A：屏幕可用高度 → (窗口宽, 窗口高, 图表区间) 两档自适应。"""
     from app.main_window import MainWindow

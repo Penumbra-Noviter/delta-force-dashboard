@@ -9,7 +9,7 @@ from __future__ import annotations
 
 __all__ = ["MoneyLineEdit", "InputPanel"]
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QPoint, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.motion import fade_in_widget
+from app.motion import animations_enabled, fade_in_widget
 from app.theme import get_color
 from calculator import ProfitCalculatorLogic
 from formatting import (
@@ -69,8 +69,31 @@ class MoneyLineEdit(QLineEdit):
         if valid:
             self._set_validity_state("valid")
         else:
+            prev = self.property("validity")
             self._set_validity_state("invalid")
+            # W-02：状态从非 invalid 变 invalid 时抖动反馈（防抖：连续非法不重复）
+            if prev != "invalid":
+                self._shake()
         self.validity_changed.emit(valid and text != "")
+
+    def _shake(self) -> None:
+        """非法输入抖动反馈（W-02）：150ms 水平平移 [-6,6,-4,4] 回原位。
+
+        仅用户输入触发的校验失败时调用（失焦立即校验同路径）；
+        动画对象挂 self 防 GC；动效关闭时直接跳过。
+        """
+        if not animations_enabled():
+            return
+        anim = QPropertyAnimation(self, b"pos", self)
+        anim.setDuration(150)
+        start = self.pos()
+        anim.setKeyValueAt(0.0, start)
+        anim.setKeyValueAt(0.25, start + QPoint(-6, 0))
+        anim.setKeyValueAt(0.5, start + QPoint(6, 0))
+        anim.setKeyValueAt(0.75, start + QPoint(-4, 0))
+        anim.setKeyValueAt(1.0, start)
+        anim.start()
+        self._shake_anim = anim
 
     def set_value(self, text: str) -> None:
         """程序化设值，跳过格式化重入保护。
