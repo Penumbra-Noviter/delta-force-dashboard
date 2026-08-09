@@ -70,15 +70,19 @@
 
 **具体改动**：
 1. `app/theme.py` — 检查 7 个包色 + 4 个图表序列色：统一到同一明度/饱和度带（当前 `#7B8CFF`/`#A58BFF` 等明度差异大，混排显脏）；装饰色（包/序列）与语义色（涨跌 FG_POS/FG_NEG）显式分离并注释规则
-2. `app/exchange_page.py` — `_PACKAGE_CONFIG` 色键与图表序列共用色板键（当前 CHART_SERIES_0~3 与 PACKAGE_COLOR_0~2 两套定义，亮暗主题同值但语义重复），收敛为单一角色命名
+2. `app/exchange_page.py` — `_PACKAGE_CONFIG` 7 色键收敛为单一角色命名（当前 CHART_SERIES_0~3 + PACKAGE_COLOR_0~2 两套键：**CHART_SERIES 实际只服务兑换页包色、chart_widget 不引用它——键名撒谎**；PACKAGE_COLOR 亮暗同值语义重复）；顺带修正 exchange_page.py:34 注释「hex 回退色」与实现不符（`get_color` 缺失键返回 `""`，`or color` 回退的是键名字符串=无效色，不存在 hex 回退路径）
 3. 不做：不收敛为单 accent、不删 emoji、不改红涨绿跌
 
-**影响范围**：`app/theme.py`、`app/exchange_page.py`、`app/chart_widget.py`
+**影响范围**：`app/theme.py`、`app/exchange_page.py`、`tests/test_fetch_pages.py`（键元组断言随映射同步）；`app/chart_widget.py` 已核实不引用 CHART_SERIES_*，无需改
 
-**验收标准**：
-- [ ] 兑换页 7 色与图表序列色出自同一色板定义，无重复键
-- [ ] 亮暗两主题下装饰色与语义色（涨跌）不混淆（评审目检 + 既有取色键测试覆盖）
-- [ ] 两主题切换后颜色不变脏（与现状视觉对比）
+**验收标准**（全部可机器证伪，目检仅辅助）：
+- [ ] 键名如实：7 包色收敛为单一角色命名一套键（如 PACKAGE_COLOR_0~6），删除 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；亮暗同值键**不抽常亮色**（保留双主题定义防 Locality 坑），随主题变化/固定键清单显式化并注释规则
+- [ ] 键引用完整：exchange_page 引用的全部色键在 THEMES 双主题下存在且非空（测试断言，防 `get_color` 静默返回 `""` 漏改不报错）
+- [ ] 装饰 ≠ 语义：双主题下装饰键值 ≠ FG_POS/FG_NEG 值 + HSL 亮度差 ≥ 阈值（**当前 dark 下 CHART_SERIES_2/3 与 FG_POS/FG_NEG 完全同值，必须修**——5 级包标签=亏色、3 级包标签=涨色）
+- [ ] 明度带量化：7 装饰色 HSL 亮度落统一区间、饱和度 ≥ 下限（colorsys 计算断言）
+- [ ] 两两可分辨：同主题内 7 装饰色两两色差 ≥ 阈值（防明度统一后 `#7B8CFF`/`#A58BFF` 色相过近更难分）
+- [ ] 不破坏可读性底线：badge/标签文字对比度维持 U-07 的 AA 4.5:1（浅底深字），明度统一后抽查
+- [ ] 目检降级为辅助：修复前/后截图对比仅作辅助证据，不作为独立验收（U-09 前科：目检已实锤不可靠，QSS 字体族背景问题目检未发现）
 
 ---
 
