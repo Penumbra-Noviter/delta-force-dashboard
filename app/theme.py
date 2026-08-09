@@ -70,6 +70,7 @@ THEMES = {
         "SELECTION_BG": "#2F6B4F",
         "SELECTION_FG": "#ffffff",
         "NAV_HOVER_BG": "rgba(128, 128, 128, 0.1)",  # 侧边栏导航 hover（浅色：中性灰 overlay）
+        "NAV_SELECT_BG": "rgba(47, 107, 79, 0.12)",  # 导航选中浅底 pill（森林绿 12% 透明）
         # 新增：表面层级
         "SURFACE_0": "#eef0ec",
         "SURFACE_1": "#ffffff",
@@ -158,6 +159,7 @@ THEMES = {
         "SELECTION_BG": "#E8A33D",
         "SELECTION_FG": "#141008",
         "NAV_HOVER_BG": "rgba(255, 255, 255, 0.1)",  # 侧边栏导航 hover（暗色：半透明白 overlay）
+        "NAV_SELECT_BG": "rgba(232, 163, 61, 0.14)",  # 导航选中浅底 pill（琥珀 14% 透明）
         # 新增：表面层级
         "SURFACE_0": "#08090f",
         "SURFACE_1": "#12141c",

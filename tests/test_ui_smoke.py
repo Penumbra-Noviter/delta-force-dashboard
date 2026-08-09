@@ -175,6 +175,19 @@ def test_u02_type_scale(sample_window):
     assert win.chart.maximumHeight() > 220
 
 
+def test_u04_sidebar_selection_pill(sample_window):
+    """U-04：侧边栏 130px；选中态为浅底 pill + 3px accent 指示条（非实心色块）。"""
+    win = sample_window
+    assert win.sidebar.width() == 130
+
+    style = win.sidebar.styleSheet()
+    # 选中态：浅底 pill + border-left 指示条（transparent 占位保证零位移）
+    assert "border-left: 3px solid transparent" in style
+    assert "border-left: 3px solid" in style.split("::item:selected")[1][:200]
+    # 不再整条实心 BTN_BG 填充（旧样式已移除）
+    assert "item:selected" in style
+
+
 def test_u07_ui_minor_fixes(sample_window):
     """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
     from PySide6.QtCore import Qt

@@ -22,7 +22,8 @@ class Sidebar(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(100)
+        # U-04：100→130px，容纳「图标+文字」导航项与底部按钮
+        self.setFixedWidth(130)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 8, 0, 8)
@@ -77,10 +78,13 @@ class Sidebar(QWidget):
 
         bg = get_color("MUTED_BG")
         fg = get_color("FG_LABEL")
-        sel_bg = get_color("BTN_BG")
-        sel_fg = get_color("BTN_FG")
+        sel_pill = get_color("NAV_SELECT_BG")
+        sel_fg = get_color("BTN_BG")  # 选中文字用 accent 色（U-04 浅底 pill）
+        accent = get_color("BTN_BG")
         nav_hover_bg = get_color("NAV_HOVER_BG")
 
+        # U-04：选中态从「整条实心色块」改「浅底 pill + 3px accent 指示条」——
+        # border-left 选中/未选中同宽（transparent vs accent），文字零位移。
         self.setStyleSheet(f"""
         #sidebar {{
             background-color: {bg};
@@ -89,10 +93,12 @@ class Sidebar(QWidget):
             background: transparent; border: none; font-size: 13px; outline: none;
         }}
         QListWidget#sidebarNavList::item {{
-            padding: 16px 4px; color: {fg}; border: none;
+            padding: 12px 4px; color: {fg}; border: none;
+            border-left: 3px solid transparent;
         }}
         QListWidget#sidebarNavList::item:selected {{
-            background-color: {sel_bg}; color: {sel_fg}; font-weight: bold;
+            background-color: {sel_pill}; color: {sel_fg}; font-weight: bold;
+            border-left: 3px solid {accent};
         }}
         QListWidget#sidebarNavList::item:hover:!selected {{
             background-color: {nav_hover_bg};
