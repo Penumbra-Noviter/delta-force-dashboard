@@ -12,17 +12,157 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-06）：X 系列已归档。无待办工单。
+> 活跃表（2026-08-09）：U 系列 — UI 视觉打磨（finesse-ui 审计，方向：**游戏感强一点**——保留多色点缀与 emoji 风格，只修层级/布局/动效，不收敛配色）。无阻塞依赖；U-07 小修可随时开工，U-01/U-02 是视觉骨架，U-06 建议排在 U-02 之后（样式稳定再叠动效）。
 
-| Ticket | 标题 | 类型 | 状态 | 深度 |
+| Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| | | | | |
+| U-01 | KPI 磁贴 + 顶部两栏：总盈亏/现金总变化升级为卡片磁贴（大数字+信号色+迷你趋势），输入表单限宽与 KPI 并排 | 功能（UI） | 📝 已录入 | 🟢 Strong |
+| U-02 | 排版刻度：三级字号体系（display 20-22 / section 15-16 / body 12-13 / meta 10-11）+ 按钮两级 + 应用名与页面标题层级区分 + 图表弹性分配翻转（min-height 200） | 功能（UI） | 📝 已录入 | 🟢 Strong |
+| U-03 | 色彩角色系统化（不收敛单 accent）：多色保留，但统一明度/饱和度带 + 语义色与装饰色分离 + 兑换页/图表序列共用同一色板定义（去重复键） | 架构（UI） | 📝 已录入 | 🟡 Worth exploring |
+| U-04 | 侧边栏重做：图标+文字导航、选中态改浅底 pill + accent 指示条（替代全色块）、底部按钮统一 | 功能（UI） | 📝 已录入 | 🟡 Worth exploring |
+| U-05 | emoji/图标一致性：固定 emoji 集 + 统一字号与字体族（避免基线错位）+ 状态提示前缀统一 | 功能（UI） | 📝 已录入 | 🟡 Worth exploring |
+| U-06 | 反馈型动效：hover 150ms 过渡、页面切换淡入、图表曲线绘制动画、保存成功微动效 | 功能（UI） | 📝 已录入 | 🟡 Worth exploring |
+| U-07 | 交互小修批量：可点「重试」label、按钮焦点态补全、今日未录入升级状态 pill、标题/日期轴线对齐、QStatusBar 死样式删除、中性 badge 对比度提升 | 修复（UI） | 📝 已录入 | 🟢 Strong |
 
 ---
 
 ## 工单详情
 
-### L 系列 — Delta Force 游戏工具（2026-08-04，来源：Grilling + ADR-0004）
+### U 系列 — UI 视觉打磨（2026-08-09，来源：finesse-ui 审计）
+
+方向共识（用户拍板）：**游戏感强一点**——保留多色点缀与 emoji 风格，不收敛配色；修的是「数字没有家（KPI 层级）、字号没有刻度（排版层级）、颜色没有组织（色彩角色）」三个问题。
+
+#### U-01：KPI 磁贴 + 顶部两栏布局
+
+**目标**：仪表盘最核心的两个数字（总盈亏 / 现金总变化）从裸 QLabel 升级为卡片磁贴，输入区不再全宽拉伸。
+
+**具体改动**：
+1. `app/main_window.py` — `_default_registry` 中 summary_widget 改卡片容器（复用 `_build_card` 阴影卡片），磁贴内大数字（20-22px）+ 信号色 + 迷你趋势（可先用文本 delta，不做 sparkline）
+2. 顶部区域改两栏：左侧输入卡片限宽（~420-480px），右侧 KPI 磁贴（2 个并排），窗口 ≥ 900px 时生效、窄窗口回退纵向堆叠
+3. `app/input_panel.py` — 输入框 `stretch 1` 改限宽，避免宽窗口下无限横向拉伸
+
+**影响范围**：`app/main_window.py`、`app/input_panel.py`、`app/theme.py`（磁贴 QSS）
+
+**验收标准**：
+- [ ] 两个 KPI 磁贴有卡片底 + 阴影，数字明显大于正文（对比现状裸 QLabel）
+- [ ] 宽窗口（≥1000px）下输入区不再全宽拉伸，与 KPI 并排
+- [ ] 主题切换磁贴颜色联动；pytest 全绿
+
+---
+
+#### U-02：排版刻度
+
+**目标**：建立三级字号体系，按钮收敛两级，应用名与页面标题分层，图表获得更多垂直空间。
+
+**具体改动**：
+1. `app/theme.py` — `generate_qss` 统一字号 token：display（KPI 数字 20-22）/ section（页面标题 15-16）/ body（正文 12-13）/ meta（10-11）；现状 8px（QStatusBar）/10px 混杂全部归位
+2. 按钮两级：primary（保存/查询，13px 600）/ secondary（复用/刷新/导出/主题/置顶，11px 500）；删除 10/12px 游离档
+3. 页面标题与应用名分层：`titleLabel`（应用名 18px 保持）与 `FetchPageBase._title`（页面标题改 15-16px）不再同字号
+4. `app/main_window.py` — 图表 `setMinimumHeight(140)/setMaximumHeight(220)` 改 min 200 + 弹性分配翻转：表格 stretch 1 但给 max（或图表 stretch 随窗口增长），趋势图优先获得窗口增长空间
+
+**影响范围**：`app/theme.py`、`app/fetch_page_base.py`、`app/main_window.py`、`app/sidebar.py`
+
+**验收标准**：
+- [ ] 全 app 字号只有 3 级 + meta 1 级，按钮只有 2 级
+- [ ] 应用名 > 页面标题 > 卡片正文 层级肉眼可辨
+- [ ] 窗口拉高时图表高度增长、表格不再独占弹性空间
+- [ ] pytest 全绿（含最小窗口尺寸断言，若布局收紧需同步调整）
+
+---
+
+#### U-03：色彩角色系统化（保留多色）
+
+**目标**：多色保留（游戏感），但让多色"有组织"——统一明度/饱和度带、语义色与装饰色分离、色板定义去重。
+
+**具体改动**：
+1. `app/theme.py` — 检查 7 个包色 + 4 个图表序列色：统一到同一明度/饱和度带（当前 `#7B8CFF`/`#A58BFF` 等明度差异大，混排显脏）；装饰色（包/序列）与语义色（涨跌 FG_POS/FG_NEG）显式分离并注释规则
+2. `app/exchange_page.py` — `_PACKAGE_CONFIG` 色键与图表序列共用色板键（当前 CHART_SERIES_0~3 与 PACKAGE_COLOR_0~2 两套定义，亮暗主题同值但语义重复），收敛为单一角色命名
+3. 不做：不收敛为单 accent、不删 emoji、不改红涨绿跌
+
+**影响范围**：`app/theme.py`、`app/exchange_page.py`、`app/chart_widget.py`
+
+**验收标准**：
+- [ ] 兑换页 7 色与图表序列色出自同一色板定义，无重复键
+- [ ] 亮暗两主题下装饰色与语义色（涨跌）不混淆（评审目检 + 既有取色键测试覆盖）
+- [ ] 两主题切换后颜色不变脏（与现状视觉对比）
+
+---
+
+#### U-04：侧边栏重做
+
+**目标**：100px 纯文字栏 + 全色块选中态 → 图标+文字导航 + 轻量选中态。
+
+**具体改动**：
+1. `app/sidebar.py` — 导航项图标+文字（保留 emoji 风格，见 U-05 统一规则）；宽度 100→120-140px
+2. 选中态：全色块（`item:selected` 整条 BTN_BG 实心）改浅底 pill + 左侧 3px accent 指示条；hover 态保留
+3. 底部三按钮（主题/置顶/导出）统一为 icon+text 两档样式（与 U-02 按钮分级对齐）
+
+**影响范围**：`app/sidebar.py`、`app/theme.py`、`app/main_window.py`（`_update_theme_btn_text`/`_update_pin_btn_style` 文案联动）
+
+**验收标准**：
+- [ ] 选中态视觉轻一个量级（浅底+指示条，非实心色块）
+- [ ] 底部按钮与全局按钮分级一致
+- [ ] 主题切换联动不变；现有 sidebar 相关测试全绿
+
+---
+
+#### U-05：emoji/图标一致性
+
+**目标**：不删 emoji（游戏感），但消除"基线错位 + 字体混排"的廉价感。
+
+**具体改动**：
+1. 全 app emoji 盘点（📒🔧🌙☀️📌🔄💾✓⚠️ 等）：收敛为固定集合，每个含义一个字符，不混用变体
+2. Qt 下显式统一 emoji 渲染：QSS/字体设置指定含 emoji 的字体族（Windows 为 Segoe UI Emoji）或改用等宽符号字符，消除与中文文字基线的错位
+3. 状态提示（加载/错误/成功）emoji 前缀统一（🔄 加载/⚠️ 失败/✓ 成功），与 U-07 可点重试联动
+
+**影响范围**：`app/sidebar.py`、`app/fetch_page_base.py`、`app/chart_widget.py`、`app/main_window.py`、`app/theme.py`
+
+**验收标准**：
+- [ ] emoji 集合有单一来源（常量或注释清单），无散落变体
+- [ ] 截图目检：emoji 与文字同一基线、字号一致
+- [ ] 功能无回归（按钮文案测试如 `_update_theme_btn_text` 断言同步）
+
+---
+
+#### U-06：反馈型动效
+
+**目标**：product register 的"反馈型动效"底线——hover 过渡、页面切换淡入、曲线绘制动画、保存反馈。
+
+**具体改动**：
+1. hover/pressed 过渡：QSS 无 transition 支持，用 `QPropertyAnimation`（背景色/透明度 150ms）或可接受的等效方案，覆盖按钮两级（U-02 后）
+2. 页面切换：QStackedWidget 切换 120ms 淡入（`QGraphicsOpacityEffect` + 动画，或 `QStackedWidget` 动画替代方案），尊重系统动画关闭（Windows 设置检测或设置项）
+3. 图表：曲线绘制动画（pyqtgraph `setData` 前先 clip/逐点 reveal，或 `pg` 内置动画方案），仅限仓库序列
+4. 保存成功：savedIndicator 出现微动效（淡入）+ 可选 KPI 数字滚动（不强制）
+
+**影响范围**：`app/main_window.py`、`app/chart_widget.py`、`app/input_panel.py`、新增动效工具模块（如需）
+
+**验收标准**：
+- [ ] 动效均为反馈型（触发后 ≤200ms 完成），无装饰性循环动画
+- [ ] 系统关闭动画时全部动效失效但功能完整
+- [ ] offscreen 测试不因动画挂起（动画用 QTest.qWait 或直接 set 终态）；pytest 全绿
+
+---
+
+#### U-07：交互小修批量
+
+**目标**：6 条低风险小问题一次清完。
+
+**具体改动**：
+1. `app/fetch_page_base.py:141` — 「⚠️ 数据获取失败，点击重试」label 加点击事件（或改文案为「点击刷新按钮重试」），消除"骗人文案"
+2. `app/theme.py` — QPushButton 补 `:focus` 样式（2px FOCUS_RING），键盘 Tab 流可见
+3. `app/main_window.py:95` — 「今日未录入」从 10px 小字升级为状态 pill（底色 + 边框）
+4. `app/main_window.py:103-107` — 日期标签与标题对齐（同侧对齐或取消整页居中）
+5. `app/theme.py:619-623` — QStatusBar 死样式删除（从未使用）
+6. `app/table_widget.py:81-94` — 中性「—」badge 对比度提升（FG_MUTED 底 + 白字 4.2:1 → 换更浅底或深字，达 AA 4.5:1）
+
+**影响范围**：`app/fetch_page_base.py`、`app/theme.py`、`app/main_window.py`、`app/table_widget.py`
+
+**验收标准**：
+- [ ] 错误态 label 可点击重试（或文案不再误导）
+- [ ] Tab 焦点在按钮上可见；badge 对比度 ≥ 4.5:1
+- [ ] pytest 全绿（状态 pill 若改 objectName 需同步测试）
+
+---
 
 #### L-01：侧边栏导航系统
 

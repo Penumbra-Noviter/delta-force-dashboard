@@ -34,6 +34,14 @@
 
 ## 日志正文
 
+### 2026-08-09 | 审计 | finesse-ui UI 审计 → U 系列工单录入（TO-TICKETS 活跃表）
+- 用户反馈 UI「差点意思」，按 finesse-ui skill（product register：craft floor + 密度 + 反廉价清单）全量审计 9 个 UI 模块
+- 结论：**底色（craft floor）已达标**——tinted 中性色（无纯 #fff/#000）、hairline 半透明边框、红涨绿跌语义色、焦点环、主题切换无 import 期冻结（C1 教训内化）；问题集中在三层：数字没有家（KPI 层级）、字号没有刻度（排版层级）、颜色没有组织（色彩角色）
+- 关键发现：① 汇总（总盈亏/现金总变化）是唯一没住进卡片的元素；② 全 app 字号挤在 8-18px 无刻度，按钮 10/11/12/13px 四档乱跳；③ 图表限高 [140,220] 拿不到窗口增长空间；④ 兑换页 7 包 7 色相 + emoji 混排（游戏感 OK 但无组织）；⑤ 「点击重试」label 不可点（骗人文案）；⑥ 动效为零（hover 直跳色、页面切换无过渡）
+- 方向拍板（用户）：**游戏感强一点**——保留多色点缀与 emoji，不收敛配色，只修层级/布局/动效
+- 录入 U-01~U-07 至 TO-TICKETS 活跃表（U-01 KPI 磁贴+顶部两栏 / U-02 排版刻度 / U-03 色彩角色系统化 / U-04 侧边栏重做 / U-05 emoji 一致性 / U-06 反馈型动效 / U-07 交互小修批量），暂不实现
+- 一次性审计脚本（offscreen 两页两主题截图）已清理，未入版本控制
+
 ### 2026-08-08 | 评审修复 | 多维度评审 → 4 子代理按优先级实现（P0/P1/P2）
 - P0: `FetchWorker.shutdown(timeout_ms=300)` + 逃生舱——`requestInterruption()` + `wait(超时)`，超时后 `setParent(None)` 脱离 + 模块级 `_detached_workers` 强引用 + `atexit` 兜底 join；`run()` 顶部检查中断标志；`MainWindow.closeEvent` 停 `_preload_timer` + 级联 `ProfitPage.shutdown()`；消除 "QThread: Destroyed while thread is still running" abort 路径（4 项新测试）
 - P1: `app/fetch_page_base.py`（179 行）——crafting/exchange 共享基类：`_client/_loading/_loaded_once/_worker/_data/_shut_down` 状态机、showEvent 懒加载、标题栏+状态标签构建、`_load_data/_on_fetch_done/_on_fetch_error` 三件套、`refresh/preload/shutdown`；crafting 210→122、exchange 256→178 行；`_error` 死状态（两页均只写不读）删除并有测试固化
