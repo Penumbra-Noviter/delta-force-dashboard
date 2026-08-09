@@ -594,24 +594,40 @@ class MainWindow(QMainWindow):
             self.logic.get_record(self.today) is None
         )
 
+    @staticmethod
+    def _split_kpi_text(text: str) -> tuple[str, str]:
+        """拆分汇总文本为 (说明, 数值)：`最近7条总盈亏：+¥41.0M` → 两段。
+
+        U-01 磁贴化：说明行（小字）与数值行（大字）分居两个 QLabel；
+        无分隔符时整体作说明，数值留空。
+        """
+        if "：" in text:
+            caption, value = text.split("：", 1)
+            return caption, value
+        return text, ""
+
     def _update_summary(self) -> None:
-        """读取 logic 的最近记录汇总（按录入条数），并格式化为标签展示。
+        """读取 logic 的最近记录汇总，拆分为磁贴「说明 + 大数字」渲染。
 
         D-07：文本与信号由 format_summary / format_cash_summary 纯函数生成，
         本方法只做信号→颜色映射与样式落地（颜色映射留 UI）。
-        总盈亏（_summary_label）与现金总变化（_cash_summary_label）并排双标签，
+        总盈亏（_summary_label）与现金总变化（_cash_summary_label）双磁贴，
         同源 recent_records(_view_n)，随视图 7/30 联动。
         """
         count, total = self.logic.summary(self._view_n)
         text, signal = format_window_text(count, total, "总盈亏", self._view_n)
-        self._summary_label.setText(text)
+        caption, value = self._split_kpi_text(text)
+        self._summary_caption.setText(caption)
+        self._summary_label.setText(value)
         self._summary_label.setStyleSheet(summary_style(signal))
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
         cash_text, cash_signal = format_window_text(
             cash_count, cash_delta, "现金总变化", self._view_n
         )
-        self._cash_summary_label.setText(cash_text)
+        caption, value = self._split_kpi_text(cash_text)
+        self._cash_summary_caption.setText(caption)
+        self._cash_summary_label.setText(value)
         self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
 
     # ═══════════════════════════════════════════════════════
@@ -626,12 +642,20 @@ class MainWindow(QMainWindow):
         input_panel = InputPanel()
         self.input_panel = input_panel
 
+        # 顶部区域（U-01）：输入卡（左，限宽 520）+ KPI 磁贴卡（右，吃剩余空间）
+        top_bar = QWidget()
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(0, 0, 0, 0)
+        top_bar_layout.setSpacing(12)
+
         def setup_input(root_layout, mw):
             card = mw._build_card()
+            card.setMaximumWidth(520)  # 限宽：宽窗口下输入框不再无限横向拉伸（U-01）
             card_layout = QVBoxLayout(card)
             card_layout.setContentsMargins(12, 10, 12, 10)
             card_layout.addWidget(input_panel)
-            root_layout.addWidget(card)
+            top_bar_layout.addWidget(card, 0)
+            root_layout.addWidget(top_bar)
             root_layout.addSpacing(8)
 
         def connect_input(mw):
@@ -642,31 +666,43 @@ class MainWindow(QMainWindow):
 
         registry.register(AppWidget(input_panel, setup_input, connect_input))
 
-        # ── 汇总条 ──
-        summary_widget = QWidget()
-        summary_layout = QHBoxLayout(summary_widget)
-        summary_layout.setContentsMargins(0, 0, 0, 0)
-        summary_layout.setSpacing(16)
-
+        # ── KPI 磁贴卡（总盈亏 / 现金总变化）──
+        # U-01：核心数字从裸 QLabel 升级为卡片磁贴——大数字（summary_style 22px
+        # 信号色）+ 小字说明（caption），与输入卡并排，成为页面的读数锚点。
         self._summary_label = QLabel("")
         self._summary_label.setObjectName("summaryLabel")
-        self._summary_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        summary_layout.addWidget(self._summary_label, 1)
+        self._summary_label.setWordWrap(True)
+        self._summary_caption = QLabel("")
+        self._summary_caption.setObjectName("summaryCaption")
 
         self._cash_summary_label = QLabel("")
         self._cash_summary_label.setObjectName("cashSummaryLabel")
-        self._cash_summary_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
-        )
-        summary_layout.addWidget(self._cash_summary_label, 1)
+        self._cash_summary_label.setWordWrap(True)
+        self._cash_summary_caption = QLabel("")
+        self._cash_summary_caption.setObjectName("cashSummaryCaption")
+
+        # KPI 卡片本体在 setup 时由 _build_card 创建（需要 mw）；
+        # widget 字段仅为 registry 契约占位，布局由 setup 回调决定。
+        kpi_card = QWidget()
 
         def setup_summary(root_layout, mw):
-            root_layout.addWidget(summary_widget)
-            root_layout.addSpacing(6)
+            kpi_card_real = mw._build_card()
+            kcl = QVBoxLayout(kpi_card_real)
+            kcl.setContentsMargins(16, 12, 16, 12)
+            kcl.setSpacing(6)
+            for caption, value in (
+                (self._summary_caption, self._summary_label),
+                (self._cash_summary_caption, self._cash_summary_label),
+            ):
+                tile = QVBoxLayout()
+                tile.setSpacing(2)
+                tile.addWidget(caption)
+                tile.addWidget(value)
+                kcl.addLayout(tile)
+            kcl.addStretch()
+            top_bar_layout.addWidget(kpi_card_real, 1)
 
-        registry.register(AppWidget(summary_widget, setup_summary, None))
+        registry.register(AppWidget(kpi_card, setup_summary, None))
 
         # ── TableWidget ──
         table = TableWidget()

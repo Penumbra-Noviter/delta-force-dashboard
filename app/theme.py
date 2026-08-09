@@ -248,13 +248,14 @@ def signal_color(signal: RateSignal | PnLSignal) -> str:
 
 
 def summary_style(signal: RateSignal) -> str:
-    """汇总标签样式：根据信号返回 QSS 样式字符串（颜色+字号+粗细）。
+    """KPI 磁贴数字样式：数据不足/仅 1 条 → 灰字小号；否则 → 信号色大字号。
 
-    数据不足/仅 1 条 → 灰字小号；否则 → 信号色常规字号。
+    磁贴化后汇总数字是页面核心读数（U-01）：正常态 22px 加粗信号色，
+    数据不足态降为 16px 灰字。
     """
     if signal is RateSignal.NONE:
-        return f"color: {get_color('FG_MUTED')}; font-size: 12px; font-weight: bold;"
-    return f"color: {signal_color(signal)}; font-size: 13px; font-weight: bold;"
+        return f"color: {get_color('FG_MUTED')}; font-size: 16px; font-weight: bold;"
+    return f"color: {signal_color(signal)}; font-size: 22px; font-weight: 700;"
 
 
 def button_style(role: str) -> str:
@@ -380,8 +381,11 @@ QLabel#todayStatusLabel {{
     font-weight: 600;
 }}
 QLabel#summaryLabel, QLabel#cashSummaryLabel {{
-    font-size: 14px;
     font-weight: 600;
+}}
+QLabel#summaryCaption, QLabel#cashSummaryCaption {{
+    color: {fg_muted};
+    font-size: 11px;
 }}
 QLabel#statusLabel {{
     color: {fg_label};

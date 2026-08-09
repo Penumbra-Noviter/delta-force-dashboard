@@ -129,6 +129,28 @@ def test_ui_initialization(sample_window):
     assert pnl_widget is not None
 
 
+def test_kpi_tile_splits_caption_and_value(sample_window):
+    """U-01：汇总文本拆为「说明行 + 数值行」，磁贴数字为大字号信号色。"""
+    from signals import RateSignal
+
+    from app.theme import get_color, summary_style
+
+    win = sample_window
+
+    caption, value = win._split_kpi_text("最近7条总盈亏：+¥41.0M")
+    assert caption == "最近7条总盈亏"
+    assert value == "+¥41.0M"
+    # 无分隔符（兜底）→ 整体作说明，数值留空
+    assert win._split_kpi_text("数据不足") == ("数据不足", "")
+
+    # 磁贴数字样式：正常态 22px 信号色；数据不足态 16px 灰字
+    style = summary_style(RateSignal.POSITIVE)
+    assert "font-size: 22px" in style
+    assert get_color("FG_POS") in style
+    none_style = summary_style(RateSignal.NONE)
+    assert "font-size: 16px" in none_style
+
+
 def test_u07_ui_minor_fixes(sample_window):
     """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
     from PySide6.QtCore import Qt
@@ -696,7 +718,7 @@ def test_view_switch_to_30_refreshes_all(view_switch_window):
     assert win.table.current_view() == 30
     assert win.table._left_table.rowCount() == 15   # 30 → 15+15 均分（Q7）
     assert win.table._right_table.rowCount() == 15
-    assert "最近30条" in win._summary_label.text()   # 汇总联动（Q9）
+    assert "最近30条" in win._summary_caption.text()   # 汇总联动（Q9）
 
 
 def test_view_switch_back_to_7_keeps_storage(view_switch_window):
@@ -714,18 +736,21 @@ def test_view_switch_back_to_7_keeps_storage(view_switch_window):
     rows = win.table._left_table.rowCount() + win.table._right_table.rowCount()
     assert rows == 7
     assert len(win.logic.data) == 30      # 存储不丢
-    assert "最近7条" in win._summary_label.text()
+    assert "最近7条" in win._summary_caption.text()
 
 
 def test_cash_summary_label_follows_view(view_switch_window):
-    """现金总变化标签随视图 7/30 联动，与总盈亏标签并排渲染。"""
+    """现金总变化磁贴随视图 7/30 联动，与总盈亏磁贴同卡渲染（U-01 磁贴化）。"""
     win = view_switch_window
-    assert hasattr(win, "_cash_summary_label")  # 双标签就位（总盈亏旁边）
+    assert hasattr(win, "_cash_summary_label")  # 双磁贴就位
+    assert hasattr(win, "_summary_caption")
 
     win.refresh_display()
-    assert "最近7条" in win._summary_label.text()
-    assert "最近7条现金总变化" in win._cash_summary_label.text()
+    assert "最近7条" in win._summary_caption.text()
+    assert "最近7条现金总变化" in win._cash_summary_caption.text()
+    # 磁贴数字行有内容（拆「说明：数值」后数值非空）
+    assert win._summary_label.text() != ""
 
     btn30 = next(b for b in win.table._view_buttons if b.property("days") == 30)
     btn30.click()
-    assert "最近30条现金总变化" in win._cash_summary_label.text()
+    assert "最近30条现金总变化" in win._cash_summary_caption.text()
