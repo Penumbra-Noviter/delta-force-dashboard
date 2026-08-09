@@ -170,9 +170,13 @@ def test_u02_type_scale(sample_window):
     assert "QLabel#pageTitleLabel" in qss
     assert "font-size: 16px" in qss
 
-    # 图表弹性翻转：min 200 且无 220 封顶（窗口拉高图表增长）
-    assert win.chart.minimumHeight() == 200
-    assert win.chart.maximumHeight() > 220
+    # 图表弹性回退（U 系列实测：用户要求表格全量展示优先）：
+    # 固定小卡片 [140, 150]，不随窗口扩张
+    assert win.chart.minimumHeight() == 140
+    assert win.chart.maximumHeight() == 150
+
+    # 表格固定行高 26px（30 天 15+15 行全量展示的关键参数）
+    assert win.table._left_table.rowHeight(0) == 26
 
 
 def test_u04_sidebar_selection_pill(sample_window):

@@ -34,6 +34,14 @@
 
 ## 日志正文
 
+### 2026-08-09 | 修复 | U-09 用户实测反馈（打包前修复，314/314）
+- 用户反馈三处：①折线图卡片太大挤占表格，表格要全量展示不要滚动；②「今日未录入」提醒没了；③利润页亮色主题卡片纯白背景纯黑违和
+- **①图表布局回退**：U-02 的弹性翻转（chart stretch 1 吃窗口增长）推翻——chart 固定 [140,150] stretch 0，表格恢复 stretch 1（H-01 语义）；30 天视图全量展示关键参数：行高固定 26px（`resizeRowsToContents` 的 sizeHint 与 QSS 交互算出 33px，15 行塞不下 → 改 `setDefaultSectionSize(26)`）+ 视图按钮 28→24px + 卡片边距 (12,10)→(10,8) + 默认窗口 880→920；实测 920 窗口 30 天视图左 15/15 右 15/15 全量可见、无滚动条，7 天 4+3 全量
+- **②pill 不可见根因**：WARNING_BG `#fcf4e8` 与 sage 页面底 `#eef0ec` 亮度差仅 0.029（近同色）→ 改 `#F1D9A0`/`#6E4A08`（亮度差 0.084 + 琥珀 vs 灰绿 hue 双区分，10px 文字对比 ≈7:1）；dark `#261e14`→`#3A2E1A`
+- **③利润页背景纯黑根因**：U-05 全局 `QWidget { font-family }` 规则使**所有未显式设背景的 QWidget 落入 palette.window 背景**（不随主题）——用户系统深色 palette 时亮色主题下背景即纯黑（本机实测 viewport palette window `#efefef`，autoFillBackground 被 QStyleSheetStyle 接管、代码关闭无效）→ QSS 显式 `QWidget#profitPage, QWidget#profitContainer { background-color: bg }` + profit_page.py viewport 内联透明（QSS 选择器匹配不到 viewport）；双主题实测背景 == 主题 BG
+- 附带：QSS 注释内 `{ font-family }` 触发 f-string 插值 NameError（已改写注释避坑）；test_u02_type_scale 图表断言更新为回退语义
+- 打包：PyInstaller onedir 重建，dist 67M，offscreen 烟测 12s 无崩溃
+
 ### 2026-08-09 | 修复 | U 系列 code-review 评审修复（U-08，314/314）
 - 双轴评审（Standards + Spec + Falsify 维度，2 子代理并行）结果：无崩溃级问题；3 处真实规格偏差 + 若干标准项
 - **修复**：① 动效全局开关——`motion.set_animations_enabled`（settings 键 `animations`，默认 true），关闭时 fade_in 不挂 effect、属性动画直接落终态（U-06 验收「系统关闭动画时全部动效失效」以设置项实现，注册表检测不做）；② `fade_in_widget` 竞态防护——同 widget 连续触发先 stop 旧动画（QPropertyAnimation.stop 不发 finished，旧清理回调不会误删新 effect）；③ `animate_property` 参数收紧 `QObject`（去 type: ignore）；④ `exchangePage` 包名标签内联 14→15px（QSS 已改 15 但内联优先级更高，U-02 归位失真——DEV_LOG 上一版记录失真已更正）；⑤ `EMOJI['ok']` 收敛 main_window CSV 提示（字面量 ✓ 清零，测试 regex 补 ✓ + Path 绝对化）；⑥ 曲线动画 250→200ms（feedback-only 上限）

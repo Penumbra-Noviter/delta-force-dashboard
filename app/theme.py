@@ -88,8 +88,8 @@ THEMES = {
         "INFO_FG": "#2C7A8C",
         "SUCCESS_BG": "#e8f4ec",
         "SUCCESS_FG": "#2F6B4F",
-        "WARNING_BG": "#fcf4e8",
-        "WARNING_FG": "#B77A16",
+        "WARNING_BG": "#F1D9A0",   # 琥珀中调底（今日未录入 pill；与 sage 底亮度差 ≈0.11 可辨）
+        "WARNING_FG": "#6E4A08",   # 深琥珀文字（10px 小字对 #F1D9A0 对比 ≈7:1，AA）
         "ERROR_BG": "#fef2f2",
         "ERROR_FG": "#C0453C",
         "BADGE_FG": "#ffffff",         # 盈亏标签文字（双主题同值，保持既有白字）
@@ -177,7 +177,7 @@ THEMES = {
         "INFO_FG": "#7B8CFF",
         "SUCCESS_BG": "#14261e",
         "SUCCESS_FG": "#3FCB86",
-        "WARNING_BG": "#261e14",
+        "WARNING_BG": "#3A2E1A",   # 琥珀淡底（今日未录入 pill；原 #261e14 在午夜底上过暗）
         "WARNING_FG": "#E8A33D",
         "ERROR_BG": "#1f1418",
         "ERROR_FG": "#FF5F56",
@@ -396,6 +396,18 @@ QLabel#todayStatusLabel {{
     font-size: 10px;
     font-weight: 600;
 }}
+
+/* ═══════════════════════════════════════════
+   滚动区（利润页）
+   ═══════════════════════════════════════════ */
+/* U 系列修复：全局 QWidget 字体族规则使所有未显式设背景的 QWidget
+   落入 palette.window 背景（不随主题）——用户系统深色 palette 时
+   亮色主题下利润页背景纯黑、与亮色卡片违和。profitPage/container
+   显式主题 BG；viewport 的透明由 profit_page.py 内联样式处理
+   （QSS 选择器匹配不到 viewport）。 */
+QWidget#profitPage, QWidget#profitContainer {{
+    background-color: {bg};
+}}
 QLabel#summaryLabel, QLabel#cashSummaryLabel {{
     font-weight: 600;
 }}
@@ -612,7 +624,7 @@ QTableWidget {{
     font-size: 11px;
 }}
 QTableWidget::item {{
-    padding: 8px 10px;
+    padding: 2px 8px;
     border-bottom: 1px solid {separator};
 }}
 QTableWidget::item:hover {{

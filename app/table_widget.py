@@ -87,7 +87,7 @@ class PnLBadge(QWidget):
             background-color: {bg_color};
             color: {fg_color};
             border-radius: 12px;
-            padding: 3px 12px;
+            padding: 2px 10px;
             font-size: 11px;
             font-weight: 600;
         """
@@ -213,6 +213,11 @@ class _DaySubTable(QTableWidget):
         # Font（基础字号，实际由 QSS 覆盖）
         cell_font = QFont("Microsoft YaHei", 10)
         self.setFont(cell_font)
+
+        # U 系列：固定行高 26px（resizeRowsToContents 的 sizeHint 与 QSS 交互
+        # 算出 33px，30 天 15 行全量放不下）——badge 高 ~23 / 操作按钮 24，
+        # 26px 内完整可见；超高内容靠 defaultSectionSize 兜底
+        self.verticalHeader().setDefaultSectionSize(26)
 
     def mousePressEvent(self, event) -> None:
         """点击空白区（非单元格、非按钮）时清除选中高亮。"""
@@ -378,8 +383,6 @@ class _DaySubTable(QTableWidget):
 
             prev_warehouse = record.warehouse
 
-        # 纵向自适应行高
-        self.resizeRowsToContents()
         # 按比例分配列宽（窗口首次显示时 resizeEvent 可能还未触发）
         self._apply_proportional_widths()
 
@@ -430,7 +433,8 @@ class TableWidget(QWidget):
             btn.setProperty("days", days)
             btn.setCheckable(True)
             btn.setChecked(days == default_view)
-            btn.setFixedHeight(28)
+            # U 系列：24px 紧凑切换栏（原 28px），为表格全量展示让出纵向空间
+            btn.setFixedHeight(24)
             self._btn_group.addButton(btn)
             self._view_buttons.append(btn)
             btn.toggled.connect(self._on_view_toggled)

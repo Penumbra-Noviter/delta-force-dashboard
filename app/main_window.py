@@ -174,8 +174,8 @@ class MainWindow(QMainWindow):
     def _setup_window(self) -> None:
         self.setWindowTitle("Delta Force Dashboard")
 
-        # 基础大小（双栏表格需更宽）
-        base_w, base_h = 820, 880
+        # 基础大小（双栏表格需更宽；30 天视图全量展示需更高，U 系列实测调优）
+        base_w, base_h = 820, 920
         self.setMinimumSize(680, 650)
 
         # 恢复上次几何
@@ -676,7 +676,7 @@ class MainWindow(QMainWindow):
             card = mw._build_card()
             card.setMaximumWidth(520)  # 限宽：宽窗口下输入框不再无限横向拉伸（U-01）
             card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.setContentsMargins(10, 8, 10, 8)
             card_layout.addWidget(input_panel)
             top_bar_layout.addWidget(card, 0)
             root_layout.addWidget(top_bar)
@@ -712,7 +712,7 @@ class MainWindow(QMainWindow):
         def setup_summary(root_layout, mw):
             kpi_card_real = mw._build_card()
             kcl = QVBoxLayout(kpi_card_real)
-            kcl.setContentsMargins(16, 12, 16, 12)
+            kcl.setContentsMargins(14, 10, 14, 10)
             kcl.setSpacing(6)
             for caption, value in (
                 (self._summary_caption, self._summary_label),
@@ -735,11 +735,11 @@ class MainWindow(QMainWindow):
         def setup_table(root_layout, mw):
             table_card = mw._build_card()
             tcl = QVBoxLayout(table_card)
-            tcl.setContentsMargins(12, 10, 12, 10)
+            tcl.setContentsMargins(10, 8, 10, 8)
             tcl.addWidget(table)
-            # U-02：表格不再独占弹性（原 stretch=1 与图表 0 互换），
-            # 超高时内部滚动兜底（_DaySubTable vertical AsNeeded）
-            root_layout.addWidget(table_card, 0)
+            # 表格全量展示优先（H-01 语义，U-02 弹性翻转后用户实测回退）：
+            # 表格吃窗口增长空间，超高时 _DaySubTable 内部滚动仅作极端兜底
+            root_layout.addWidget(table_card, 1)
             root_layout.addSpacing(8)
 
         def connect_table(mw):
@@ -756,13 +756,13 @@ class MainWindow(QMainWindow):
         def setup_chart(root_layout, mw):
             chart_card = mw._build_card()
             ccl = QVBoxLayout(chart_card)
-            ccl.setContentsMargins(12, 10, 12, 10)
+            ccl.setContentsMargins(10, 8, 10, 8)
             ccl.addWidget(chart)
-            # U-02：趋势图是核心「读」对象——min 200 保底、随窗口增长
-            # （H-01 的 140-220 封顶让图表拿不到窗口增长空间）；
-            # 表格超高时靠 _DaySubTable 内部滚动兜底（vertical AsNeeded）。
-            chart.setMinimumHeight(200)
-            root_layout.addWidget(chart_card, 1)
+            # 折线图固定小卡片（H-01 语义）：不随窗口扩张，为表格全量展示让位
+            # （U-02 曾改 min 200 + stretch 1，用户实测挤压表格 → 回退）
+            chart.setMinimumHeight(140)
+            chart.setMaximumHeight(150)
+            root_layout.addWidget(chart_card, 0)
             root_layout.addSpacing(8)
 
         registry.register(AppWidget(chart, setup_chart, None))

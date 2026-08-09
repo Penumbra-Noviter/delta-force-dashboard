@@ -48,6 +48,13 @@ class ProfitPage(QWidget):
         self._scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        # U 系列修复：QScrollArea viewport 默认绘制 palette.window 背景
+        # （不随主题，用户系统深色 palette 时亮色主题下背景纯黑）——
+        # QSS 选择器匹配不到 viewport（QStyleSheetStyle 也忽略 autoFillBackground），
+        # 必须对 viewport 直接设内联透明样式。
+        self._scroll.viewport().setStyleSheet(
+            "QWidget { background-color: transparent; }"
+        )
 
         container = QWidget()
         container.setObjectName("profitContainer")
