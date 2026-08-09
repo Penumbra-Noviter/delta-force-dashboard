@@ -371,7 +371,11 @@ QLabel#savedIndicator {{
     font-size: 10px;
 }}
 QLabel#todayStatusLabel {{
-    color: {fg_today};
+    color: {t["WARNING_FG"]};
+    background-color: {t["WARNING_BG"]};
+    border: 1px solid {t["BORDER_WARNING"]};
+    border-radius: 9px;
+    padding: 2px 10px;
     font-size: 10px;
     font-weight: 600;
 }}
@@ -440,6 +444,10 @@ QPushButton {{
     padding: 6px 20px;
     font-size: 12px;
     font-weight: 500;
+}}
+QPushButton:focus {{
+    outline: 2px solid {t["FOCUS_RING"]};
+    outline-offset: 1px;
 }}
 QPushButton#saveBtn {{
     background-color: {btn_bg};
@@ -611,15 +619,6 @@ QFrame#cardFrame, QFrame#craftingCard {{
     background-color: {card_bg};
     border: 1px solid {card_border};
     border-radius: 12px;
-}}
-
-/* ═══════════════════════════════════════════
-   状态栏 / 提示
-   ═══════════════════════════════════════════ */
-QStatusBar {{
-    background-color: {bg};
-    color: {placeholder};
-    font-size: 8px;
 }}
 
 /* ═══════════════════════════════════════════

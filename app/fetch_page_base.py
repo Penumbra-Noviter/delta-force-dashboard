@@ -14,8 +14,8 @@ __all__ = ["FetchPageBase"]
 import logging
 from typing import Any
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QShowEvent
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QCursor, QShowEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -28,6 +28,17 @@ from app.fetch_worker import FetchWorker
 from kkrb_client import KkrbClient, KkrbError
 
 logger = logging.getLogger(__name__)
+
+
+class _ClickableLabel(QLabel):
+    """可点击标签：错误状态「点击重试」文案真正可点（U-07）。"""
+
+    clicked = Signal()
+
+    def mousePressEvent(self, event) -> None:
+        super().mousePressEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
 
 
 class FetchPageBase(QWidget):
@@ -88,11 +99,12 @@ class FetchPageBase(QWidget):
 
         layout.addWidget(title_bar)
 
-        # 状态提示
-        self._status_label = QLabel("")
+        # 状态提示（错误时变为可点击重试）
+        self._status_label = _ClickableLabel("")
         self._status_label.setObjectName("statusLabel")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status_label.setVisible(False)
+        self._status_label.clicked.connect(self._load_data)
         layout.addWidget(self._status_label)
 
         # 页面主体（子类构建）
@@ -120,6 +132,7 @@ class FetchPageBase(QWidget):
         self._loading = True
         self._status_label.setText("🔄 加载中…")
         self._status_label.setVisible(True)
+        self._status_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         self._refresh_btn.setEnabled(False)
 
         self._worker = FetchWorker(self._fetch)
@@ -142,7 +155,9 @@ class FetchPageBase(QWidget):
         else:
             logger.error("%s数据获取异常: %s", self._page_name, e)
             self._status_label.setText("⚠️ 网络异常，请检查连接后重试")
+        # 错误状态：label 可点击重试（U-07，文案与行为一致）
         self._status_label.setVisible(True)
+        self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._data = []
         self._loading = False
         self._refresh_btn.setEnabled(True)

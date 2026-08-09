@@ -126,6 +126,35 @@ def test_diff_cell_zero_delta_has_no_plus_prefix(qapp, theme_guard):
     assert item.text() == "¥0.00"
 
 
+def test_neutral_badge_uses_high_contrast_pair(qapp, theme_guard):
+    """U-07：中性「—」badge 用浅底深字（FG_MUTED 底+白字 4.2:1 → 浅底+TEXT_SECONDARY ≥ 4.5:1）。"""
+    from app.table_widget import COL_PNL, PnLBadge
+
+    table = _make_table()
+    theme_mod.set_theme("light")
+    table.draw(
+        records=[("2026-07-30", DayRecord(cash=50.0, warehouse=200.0, date="2026-07-30"))],
+        today="2026-07-30",
+        prev_warehouse=200.0,  # 前后相等 → 中性态
+    )
+    badge = table.cellWidget(0, COL_PNL)
+    assert isinstance(badge, PnLBadge), "盈亏 badge 未渲染"
+    style = badge._label.styleSheet()
+    assert theme_mod.get_color("MUTED_BG") in style, "中性 badge 应为浅色底"
+    assert theme_mod.get_color("TEXT_SECONDARY") in style, "中性 badge 应为深色字"
+
+    # 双主题同一路径：暗色下同样使用浅底深字对
+    theme_mod.set_theme("dark")
+    table.draw(
+        records=[("2026-07-30", DayRecord(cash=50.0, warehouse=200.0, date="2026-07-30"))],
+        today="2026-07-30",
+        prev_warehouse=200.0,
+    )
+    style = badge._label.styleSheet()
+    assert theme_mod.get_color("MUTED_BG") in style
+    assert theme_mod.get_color("TEXT_SECONDARY") in style
+
+
 # ── 静态检查：防 import 期冻结复发 ───────────────────────
 
 

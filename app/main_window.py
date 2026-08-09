@@ -102,7 +102,10 @@ class DashboardPage(QWidget):
         # 日期
         self._date_label = QLabel(today)
         self._date_label.setObjectName("dateLabel")
-        self._date_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # U-07：与标题同侧左对齐，消除「标题左、日期居中」的轴线错位
+        self._date_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         layout.addSpacing(4)
         layout.addWidget(self._date_label)
         layout.addSpacing(12)

@@ -34,6 +34,15 @@
 
 ## 日志正文
 
+### 2026-08-09 | 实现 | U-07 交互小修批量（交互反馈闭环）
+- **可点「重试」**：`fetch_page_base.py` 新增 `_ClickableLabel`（clicked 信号 + mousePressEvent），错误态设手型光标、点击重新 `_load_data`；文案「点击重试」从骗人变真实（T-02 旧文案回归测试保持通过）
+- **按钮焦点态**：`generate_qss` 加 `QPushButton:focus { outline: 2px solid FOCUS_RING }`（Qt 6 QSS outline 不占布局，避免像 QLineEdit 那样 padding 补偿）；Tab 键流可见
+- **今日未录入 pill**：`todayStatusLabel` 从裸文字改 WARNING 系底色+边框+圆角 pill（亮 #fcf4e8/#B77A16，暗 #261e14/#E8A33D）
+- **轴线对齐**：日期标签取消整页居中改左对齐（与标题同侧），消「标题左/日期中」错位
+- **QStatusBar 死样式删除**（8px，从未使用）
+- **中性 badge 对比度**：`—` badge 由 FG_MUTED 底+白字（≈4.2:1）改 MUTED_BG 底 + TEXT_SECONDARY 字（light ≈7:1 / dark ≈5.5:1，AA 达标）；涨/亏 badge 配色不变
+- 测试 +3（可点重试 / 中性 badge 双主题 / UI 小修聚合断言）；doc_sync 刷新 11 标记；pytest 308/308 ✅
+
 ### 2026-08-09 | 审计 | finesse-ui UI 审计 → U 系列工单录入（TO-TICKETS 活跃表）
 - 用户反馈 UI「差点意思」，按 finesse-ui skill（product register：craft floor + 密度 + 反廉价清单）全量审计 9 个 UI 模块
 - 结论：**底色（craft floor）已达标**——tinted 中性色（无纯 #fff/#000）、hairline 半透明边框、红涨绿跌语义色、焦点环、主题切换无 import 期冻结（C1 教训内化）；问题集中在三层：数字没有家（KPI 层级）、字号没有刻度（排版层级）、颜色没有组织（色彩角色）

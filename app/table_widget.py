@@ -347,17 +347,21 @@ class _DaySubTable(QTableWidget):
             pnl_text, pnl_signal = get_pnl_label(
                 prev_warehouse, record.warehouse
             )
-            pnl_bg = signal_color(pnl_signal)
             if pnl_text == "—":
+                # 中性态：浅底深字（FG_MUTED 底 + 白字仅 4.2:1，不达 AA，U-07）
                 badge_text = "—"
+                badge_bg = get_color("MUTED_BG")
+                badge_fg = get_color("TEXT_SECONDARY")
             else:
                 badge_text = f"{pnl_text} {rate_str}"
+                badge_bg = signal_color(pnl_signal)
+                badge_fg = None
             badge = self.cellWidget(ri, COL_PNL)
             if badge is None:
-                badge = PnLBadge(badge_text, pnl_bg)
+                badge = PnLBadge(badge_text, badge_bg, badge_fg)
                 self.setCellWidget(ri, COL_PNL, badge)
             else:
-                badge.update_content(badge_text, pnl_bg)
+                badge.update_content(badge_text, badge_bg, badge_fg)
 
             # 6: 操作按钮
             actions = self.cellWidget(ri, COL_ACTIONS)

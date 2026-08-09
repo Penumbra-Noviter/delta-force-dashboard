@@ -129,6 +129,32 @@ def test_ui_initialization(sample_window):
     assert pnl_widget is not None
 
 
+def test_u07_ui_minor_fixes(sample_window):
+    """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
+    from PySide6.QtCore import Qt
+
+    from app.theme import generate_qss
+
+    win = sample_window
+
+    # 日期标签与标题同侧左对齐（消除轴线错位）
+    align = win._date_label.alignment()
+    assert align & Qt.AlignmentFlag.AlignLeft
+
+    # 「今日未录入」升级为状态 pill：QSS 含背景/边框/padding（非裸文字）
+    qss_light = generate_qss("light")
+    assert "QLabel#todayStatusLabel" in qss_light
+    assert "background-color" in qss_light.split("QLabel#todayStatusLabel")[1][:300]
+    assert "border-radius: 9px" in qss_light
+
+    # QPushButton 焦点态可见（outline 不占布局，QLineEdit 已有 2px 边框环）
+    assert "QPushButton:focus" in qss_light
+    assert "outline" in qss_light
+
+    # QStatusBar 死样式已删除（从未使用）
+    assert "QStatusBar" not in generate_qss("dark")
+
+
 # ── 5. 保存今日数据 ──────────────────────────────────────
 
 

@@ -196,6 +196,36 @@ def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None
     assert page._refresh_btn.isEnabled()
 
 
+def test_error_label_click_retries(qapp, monkeypatch) -> None:
+    """U-07：「点击重试」label 真实可点——点击后重新发起加载（新 worker）。"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from app.crafting_page import CraftingPage
+    from kkrb_client import KkrbError
+
+    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
+    page = CraftingPage()
+    page._client.fetch_ov_data = lambda: (_ for _ in ()).throw(KkrbError("boom"))
+
+    page.show()  # label 可见性需父链已显示
+    qapp.processEvents()
+    page.preload()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    # 错误态：label 可见 + 手型光标（可点提示）
+    assert page._status_label.isVisible()
+    assert page._status_label.cursor().shape() == Qt.CursorShape.PointingHandCursor
+
+    # 点击 label → 重新加载（新 worker 启动，_loading 置真）
+    QTest.mouseClick(page._status_label, Qt.MouseButton.LeftButton)
+    assert page._loading is True
+    assert page._worker is not None and page._worker is not worker
+
+
 def test_preload_after_shutdown_does_not_start(qapp, monkeypatch) -> None:
     """shutdown() 后不再启动新预加载（关窗后迟到的定时器回调不复活线程）。"""
     from app.crafting_page import CraftingPage
