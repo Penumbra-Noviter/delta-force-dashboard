@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.fetch_worker import FetchWorker
+from app.ui_text import EMOJI
 from kkrb_client import KkrbClient, KkrbError
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,7 @@ class FetchPageBase(QWidget):
 
         title_layout.addStretch()
 
-        self._refresh_btn = QPushButton("🔄 刷新")
+        self._refresh_btn = QPushButton(f"{EMOJI['loading']} 刷新")
         self._refresh_btn.setObjectName("refreshBtn")
         self._refresh_btn.clicked.connect(self._load_data)
         title_layout.addWidget(self._refresh_btn)
@@ -131,7 +132,7 @@ class FetchPageBase(QWidget):
         if self._loading:
             return
         self._loading = True
-        self._status_label.setText("🔄 加载中…")
+        self._status_label.setText(f"{EMOJI['loading']} 加载中…")
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         self._refresh_btn.setEnabled(False)
@@ -152,10 +153,10 @@ class FetchPageBase(QWidget):
     def _on_fetch_error(self, e: Exception) -> None:
         if isinstance(e, KkrbError):
             logger.warning("%s数据获取失败: %s", self._page_name, e)
-            self._status_label.setText("⚠️ 数据获取失败，点击重试")
+            self._status_label.setText(f"{EMOJI['warn']} 数据获取失败，点击重试")
         else:
             logger.error("%s数据获取异常: %s", self._page_name, e)
-            self._status_label.setText("⚠️ 网络异常，请检查连接后重试")
+            self._status_label.setText(f"{EMOJI['warn']} 网络异常，请检查连接后重试")
         # 错误状态：label 可点击重试（U-07，文案与行为一致）
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))

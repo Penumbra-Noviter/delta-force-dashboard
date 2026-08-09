@@ -49,6 +49,7 @@ from app.table_widget import TableWidget
 from app.profit_page import ProfitPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
+from app.ui_text import EMOJI
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -289,7 +290,7 @@ class MainWindow(QMainWindow):
 
     def _update_theme_btn_text(self) -> None:
         self.sidebar.theme_btn.setText(
-            "🌙 暗色" if self._theme == "light" else "☀️ 亮色"
+            f"{EMOJI['theme_dark']} 暗色" if self._theme == "light" else f"{EMOJI['theme_light']} 亮色"
         )
 
     # ═══════════════════════════════════════════════════════
@@ -372,13 +373,13 @@ class MainWindow(QMainWindow):
     def _update_pin_btn_style(self) -> None:
         """更新置顶按钮外观（仅在状态变化时触发 style polish）。"""
         if self._pinned:
-            self.sidebar.pin_btn.setText("📌 已置顶")
+            self.sidebar.pin_btn.setText(f"{EMOJI['pin']} 已置顶")
             if self.sidebar.pin_btn.property("active") != "true":
                 self.sidebar.pin_btn.setProperty("active", "true")
                 self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)
                 self.sidebar.pin_btn.style().polish(self.sidebar.pin_btn)
         else:
-            self.sidebar.pin_btn.setText("📌 置顶")
+            self.sidebar.pin_btn.setText(f"{EMOJI['pin']} 置顶")
             if self.sidebar.pin_btn.property("active") == "true":
                 self.sidebar.pin_btn.setProperty("active", "false")
                 self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)

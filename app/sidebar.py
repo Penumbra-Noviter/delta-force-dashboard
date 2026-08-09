@@ -12,12 +12,14 @@ __all__ = ["Sidebar"]
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget
 
+from app.ui_text import EMOJI
+
 
 class Sidebar(QWidget):
     """左侧导航栏：导航项列表 + 底部操作按钮。"""
 
     nav_changed = Signal(int)
-    NAV_ITEMS = ["📒 记账", "🔧 利润"]
+    NAV_ITEMS = [f"{EMOJI['nav_ledger']} 记账", f"{EMOJI['nav_profit']} 利润"]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -49,7 +51,7 @@ class Sidebar(QWidget):
         self.theme_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.theme_btn)
 
-        self.pin_btn = QPushButton("📌 置顶")
+        self.pin_btn = QPushButton(f"{EMOJI['pin']} 置顶")
         self.pin_btn.setObjectName("pinBtn")
         self.pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.pin_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)

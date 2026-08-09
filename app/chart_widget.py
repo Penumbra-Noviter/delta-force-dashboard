@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import get_color
+from app.ui_text import EMOJI
 from formatting import format_compact, format_short_date
 
 
@@ -546,7 +547,7 @@ class ChartWidget(QWidget):
             return
         self._menu = QMenu(self)
 
-        export_action = QAction("💾 导出为 PNG", self)
+        export_action = QAction(f"{EMOJI['save']} 导出为 PNG", self)
         export_action.triggered.connect(self.export_png)
         self._menu.addAction(export_action)
 

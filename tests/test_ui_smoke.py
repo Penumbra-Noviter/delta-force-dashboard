@@ -188,6 +188,34 @@ def test_u04_sidebar_selection_pill(sample_window):
     assert "item:selected" in style
 
 
+def test_u05_emoji_single_source(sample_window):
+    """U-05：emoji 收敛到 ui_text.EMOJI 单一来源；全局字体族含 Segoe UI Emoji。"""
+    import re
+
+    from app.theme import generate_qss
+    from app.ui_text import EMOJI
+
+    win = sample_window
+
+    # 导航项/置顶按钮文案由 EMOJI 常量拼装
+    assert win.sidebar.NAV_ITEMS[0].startswith(EMOJI["nav_ledger"])
+    assert win.sidebar.NAV_ITEMS[1].startswith(EMOJI["nav_profit"])
+    assert win.sidebar.pin_btn.text().startswith(EMOJI["pin"])
+
+    # 全局字体族统一（微软雅黑 + Segoe UI Emoji，消基线错位）
+    assert "Segoe UI Emoji" in generate_qss("light")
+
+    # app 源码（除 ui_text.py 外）无散落 emoji 字面量
+    import pathlib
+
+    literal = re.compile(r"[📒🔧🌙☀️📌🔄⚠️💾]")
+    for py in pathlib.Path("app").glob("*.py"):
+        if py.name == "ui_text.py":
+            continue
+        text = py.read_text(encoding="utf-8")
+        assert not literal.search(text), f"{py.name} 含散落 emoji 字面量"
+
+
 def test_u07_ui_minor_fixes(sample_window):
     """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
     from PySide6.QtCore import Qt
