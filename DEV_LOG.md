@@ -34,6 +34,14 @@
 
 ## 日志正文
 
+### 2026-08-09 | 重构 | V-01 kkrb_client 解析拆出（架构深化候选 1，331/331）
+- 来源：improve-codebase-architecture 报告 + grilling 共识（6 问全按推荐）
+- `kkrb_models.py`（新，零依赖叶子，仿 signals.py 先例）：CraftingProduct / AmmoPackageItem / KkrbError——模型被解析、客户端、UI 三方引用，独立避免循环 import
+- `kkrb_parsing.py`（新，纯函数模块）：`parse_ov_response` / `parse_ammo_package_response`（公开名去 `_` 前缀）/ `_int_or_zero`——原 KkrbClient 类内 staticmethod 迁移，行为逐字保持
+- `kkrb_client.py` 收敛：删除类内 `_parse_*`/`_int_or_zero`（协议表面收敛为 fetch_* + reset），`from kkrb_models/kkrb_parsing import` + `__all__` 重新导出——crafting/exchange/fetch_page_base 及全部测试**零改动**（协议表面不变）；`_parse_json`（HTTP 体→JSON）保留在传输层
+- 测试：`tests/test_kkrb_parsing.py` 新建（28 用例 = 迁移 16 + 畸形矩阵扩展 12：非 dict/缺字段/字段类型异常/畸形条目跳过/placeName 回退 key/字符串数字转 int）；`test_kkrb_client.py` 精简为 4 用例（模型 + 协议表面收敛断言：`not hasattr(KkrbClient, "_parse_ov_response")`）；CODE_WIKI 新文件标记手补 + doc_sync
+- pytest 331/331 ✅；重新打包 + 烟测
+
 ### 2026-08-09 | 修复 | U-11 切页崩溃（用户实测：点利润→切回→再点利润闪退，317/317）
 - **症状**：快速切页（利润→记账→利润）闪退无提示；日志无崩溃现场（无 crash 捕获）
 - **根因定位**：U-06 切页淡入动画（`fade_in_widget` → QGraphicsOpacityEffect + QPropertyAnimation 挂 QStackedWidget 页面）——QGraphicsEffect 挂在 QStackedWidget 页面上，动画进行中页面被 hide/show（快速切页），触发 Qt 已知崩溃路径（effect 与 stack 绘制交互）；Falsify 只测过「同 widget 连续 fade」，未覆盖「stack 切页中 hide/show」场景

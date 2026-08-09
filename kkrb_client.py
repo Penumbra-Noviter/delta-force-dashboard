@@ -1,7 +1,10 @@
 """
-kkrb.net API 客户端：获取制造产物推荐数据及子弹自选包兑换利润数据。
+kkrb.net API 客户端：会话管理 + HTTP 传输 + TTL 缓存。
 
 纯 stdlib 实现（urllib.request + http.cookiejar），零外部依赖。
+架构深化（候选 1）：响应解析已拆至 kkrb_parsing（纯函数，独立单测），
+数据模型与异常在 kkrb_models（零依赖叶子）；本模块协议表面收敛为
+`fetch_*` + `reset`——CSRF 握手、cookie 会话、缓存细节全部隐藏。
 """
 
 from __future__ import annotations
@@ -17,10 +20,13 @@ import logging
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
 from http.cookiejar import CookieJar
 from typing import Any
 from urllib.request import HTTPCookieProcessor, Request, build_opener
+
+# 重新导出（协议表面保持）：模型/异常定义在 kkrb_models 叶子
+from kkrb_models import AmmoPackageItem, CraftingProduct, KkrbError  # noqa: F401
+from kkrb_parsing import parse_ammo_package_response, parse_ov_response
 
 logger = logging.getLogger(__name__)
 
@@ -31,45 +37,11 @@ _TIMEOUT = 10
 _CACHE_TTL = 60  # 秒；缓存有效期内不重复请求
 
 
-# ── 数据模型 ────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class CraftingProduct:
-    """制造产物推荐数据。"""
-
-    station: str          # 台位名（技术中心/工作台/制药台/防具台）
-    product: str          # 产物名
-    profit: int           # 单件总利润（当前售价 - 材料成本）
-    ideal_price: int      # 当前单个售价
-    sell_time: str        # 建议出售时段（如「晚上8点」「上午6点」）
-
-
-@dataclass(frozen=True)
-class AmmoPackageItem:
-    """子弹自选包兑换利润数据。"""
-
-    package_name: str        # 包名（如「3级子弹自选包」）
-    item_name: str           # 子弹名（如「5.7x28mm L191」）
-    item_grade: int          # 等级（3/4/5）
-    item_count: int          # 数量
-    single_price: int        # 单个售价
-    total_price: int         # 总价
-    profit: int              # 利润
-
-
-# ── 自定义异常 ──────────────────────────────────────────
-
-
-class KkrbError(Exception):
-    """kkrb.net API 请求失败。"""
-
-
 # ── 客户端 ──────────────────────────────────────────────
 
 
 class KkrbClient:
-    """kkrb.net API 客户端。
+    """kkrb.net API 客户端（会话 + 传输 + 缓存）。
 
     用法：
         client = KkrbClient()
@@ -94,7 +66,7 @@ class KkrbClient:
             KkrbError: 网络请求失败或数据解析失败。
         """
         data = self._post_json(_OV_ENDPOINT)
-        return self._parse_ov_response(data)
+        return parse_ov_response(data)
 
     def fetch_ammo_package_data(self) -> list[AmmoPackageItem]:
         """获取子弹自选包兑换利润数据。
@@ -106,7 +78,7 @@ class KkrbClient:
             KkrbError: 网络请求失败或数据解析失败。
         """
         data = self._post_json(_AMMO_PACKAGE_ENDPOINT)
-        return self._parse_ammo_package_response(data)
+        return parse_ammo_package_response(data)
 
     # ── CSRF 管理 ───────────────────────────────────────
 
@@ -178,12 +150,12 @@ class KkrbClient:
             logger.error(msg)
             raise KkrbError(msg) from e
 
-    # ── 解析 ────────────────────────────────────────────
+    # ── 辅助 ────────────────────────────────────────────
 
     @staticmethod
     def _parse_json(body: str) -> Any:
         """安全解析 JSON，处理 kkrb.net 的 BOM 和异常格式。"""
-        text = body.lstrip("﻿").strip()
+        text = body.lstrip("\ufeff").strip()
         if not text:
             raise KkrbError("空响应")
         import json  # noqa: PLC0415
@@ -194,117 +166,6 @@ class KkrbClient:
             raise KkrbError(f"JSON 解析失败: {e}") from e
 
     @staticmethod
-    def _parse_ammo_package_response(data: Any) -> list[AmmoPackageItem]:
-        """解析 getAmmoPackageData 响应。
-
-        实际格式：
-        {
-            "code": 1,
-            "data": {
-                "cn": [...],
-                "en": [...],
-                "version": "..."
-            }
-        }
-
-        每个条目格式：
-        {
-            "packageName": "3级子弹自选包",
-            "itemName": "5.7x28mm L191",
-            "itemGrade": 3,
-            "itemCount": 200,
-            "singlePrice": 555,
-            "totalPrice": 111000,
-            "profit": 98790
-        }
-        """
-        if not isinstance(data, dict):
-            raise KkrbError(
-                f"弹药包数据格式异常: 期望 dict，got {type(data).__name__}"
-            )
-
-        raw = data.get("data", {})
-        if not isinstance(raw, dict):
-            return []
-
-        items: list[AmmoPackageItem] = []
-        for region in ("cn",):
-            region_data = raw.get(region, [])
-            if not isinstance(region_data, list):
-                continue
-            for entry in region_data:
-                if not isinstance(entry, dict):
-                    continue
-                items.append(
-                    AmmoPackageItem(
-                        package_name=str(entry.get("packageName", "")),
-                        item_name=str(entry.get("itemName", "")),
-                        item_grade=_int_or_zero(entry.get("itemGrade")),
-                        item_count=_int_or_zero(entry.get("itemCount")),
-                        single_price=_int_or_zero(entry.get("singlePrice")),
-                        total_price=_int_or_zero(entry.get("totalPrice")),
-                        profit=_int_or_zero(entry.get("profit")),
-                    )
-                )
-
-        # 按利润降序排列
-        items.sort(key=lambda p: p.profit, reverse=True)
-        return items
-
-    @staticmethod
-    def _parse_ov_response(data: Any) -> list[CraftingProduct]:
-        """解析 getOVData 响应。
-
-        实际格式：
-        {
-            "code": 1,
-            "data": {
-                "spData": {
-                    "tech":     { "placeName": "技术中心", "itemName": "...",
-                                  "profit": 24669, "singlePrice": 39077,
-                                  "yesterdayHighestTime": "晚上8点",
-                                  "totalMaterialLists": [...], "totalMaterialValue": 10109 },
-                    "workbench": { ... },
-                    "pharmacy":  { ... },
-                    "armory":    { ... },
-                }
-            }
-        }
-        """
-        if not isinstance(data, dict):
-            raise KkrbError(f"OV 数据格式异常: 期望 dict，got {type(data).__name__}")
-
-        raw = data.get("data", {})
-        if isinstance(raw, dict):
-            raw = raw.get("spData", {})
-
-        if not isinstance(raw, dict):
-            return []
-
-        products: list[CraftingProduct] = []
-        for _place_key, station in raw.items():
-            if not isinstance(station, dict):
-                continue
-
-            products.append(
-                CraftingProduct(
-                    station=str(station.get("placeName", _place_key)),
-                    product=str(station.get("itemName", "")),
-                    # 总利润（当前售价 - 材料成本）
-                    profit=_int_or_zero(station.get("profit")),
-                    # 当前单个售价
-                    ideal_price=_int_or_zero(station.get("singlePrice")),
-                    # 昨日最高价出现时段
-                    sell_time=str(station.get("yesterdayHighestTime", "")),
-                )
-            )
-
-        products.sort(key=lambda p: p.profit, reverse=True)
-        return products
-
-    # ── 辅助 ────────────────────────────────────────────
-
-    @staticmethod
     def _user_agent() -> str:
         return "ProfitCalculator/1.0"
 
@@ -313,13 +174,3 @@ class KkrbClient:
         self._csrf_token = None
         self._cookie_jar.clear()
         self._cache.clear()
-
-
-def _int_or_zero(value: Any) -> int:
-    """安全转为 int，失败返回 0。"""
-    if value is None:
-        return 0
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return 0
