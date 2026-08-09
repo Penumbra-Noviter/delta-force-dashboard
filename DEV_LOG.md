@@ -6,7 +6,9 @@
 
 ---
 
-## 滚动摘要（2026-08-08）
+## 滚动摘要（2026-08-09）
+
+- **kkrb 传输层补测（08-09）**：`tests/test_kkrb_client.py` FakeOpener 脚本式注入（替换 `client._opener` seam）——CSRF 握手降级/重试、TTL 缓存命中/过期、错误路径、reset、端到端传输 22 用例，模块覆盖率 36%→100%（总体 93%）；`_user_agent` 更名残留收尾；测试 357→**379**
 
 - **评审修复（08-08，多维度评审 → 子代理按优先级实现）**：P0 `FetchWorker.shutdown()` 关闭逃生舱（请求在途关窗不再 "QThread: Destroyed while thread is still running" abort，atexit 兜底 join）；P1 `app/fetch_page_base.py` 共享基类（crafting/exchange 双页重复提炼，210→122 / 256→178 行，`_error` 死状态删除）+ `preload()` 公开 seam（消除 main_window 四处私有穿透与 lambda 吞错）；P1 硬编码颜色收敛 theme.py（新增 BTN_HOVER_FG/BADGE_FG/NAV_HOVER_BG/OVERLAY_BG/PACKAGE_COLOR_0~2 七键，dark NAV_HOVER_BG 灰 overlay→半透明白，其余逐字保持）；P2 死代码清理（calculator 不可达 return + calendar、config SQLITE_FILE）+ 更名收尾（日志文件名 `profit_calculator.log` → `delta_force_dashboard.log`，推翻「仅改身份标识」中日志名保留项——单实例锁/user-agent 仍保留）；doc_sync 新增 `tests_total` 机械标记（测试数入 pre-commit 保护）；测试数 6 处文档 + memory 统一 305
 - **性能优化（08-07 `ded4a5d` + 08-08 `762ef27`）**：crafting/exchange 页同步 HTTP 请求改 `FetchWorker`（QThread）后台执行，UI 不再阻塞（最坏 30s 冻结→0）；`_DaySubTable.draw` 改 get-or-create 复用 widget（30 天视图每次刷新从创建 ~300 个 Qt 对象降为 0）；calculator `_sorted_dates` 缓存（recent_records/summary/export_csv O(n log n)→O(1)）；`refresh_theme()` 解耦主题切换与数据刷新；kkrb_client 60s TTL 缓存；ProfitPage 制造产物预加载
