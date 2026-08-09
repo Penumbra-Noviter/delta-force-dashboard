@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 
 from app.theme import get_color
 from app.ui_text import EMOJI
+from app.motion import animate_property
 from formatting import format_compact, format_short_date
 
 
@@ -160,6 +161,7 @@ class ChartWidget(QWidget):
             # O-06：数据过少时叠加提示，避免误读为图表损坏
             if 2 <= n <= 3:
                 self._show_sparse_hint()
+            self._play_draw_anim()
         else:
             self._clear_all()
             self._show_placeholder(n)
@@ -256,6 +258,25 @@ class ChartWidget(QWidget):
         self._plot_widget.update()
 
     # ─── 内部方法 ────────────────────────────────────────
+
+    # U-06：曲线绘制揭示动画——opacity 0→1（250ms），feedback-only；
+    # pyqtgraph 曲线 opacity 非 QObject property，走 QVariantAnimation 逐帧 setOpacity
+    _DRAW_ANIM_MS = 250
+
+    def _play_draw_anim(self) -> None:
+        if self._warehouse_curve is None or self._cash_curve is None:
+            return
+
+        def set_opacity(v: float) -> None:
+            if self._warehouse_curve is not None:
+                self._warehouse_curve.setOpacity(v)
+            if self._cash_curve is not None:
+                self._cash_curve.setOpacity(v)
+
+        set_opacity(0.0)
+        self._draw_anim = animate_property(
+            self, set_opacity, duration_ms=self._DRAW_ANIM_MS
+        )
 
     def _create(self, x, warehouse_vals, cash_vals, dates) -> None:
         """从零创建 PlotWidget + 双 ViewBox + 全部子元素。"""

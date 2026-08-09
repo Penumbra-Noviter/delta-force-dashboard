@@ -216,6 +216,42 @@ def test_u05_emoji_single_source(sample_window):
         assert not literal.search(text), f"{py.name} 含散落 emoji 字面量"
 
 
+def test_u06_motion_feedback(sample_window, monkeypatch):
+    """U-06：切页淡入 + 曲线绘制动画触发；动画结束 effect 移除（不常驻）。"""
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QFrame
+
+    from app.motion import fade_in_widget
+    from kkrb_client import KkrbClient
+
+    # 切页会触发利润页懒加载 → 屏蔽真实网络请求
+    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
+    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
+
+    win = sample_window
+    win.show()
+    QTest.qWait(50)
+
+    # 页面切换 → 淡入动画触发（对象挂 self 防 GC）
+    win.sidebar.set_current_index(1)
+    assert win._page_fade_anim is not None
+    QTest.qWait(250)  # 等动画完成
+
+    # 曲线绘制动画：draw 后启动，完成后 opacity 归 1
+    records = win.logic.recent_records(7)
+    win.chart.draw(records)
+    assert win.chart._draw_anim is not None
+    QTest.qWait(400)
+    if win.chart._warehouse_curve is not None:
+        assert win.chart._warehouse_curve.opacity() == 1.0
+
+    # fade_in_widget 契约：结束后移除 QGraphicsOpacityEffect
+    box = QFrame()
+    fade_in_widget(box, duration_ms=50)
+    QTest.qWait(120)
+    assert box.graphicsEffect() is None
+
+
 def test_u07_ui_minor_fixes(sample_window):
     """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
     from PySide6.QtCore import Qt

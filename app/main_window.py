@@ -50,6 +50,7 @@ from app.profit_page import ProfitPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
 from app.ui_text import EMOJI
+from app.motion import fade_in_widget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -270,8 +271,19 @@ class MainWindow(QMainWindow):
 
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
+        self._stack.currentChanged.connect(self._on_page_changed)
 
         self._update_theme_btn_text()
+
+    # U-06：页面切换 120ms 淡入（feedback-only；动画对象挂 self 防 GC）
+    _PAGE_FADE_MS = 120
+
+    def _on_page_changed(self, index: int) -> None:
+        page = self._stack.widget(index)
+        if page is not None:
+            self._page_fade_anim = fade_in_widget(
+                page, duration_ms=self._PAGE_FADE_MS
+            )
 
     def _build_card(self) -> QFrame:
         """构建带阴影的卡片 QFrame（12px 圆角 + 微阴影）。"""

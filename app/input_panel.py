@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.theme import button_style, get_color
+from app.motion import fade_in_widget
 from calculator import ProfitCalculatorLogic
 from formatting import (
     format_input_value,
@@ -347,6 +348,11 @@ class InputPanel(QWidget):
 
     def set_saved_indicator(self, text: str) -> None:
         self.saved_indicator.setText(text)
+        # U-06：保存/提示出现时 180ms 淡入（feedback-only，动画对象挂 self）
+        if text:
+            self._saved_indicator_anim = fade_in_widget(
+                self.saved_indicator, duration_ms=180
+            )
 
     def focus_cash(self) -> None:
         self.cash_entry.setFocus()
