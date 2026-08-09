@@ -319,26 +319,48 @@ def test_exchange_page_renders_best_per_package(qapp) -> None:
 
 
 def test_exchange_colors_resolve_from_theme(qapp) -> None:
-    """兑换页标签色收敛：7 种包全走主题键（CHART_SERIES_*/PACKAGE_COLOR_*）；分隔线用 SEPARATOR。"""
+    """兑换页标签色收敛：7 种包全走单一装饰键 PACKAGE_COLOR_0~6；分隔线用 SEPARATOR。"""
     from app.exchange_page import ExchangePage
     from app.theme import get_color
 
     page = ExchangePage()
 
-    # 前 4 张卡按 _PACKAGE_CONFIG 映射到 CHART_SERIES_2/1/3/0（亮色下与原色板一致）
-    keys = ("CHART_SERIES_2", "CHART_SERIES_1", "CHART_SERIES_3", "CHART_SERIES_0")
+    # 7 张卡按 _PACKAGE_CONFIG 映射到 PACKAGE_COLOR_2/1/3/0/4/5/6（U-03 键名如实，
+    # 色相语义沿用历史：3 级青绿 / 4 级金 / 5 级红 / 通行证基础蓝紫 / 通行证高级紫 / 物流橙褐 / 物流粉红）
+    keys = (
+        "PACKAGE_COLOR_2",
+        "PACKAGE_COLOR_1",
+        "PACKAGE_COLOR_3",
+        "PACKAGE_COLOR_0",
+        "PACKAGE_COLOR_4",
+        "PACKAGE_COLOR_5",
+        "PACKAGE_COLOR_6",
+    )
     for i, key in enumerate(keys):
-        label = page._cards[i].layout().itemAt(0).widget()
-        assert get_color(key) in label.styleSheet()
-
-    # 其余 3 张卡：PACKAGE_COLOR_0~2 主题键（双主题同值，与原 hex 逐字一致）
-    for i, key in enumerate(("PACKAGE_COLOR_0", "PACKAGE_COLOR_1", "PACKAGE_COLOR_2"), start=4):
         label = page._cards[i].layout().itemAt(0).widget()
         assert get_color(key) in label.styleSheet()
 
     # 分隔线：SEPARATOR 主题色（两主题都有定义）
     sep = page._cards[0].layout().itemAt(3).widget()
     assert get_color("SEPARATOR") in sep.styleSheet()
+
+
+def test_exchange_labels_use_resolved_hex(qapp) -> None:
+    """Falsify：标签内联色必须是真实 hex，而非键名/空串（防 get_color 静默漏改）。
+
+    旧实现 `get_color(color) or color` 对缺失键回退键名字符串（无效色），
+    且 `"" in styleSheet` 恒真会让子串断言静默通过——hex 正则直接证伪两条路径。
+    """
+    import re
+
+    from app.exchange_page import ExchangePage
+
+    page = ExchangePage()
+    for card in page._cards:
+        label = card.layout().itemAt(0).widget()
+        assert re.search(r"#[0-9A-Fa-f]{6}", label.styleSheet()), (
+            f"标签内联色非有效 hex：{label.styleSheet()!r}"
+        )
 
 
 def test_pages_have_no_dead_error_state(qapp) -> None:
