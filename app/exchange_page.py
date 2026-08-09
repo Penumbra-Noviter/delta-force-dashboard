@@ -31,18 +31,19 @@ class _PackageConfig(NamedTuple):
     """一个子弹自选包类型的显示配置。"""
     display_name: str   # 包全名（在 API 中用作 key）
     short_name: str     # 卡片上显示的短标签
-    color: str          # 标签颜色：主题色键（CHART_SERIES_*/PACKAGE_COLOR_*）或 hex 回退色
+    color: str          # 标签颜色：装饰色主题键（PACKAGE_COLOR_0~6，运行期解析）
 
-# 前 4 种与主题 CHART_SERIES_0~3 对齐（亮色下与原色板逐值一致），随主题联动；
-# 其余 3 种走 PACKAGE_COLOR_0~2（双主题同值，与历史 hex 逐字一致），随主题联动。
+# 7 种包全部走单一装饰键 PACKAGE_COLOR_0~6（U-03 键名如实：无 CHART_SERIES_* 双套键）；
+# 色值随主题联动。无 hex 回退路径——get_color 缺失键返回 ""，键完整性由
+# tests/test_theme_roles.py 在双主题下断言（防漏改静默失效）。
 _PACKAGE_CONFIG: list[_PackageConfig] = [
-    _PackageConfig("3级子弹自选包", "3级子弹", "CHART_SERIES_2"),
-    _PackageConfig("4级子弹自选包", "4级子弹", "CHART_SERIES_1"),
-    _PackageConfig("5级子弹自选包", "5级子弹", "CHART_SERIES_3"),
-    _PackageConfig("通行证基础子弹自选包", "通行证基础", "CHART_SERIES_0"),
-    _PackageConfig("通行证高级子弹自选包", "通行证高级", "PACKAGE_COLOR_0"),
-    _PackageConfig("进阶物流子弹自选包", "进阶物流", "PACKAGE_COLOR_1"),
-    _PackageConfig("特级物流子弹自选包", "特级物流", "PACKAGE_COLOR_2"),
+    _PackageConfig("3级子弹自选包", "3级子弹", "PACKAGE_COLOR_2"),
+    _PackageConfig("4级子弹自选包", "4级子弹", "PACKAGE_COLOR_1"),
+    _PackageConfig("5级子弹自选包", "5级子弹", "PACKAGE_COLOR_3"),
+    _PackageConfig("通行证基础子弹自选包", "通行证基础", "PACKAGE_COLOR_0"),
+    _PackageConfig("通行证高级子弹自选包", "通行证高级", "PACKAGE_COLOR_4"),
+    _PackageConfig("进阶物流子弹自选包", "进阶物流", "PACKAGE_COLOR_5"),
+    _PackageConfig("特级物流子弹自选包", "特级物流", "PACKAGE_COLOR_6"),
 ]
 
 # 每行卡片数
@@ -50,8 +51,12 @@ _COLS = 4
 
 
 def _resolve_color(color: str) -> str:
-    """主题色键 → 当前主题色值；普通 hex 颜色原样返回（运行期解析，非 import 期）。"""
-    return get_color(color) or color
+    """主题色键 → 当前主题色值（运行期解析，非 import 期）。
+
+    无 hex 回退路径：get_color 对缺失键返回 ""（无效色），
+    全部包色键由 tests/test_theme_roles.py 断言双主题存在，防漏改静默失效。
+    """
+    return get_color(color)
 
 
 class ExchangePage(FetchPageBase):

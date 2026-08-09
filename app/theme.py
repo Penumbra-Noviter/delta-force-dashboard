@@ -93,15 +93,18 @@ THEMES = {
         "ERROR_BG": "#fef2f2",
         "ERROR_FG": "#C0453C",
         "BADGE_FG": "#ffffff",         # 盈亏标签文字（双主题同值，保持既有白字）
-        # 新增：图表序列色（扩展用）
-        "CHART_SERIES_0": "#7B8CFF",
-        "CHART_SERIES_1": "#C08A3E",
-        "CHART_SERIES_2": "#6BA08A",
-        "CHART_SERIES_3": "#D46A6A",
-        # 新增：兑换页包标签色（3 种无图表序列对应，双主题同值保持视觉不变）
-        "PACKAGE_COLOR_0": "#A58BFF",
-        "PACKAGE_COLOR_1": "#E8A33D",
-        "PACKAGE_COLOR_2": "#E8833D",
+        # 新增：装饰色（兑换页 7 包标签，U-03 色彩角色系统化）
+        # 角色规则：装饰色与语义色（FG_POS/FG_NEG）显式分离——包标签只做分类标识，
+        # 涨跌色只做数值语义，二者不共用取值（dark 下曾与语义色完全同值，已修）。
+        # 明度带：light 深墨带 L∈[0.20,0.32]（对白卡片 AA 4.5:1 的深字底线）；
+        # 固定键清单 PACKAGE_COLOR_0~6，双主题各自定义取值（不抽常亮色，防 Locality 坑）。
+        "PACKAGE_COLOR_0": "#10048F",   # 蓝紫（通行证基础）
+        "PACKAGE_COLOR_1": "#8A700A",   # 暗金（4 级）
+        "PACKAGE_COLOR_2": "#0A715C",   # 青绿（3 级）
+        "PACKAGE_COLOR_3": "#960803",   # 深红（5 级）
+        "PACKAGE_COLOR_4": "#630A71",   # 深紫（通行证高级）
+        "PACKAGE_COLOR_5": "#5C3C14",   # 橙褐（进阶物流）
+        "PACKAGE_COLOR_6": "#6A0C38",   # 莓红（特级物流）
         # 新增：滚动条
         "SCROLLBAR_BG": "#f3f5f1",
         "SCROLLBAR_HANDLE": "#d6d3cc",
@@ -182,14 +185,15 @@ THEMES = {
         "ERROR_BG": "#1f1418",
         "ERROR_FG": "#FF5F56",
         "BADGE_FG": "#ffffff",
-        # 新增：图表序列色（扩展用）
-        "CHART_SERIES_0": "#7B8CFF",
-        "CHART_SERIES_1": "#C08A3E",
-        "CHART_SERIES_2": "#3FCB86",
-        "CHART_SERIES_3": "#FF5F56",
-        "PACKAGE_COLOR_0": "#A58BFF",
-        "PACKAGE_COLOR_1": "#E8A33D",
-        "PACKAGE_COLOR_2": "#E8833D",
+        # 新增：装饰色（兑换页 7 包标签，U-03；角色规则同 light 主题注释）
+        # 明度带：dark 亮彩带 L∈[0.72,0.84]（与涨跌语义色 FG_POS L≈0.52 / FG_NEG L≈0.67 拉开 ≥0.05）
+        "PACKAGE_COLOR_0": "#BFA9F4",   # 蓝紫（通行证基础）
+        "PACKAGE_COLOR_1": "#FAF080",   # 亮金（4 级）
+        "PACKAGE_COLOR_2": "#ADEBE6",   # 青绿（3 级）
+        "PACKAGE_COLOR_3": "#FB8387",   # 珊瑚红（5 级）
+        "PACKAGE_COLOR_4": "#EC89F5",   # 亮紫（通行证高级）
+        "PACKAGE_COLOR_5": "#F7CF97",   # 蜜桃（进阶物流）
+        "PACKAGE_COLOR_6": "#F3A5C5",   # 粉红（特级物流）
         # 新增：滚动条
         "SCROLLBAR_BG": "#1a1d27",
         "SCROLLBAR_HANDLE": "rgba(255,255,255,.12)",
