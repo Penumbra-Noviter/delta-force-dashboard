@@ -340,6 +340,12 @@ def generate_qss(theme_name: str) -> str:
 /* ═══════════════════════════════════════════
    全局
    ═══════════════════════════════════════════ */
+/* U-02 排版刻度（全 app 统一）：
+   - display 18-22px：应用名 18 / KPI 磁贴数字 22（内联样式）
+   - section 15-16px：页面标题 16 / 卡片主角名 15-16
+   - body 12-13px：正文 / 表格 / 常规控件
+   - meta 10-11px：提示 / 状态 / 按钮次级
+   按钮仅两级：primary 13px/600（saveBtn/queryBtn）、secondary 11px/500（其余） */
 QMainWindow {{
     background-color: {bg};
 }}
@@ -357,6 +363,11 @@ QLabel {{
 QLabel#titleLabel {{
     color: {table_text_bold};
     font-size: 18px;
+    font-weight: 700;
+}}
+QLabel#pageTitleLabel {{
+    color: {table_text_bold};
+    font-size: 16px;
     font-weight: 700;
 }}
 QLabel#dateLabel {{
@@ -403,7 +414,7 @@ QLabel#schemeSummary {{
     color: {table_text_bold};
 }}
 QLabel#tierLabel {{
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: {fg_today};
     padding: 4px 0;
@@ -446,7 +457,7 @@ QPushButton {{
     border: none;
     border-radius: 8px;
     padding: 6px 20px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
 }}
 QPushButton:focus {{
@@ -496,7 +507,7 @@ QPushButton#themeBtn, QPushButton#pinBtn, QPushButton#exportBtn {{
     background-color: {muted_bg};
     color: {fg_muted};
     padding: 6px 14px;
-    font-size: 10px;
+    font-size: 11px;
     border-radius: 8px;
 }}
 QPushButton#themeBtn:hover, QPushButton#pinBtn:hover, QPushButton#exportBtn:hover {{
@@ -511,7 +522,7 @@ QPushButton#refreshBtn {{
     background-color: {muted_bg};
     color: {fg_label};
     padding: 6px 18px;
-    font-size: 12px;
+    font-size: 11px;
     border-radius: 8px;
 }}
 QPushButton#refreshBtn:hover {{
@@ -555,7 +566,7 @@ QLabel#exchangeTotal {{
     font-size: 11px;
 }}
 QLabel#exchangePackageLabel {{
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
 }}
 QLabel#exchangeGradeAndCount {{

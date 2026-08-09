@@ -88,7 +88,7 @@ class PnLBadge(QWidget):
             color: {fg_color};
             border-radius: 12px;
             padding: 3px 12px;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 600;
         """
         )
@@ -145,7 +145,7 @@ class _ActionButtons(QWidget):
                 border: 1px solid {border_def};
                 border-radius: 6px;
                 padding: 2px 10px;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: 600;
             }}
             QPushButton:hover {{
@@ -161,7 +161,7 @@ class _ActionButtons(QWidget):
                 border: 1px solid {danger_border};
                 border-radius: 6px;
                 padding: 2px 10px;
-                font-size: 10px;
+                font-size: 11px;
                 font-weight: 600;
             }}
             QPushButton:hover {{
@@ -198,7 +198,9 @@ class _DaySubTable(QTableWidget):
         )
         # 横向滚动条：空间不足时自动出现（兜底，永不截断）
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # U-02：图表弹性分配翻转后表格不再独占窗口空间，
+        # 30 天视图超高时改内部滚动兜底（原 AlwaysOff 会裁剪行）
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self.verticalHeader().hide()
         self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

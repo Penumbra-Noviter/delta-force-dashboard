@@ -713,7 +713,9 @@ class MainWindow(QMainWindow):
             tcl = QVBoxLayout(table_card)
             tcl.setContentsMargins(12, 10, 12, 10)
             tcl.addWidget(table)
-            root_layout.addWidget(table_card, 1)
+            # U-02：表格不再独占弹性（原 stretch=1 与图表 0 互换），
+            # 超高时内部滚动兜底（_DaySubTable vertical AsNeeded）
+            root_layout.addWidget(table_card, 0)
             root_layout.addSpacing(8)
 
         def connect_table(mw):
@@ -732,9 +734,11 @@ class MainWindow(QMainWindow):
             ccl = QVBoxLayout(chart_card)
             ccl.setContentsMargins(12, 10, 12, 10)
             ccl.addWidget(chart)
-            chart.setMinimumHeight(140)
-            chart.setMaximumHeight(220)
-            root_layout.addWidget(chart_card, 0)
+            # U-02：趋势图是核心「读」对象——min 200 保底、随窗口增长
+            # （H-01 的 140-220 封顶让图表拿不到窗口增长空间）；
+            # 表格超高时靠 _DaySubTable 内部滚动兜底（vertical AsNeeded）。
+            chart.setMinimumHeight(200)
+            root_layout.addWidget(chart_card, 1)
             root_layout.addSpacing(8)
 
         registry.register(AppWidget(chart, setup_chart, None))

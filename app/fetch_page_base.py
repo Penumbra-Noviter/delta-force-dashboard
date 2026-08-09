@@ -87,7 +87,8 @@ class FetchPageBase(QWidget):
         title_layout.setContentsMargins(0, 0, 0, 0)
 
         title = QLabel(self._title)
-        title.setObjectName("titleLabel")
+        # U-02：页面标题与应用名（titleLabel 18px）分层——页面标题 16px
+        title.setObjectName("pageTitleLabel")
         title_layout.addWidget(title)
 
         title_layout.addStretch()

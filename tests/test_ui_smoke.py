@@ -151,6 +151,30 @@ def test_kpi_tile_splits_caption_and_value(sample_window):
     assert "font-size: 16px" in none_style
 
 
+def test_u02_type_scale(sample_window):
+    """U-02：按钮两级（primary 13 / secondary 11）、页面标题分层、图表弹性翻转。"""
+    from app.theme import generate_qss
+
+    win = sample_window
+    qss = generate_qss("light")
+
+    # 按钮两级：全局默认（secondary）11px；primary 13px/600（saveBtn/queryBtn）
+    assert "font-size: 11px" in qss
+    assert "font-size: 13px" in qss
+    btn_block = qss.split(
+        "QPushButton#themeBtn, QPushButton#pinBtn, QPushButton#exportBtn"
+    )[1][:400]
+    assert "font-size: 11px" in btn_block  # 底部三按钮不再 10px 游离档
+
+    # 页面标题独立档位（16px），与应用名 titleLabel（18px）分层
+    assert "QLabel#pageTitleLabel" in qss
+    assert "font-size: 16px" in qss
+
+    # 图表弹性翻转：min 200 且无 220 封顶（窗口拉高图表增长）
+    assert win.chart.minimumHeight() == 200
+    assert win.chart.maximumHeight() > 220
+
+
 def test_u07_ui_minor_fixes(sample_window):
     """U-07 小修断言：日期对齐、状态 pill、按钮焦点 outline、QStatusBar 死样式删除。"""
     from PySide6.QtCore import Qt

@@ -63,7 +63,8 @@ class CraftingPage(FetchPageBase):
 
         product = QLabel("暂无数据")
         product.setObjectName("craftProduct")
-        product.setStyleSheet("font-size: 18px; font-weight: bold;")
+        # U-02：卡片主角名归 section 档（原 18px 越过页面标题 16px 层级）
+        product.setStyleSheet("font-size: 16px; font-weight: bold;")
         cl.addWidget(product)
 
         profit = QLabel("")
