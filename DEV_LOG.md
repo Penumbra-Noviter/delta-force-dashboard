@@ -8,6 +8,8 @@
 
 ## 滚动摘要（2026-08-09）
 
+- **U-03 色彩角色系统化（08-09，kickoff 全流程）**：7 包色收敛单一装饰键 `PACKAGE_COLOR_0~6`（删 CHART_SERIES_*/PACKAGE_COLOR_* 双套键）+ 亮暗明度带量化（light L 0.20-0.32 / dark L 0.72-0.84，S≥0.55，两两 ΔE76≥25）+ 装饰≠语义（dark 曾与 FG_POS/FG_NEG 完全同值已修）；`tests/test_theme_roles.py` 8 机器断言（目检降级）；code-review 三轴 Falsify 抓到主题切换包标签色残留（ExchangePage.apply_theme 修复）；**活跃表清零——全部工单完成**；测试 379→**391**，覆盖率 92%
+
 - **kkrb 传输层补测（08-09）**：`tests/test_kkrb_client.py` FakeOpener 脚本式注入（替换 `client._opener` seam）——CSRF 握手降级/重试、TTL 缓存命中/过期、错误路径、reset、端到端传输 22 用例，模块覆盖率 36%→100%（总体 93%）；`_user_agent` 更名残留收尾；测试 357→**379**
 
 - **评审修复（08-08，多维度评审 → 子代理按优先级实现）**：P0 `FetchWorker.shutdown()` 关闭逃生舱（请求在途关窗不再 "QThread: Destroyed while thread is still running" abort，atexit 兜底 join）；P1 `app/fetch_page_base.py` 共享基类（crafting/exchange 双页重复提炼，210→122 / 256→178 行，`_error` 死状态删除）+ `preload()` 公开 seam（消除 main_window 四处私有穿透与 lambda 吞错）；P1 硬编码颜色收敛 theme.py（新增 BTN_HOVER_FG/BADGE_FG/NAV_HOVER_BG/OVERLAY_BG/PACKAGE_COLOR_0~2 七键，dark NAV_HOVER_BG 灰 overlay→半透明白，其余逐字保持）；P2 死代码清理（calculator 不可达 return + calendar、config SQLITE_FILE）+ 更名收尾（日志文件名 `profit_calculator.log` → `delta_force_dashboard.log`，推翻「仅改身份标识」中日志名保留项——单实例锁/user-agent 仍保留）；doc_sync 新增 `tests_total` 机械标记（测试数入 pre-commit 保护）；测试数 6 处文档 + memory 统一 305
@@ -35,6 +37,16 @@
 ---
 
 ## 日志正文
+
+### 2026-08-09 | 实现 | U-03 色彩角色系统化（kickoff 全流程：Implement + code-review 三轴，391/391）
+- **键收敛**：7 包色收敛单一装饰键 `PACKAGE_COLOR_0~6`（删 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；CHART_SERIES 键名撒谎——只服务兑换页包色、chart_widget 不引用）；亮暗同值键不抽常亮色（保留双主题定义防 Locality 坑）
+- **色板重调**：**dark 曾 3 级包标签=涨色 #3FCB86、5 级包标签=亏色 #FF5F56（与 FG_POS/FG_NEG 完全同值）**——新色板 dark 亮彩带 L∈[0.72,0.84] 整体避让 FG_NEG（L≈0.67）、light 深墨带 L∈[0.20,0.32] 保 AA 4.5:1；S≥0.55、两两 ΔE76≥25；色相语义沿用（3 级青绿/4 级金/5 级红/通行证基础蓝紫/高级紫/物流橙褐/粉红——特级物流橙红→粉红为满足 ΔE 下限漂移）
+- **谎言修正**：exchange_page.py:34「hex 回退色」注释与实现不符——`get_color` 缺失键返回 `""`，旧 `or color` 回退键名字符串=无效色，不存在 hex 回退路径；`_resolve_color` 死回退删除
+- **机器证伪验收**：`tests/test_theme_roles.py`（215 行）8 断言全过——键名如实/键引用完整/装饰≠语义（ΔL≥0.05）/明度带/两两 ΔE/AA 4.5:1/6 位 hex 格式；目检降级为辅助（U-09 前科）
+- **code-review 三轴**（Standards + Spec + Falsify 并行）：Falsify 抓到真缺陷——**主题切换后包标签色残留**：改动前双主题同值潜伏（exchange_page/fetch_page_base 无 apply_theme，标签色构建期冻结），改动后亮暗分离 → 亮→暗切换残留 light 深墨色于 dark 卡面（对比度 1.26~3.85:1 vs 正确 7.6~15.6:1），改动放大为可见缺陷；修复：`ExchangePage.apply_theme()` 运行期重解析 + 挂入 `main_window.refresh_theme`（增量不重建），Falsify 红验证（摘接线→集成测试实红→恢复全绿）
+- **审查另修**：test_theme_roles 主题状态泄漏（循环后 `set_theme("dark")` 不恢复，全绿靠字母序侥幸——theme_guard fixture 保存/恢复，反序跑验证）；6 位 hex 格式断言（8 位静默丢 alpha/rgba 裸崩两路径封死）；test_fetch_pages 注释「沿用历史」表述修正
+- 测试 388→**391**（+8 角色断言 +1 Falsify +2 评审修复 +1 集成）；覆盖率 92%；doc_sync 同步
+- 遗留（非本工单范围）：兑换页分隔线 SEPARATOR 同为构建期样式（主题切换不更新）；crafting_page 无 apply_theme（本次未改其颜色）——均记遗留，建议另开工单
 
 ### 2026-08-09 | 测试 | kkrb_client 传输层补测（V-01 收尾，379/379）
 - **背景**：V-01 拆分后传输层（CSRF 握手 / `_post_json` / TTL 缓存 / 错误路径）覆盖率仅 36%，是测试体系唯一盲区（D-04 教训在传输层未落地）

@@ -12,11 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-09）：U/V/W 系列已归档，仅剩 U-03（色彩角色系统化）待评估。
+> 活跃表（2026-08-09）：U/V/W 系列已归档，当前无活跃工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| U-03 | 色彩角色系统化（不收敛单 accent）：多色保留，但统一明度/饱和度带 + 语义色与装饰色分离 + 兑换页/图表序列共用同一色板定义（去重复键） | 架构（UI） | 🔄 进行中 | 🟡 Worth exploring |
 
 ---
 
@@ -78,13 +77,13 @@
 **评审修复（2026-08-09，code-review）**：包标签色构建期冻结 → `ExchangePage.apply_theme()` 运行期重解析，挂入 `main_window.refresh_theme` 链路（亮暗色板分离后残留即失效）；另修 test_theme_roles 主题状态泄漏、补 6 位 hex 格式断言。
 
 **验收标准**（全部可机器证伪，目检仅辅助）：
-- [ ] 键名如实：7 包色收敛为单一角色命名一套键（如 PACKAGE_COLOR_0~6），删除 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；亮暗同值键**不抽常亮色**（保留双主题定义防 Locality 坑），随主题变化/固定键清单显式化并注释规则
-- [ ] 键引用完整：exchange_page 引用的全部色键在 THEMES 双主题下存在且非空（测试断言，防 `get_color` 静默返回 `""` 漏改不报错）
-- [ ] 装饰 ≠ 语义：双主题下装饰键值 ≠ FG_POS/FG_NEG 值 + HSL 亮度差 ≥ 阈值（**当前 dark 下 CHART_SERIES_2/3 与 FG_POS/FG_NEG 完全同值，必须修**——5 级包标签=亏色、3 级包标签=涨色）
-- [ ] 明度带量化：7 装饰色 HSL 亮度落统一区间、饱和度 ≥ 下限（colorsys 计算断言）
-- [ ] 两两可分辨：同主题内 7 装饰色两两色差 ≥ 阈值（防明度统一后 `#7B8CFF`/`#A58BFF` 色相过近更难分）
-- [ ] 不破坏可读性底线：badge/标签文字对比度维持 U-07 的 AA 4.5:1（浅底深字），明度统一后抽查
-- [ ] 目检降级为辅助：修复前/后截图对比仅作辅助证据，不作为独立验收（U-09 前科：目检已实锤不可靠，QSS 字体族背景问题目检未发现）
+- [x] 键名如实：7 包色收敛为单一角色命名一套键（如 PACKAGE_COLOR_0~6），删除 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；亮暗同值键**不抽常亮色**（保留双主题定义防 Locality 坑），随主题变化/固定键清单显式化并注释规则
+- [x] 键引用完整：exchange_page 引用的全部色键在 THEMES 双主题下存在且非空（测试断言，防 `get_color` 静默返回 `""` 漏改不报错）
+- [x] 装饰 ≠ 语义：双主题下装饰键值 ≠ FG_POS/FG_NEG 值 + HSL 亮度差 ≥ 阈值（**当前 dark 下 CHART_SERIES_2/3 与 FG_POS/FG_NEG 完全同值，必须修**——5 级包标签=亏色、3 级包标签=涨色）
+- [x] 明度带量化：7 装饰色 HSL 亮度落统一区间、饱和度 ≥ 下限（colorsys 计算断言）
+- [x] 两两可分辨：同主题内 7 装饰色两两色差 ≥ 阈值（防明度统一后 `#7B8CFF`/`#A58BFF` 色相过近更难分）
+- [x] 不破坏可读性底线：badge/标签文字对比度维持 U-07 的 AA 4.5:1（浅底深字），明度统一后抽查
+- [x] 目检降级为辅助：修复前/后截图对比仅作辅助证据，不作为独立验收（U-09 前科：目检已实锤不可靠，QSS 字体族背景问题目检未发现）
 
 ---
 
@@ -305,6 +304,7 @@
 | U-09 | 用户实测反馈修复 — ①图表弹性回退：chart 固定小卡片 stretch 0、表格恢复 stretch 1（U-02 翻转挤压表格，用户要求全量展示）②30 天视图全量：行高固定 26px + 视图按钮 28→24 + 卡片边距压缩 ③「今日未录入」pill 亮色不可见 → #F1D9A0/#6E4A08 ④利润页亮色背景纯黑（全局 QWidget 字体族规则致 palette.window 背景）→ profitPage/profitContainer 显式主题 BG ⑤**方案 A 屏幕自适应**：`_window_preset(screen_h)` 纯函数——可用高 ≥1000 → 窗口 1020 + 图表 [160,240]（1080p 图表 +90px），小屏回退 920/[140,150]；两档表格全量参数一致 | 修复（UI） | 2026-08-09 | `a70d594` / `8b4661e` |
 | U-10 | 利润页启动预加载 — `_preload_profit_page` 同时预加载制造产物 + 兑换利润（此前兑换利润等首次点击才拉取 10s HTTP，点击卡顿）；各自后台线程 + kkrb 60s TTL 缓存复用；测试用轮询等待消除 qWait 固定时长与线程调度的竞态（首跑通过次跑失败问题） | 功能（性能） | 2026-08-09 | `eb2e4c7` |
 | U-11 | 崩溃修复（用户实测：点利润→切回→再点利润闪退）— 根因：U-06 切页淡入的 QGraphicsOpacityEffect 挂在 QStackedWidget 页面上，快速 hide/show 触发 Qt 崩溃路径；修复：移除切页淡入动画（保留曲线/保存指示动画）+ `fade_in_widget` 补 dynamic property 悬空指针清理（DeleteWhenStopped 后 QObject* 悬空）+ main.py 崩溃现场捕获（faulthandler crash.log + sys.excepthook + qInstallMessageHandler Qt 钩子）+ 切页 20 次循环回归测试 | 修复（崩溃） | 2026-08-09 | `86b8ae0` |
+| U-03 | 色彩角色系统化（保留多色）— 7 包色收敛单一装饰键 `PACKAGE_COLOR_0~6`（删 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；键名如实——CHART_SERIES 实际只服务兑换页包色，chart_widget 不引用）；亮暗同值键不抽常亮色（保留双主题定义防 Locality）；装饰≠语义（**dark 曾 CHART_SERIES_2/3 与 FG_POS/FG_NEG 完全同值**——5 级包=亏色/3 级包=涨色，已修）；明度带量化（light L∈[0.20,0.32] / dark L∈[0.72,0.84]，S≥0.55，colorsys 断言）；两两 ΔE76≥25 可分辨；AA 4.5:1 对比度底线 + `tests/test_theme_roles.py` 8 机器断言（全可证伪，目检降级）；修正 exchange_page.py:34「hex 回退色」谎言（`get_color` 缺失键返回 `""`，旧 `or color` 回退键名字符串=无效色）+ **评审修复**（code-review 三轴：ExchangePage.apply_theme 主题切换重解析包标签色——改动前双主题同值潜伏、改动后残留对比度 1.26:1 被 Falsify 轴抓到；theme_guard fixture 防主题状态泄漏；6 位 hex 格式断言封 8 位静默丢 alpha/rgba 裸崩） | 架构（UI） | 2026-08-09 | `ff81407`/`99efd87` |
 
 ### M 系列（2026-08-05，修复）
 
