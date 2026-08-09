@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.theme import button_style, get_color
 from app.motion import fade_in_widget
+from app.theme import button_style, get_color
 from calculator import ProfitCalculatorLogic
 from formatting import (
     format_input_value,

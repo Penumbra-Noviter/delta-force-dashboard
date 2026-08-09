@@ -276,6 +276,7 @@
 | U-05 | emoji/图标一致性 — 新增 `app/ui_text.py` EMOJI 单一来源（9 键），4 文件散落字面量清零 + 全局 font-family 补 Segoe UI Emoji | 功能（UI） | 2026-08-09 | `f0741ff` |
 | U-06 | 反馈型动效 — 新增 `app/motion.py`（fade_in_widget/animate_property）：切页 120ms 淡入、曲线 opacity 0→1 揭示 250ms、保存指示 180ms 淡入；hover 过渡因 QSS 无 transition 跳过（DEV_LOG 记取舍） | 功能（UI） | 2026-08-09 | `d430cd7` |
 | U-07 | 交互小修批量 — 可点「重试」label（`_ClickableLabel` + 手型光标）/ QPushButton `:focus` outline 焦点态 / 今日未录入状态 pill（WARNING 系底+边框）/ 日期标签左对齐（消轴线错位）/ QStatusBar 死样式删除 / 中性 badge 浅底深字（MUTED_BG+TEXT_SECONDARY，AA ≥4.5:1） | 修复（UI） | 2026-08-09 | `7d5878c` |
+| U-08 | code-review 评审修复 — 动效全局开关（settings `animations=false`）+ fade_in 竞态防护（stop 旧动画）+ `animate_property` 类型收紧 QObject / exchangePackageLabel 内联 14→15px（U-02 归位失真修复）/ `EMOJI['ok']` 收敛 main_window CSV 提示 + 测试 regex 补 ✓、Path 绝对化 / 曲线动画 250→200ms（feedback-only 上限） | 修复（UI） | 2026-08-09 | `待填` |
 
 ### M 系列（2026-08-05，修复）
 

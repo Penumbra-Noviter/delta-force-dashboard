@@ -33,9 +33,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.motion import animate_property
 from app.theme import get_color
 from app.ui_text import EMOJI
-from app.motion import animate_property
 from formatting import format_compact, format_short_date
 
 
@@ -259,9 +259,9 @@ class ChartWidget(QWidget):
 
     # ─── 内部方法 ────────────────────────────────────────
 
-    # U-06：曲线绘制揭示动画——opacity 0→1（250ms），feedback-only；
+    # U-06：曲线绘制揭示动画——opacity 0→1（200ms，feedback-only 上限）；
     # pyqtgraph 曲线 opacity 非 QObject property，走 QVariantAnimation 逐帧 setOpacity
-    _DRAW_ANIM_MS = 250
+    _DRAW_ANIM_MS = 200
 
     def _play_draw_anim(self) -> None:
         if self._warehouse_curve is None or self._cash_curve is None:

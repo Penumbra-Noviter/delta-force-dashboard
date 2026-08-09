@@ -46,11 +46,18 @@ from app.theme import (
 )
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
+from app.motion import fade_in_widget, set_animations_enabled
 from app.profit_page import ProfitPage
 from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
+from app.theme import (
+    generate_qss,
+    get_color,
+    set_theme,
+    signal_color,
+    summary_style,
+)
 from app.ui_text import EMOJI
-from app.motion import fade_in_widget
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -136,6 +143,8 @@ class MainWindow(QMainWindow):
         self._settings = self.settings_store.load()
         self._theme = self._settings.get("theme", "light")
         set_theme(self._theme)
+        # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
+        set_animations_enabled(self._settings.get("animations", True))
 
         self._setup_window()
         self.sidebar = Sidebar()
@@ -302,7 +311,9 @@ class MainWindow(QMainWindow):
 
     def _update_theme_btn_text(self) -> None:
         self.sidebar.theme_btn.setText(
-            f"{EMOJI['theme_dark']} 暗色" if self._theme == "light" else f"{EMOJI['theme_light']} 亮色"
+            f"{EMOJI['theme_dark']} 暗色"
+            if self._theme == "light"
+            else f"{EMOJI['theme_light']} 亮色"
         )
 
     # ═══════════════════════════════════════════════════════
@@ -574,7 +585,7 @@ class MainWindow(QMainWindow):
             )
             return
         logger.info("CSV 已导出：%s", path)
-        self.input_panel.set_saved_indicator("✓ CSV 已导出")
+        self.input_panel.set_saved_indicator(f"{EMOJI['ok']} CSV 已导出")
 
     # ═══════════════════════════════════════════════════════
     # 刷新展示

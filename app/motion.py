@@ -8,37 +8,67 @@ Qt Widgets 的 QSS 不支持 transition（hover 背景色无法平滑过渡—�
 - 保存指示淡入
 
 规则（product register「feedback-only motion」）：
-- 只做触发后 ≤250ms 的反馈动画，无装饰性循环；
+- 只做触发后 ≤200ms 的反馈动画，无装饰性循环；
 - 动画是纯视觉增强，终态即时可达——中断/关闭动画不影响功能；
 - 动画对象持有引用（防 GC 提前回收），结束后移除 QGraphicsEffect
-  （避免 effect 通道常驻带来的渲染开销）。
+  （避免 effect 通道常驻带来的渲染开销）；
+- 全局开关：settings 键 `animations=false` 时全部动效失效但功能完整
+  （MainWindow 启动时经 set_animations_enabled 注入）。
 """
 
 from __future__ import annotations
 
-__all__ = ["fade_in_widget"]
+__all__ = [
+    "animations_enabled",
+    "animate_property",
+    "fade_in_widget",
+    "set_animations_enabled",
+]
 
 from typing import Callable
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QVariantAnimation
+from PySide6.QtCore import QEasingCurve, QObject, QPropertyAnimation, QVariantAnimation
 from PySide6.QtWidgets import QGraphicsOpacityEffect, QWidget
+
+# 全局动效开关（默认开；settings `animations=false` 时关闭）
+_animations_enabled = True
+
+
+def set_animations_enabled(enabled: bool) -> None:
+    """设置全局动效开关（MainWindow 启动时从 settings 注入）。"""
+    global _animations_enabled
+    _animations_enabled = enabled
+
+
+def animations_enabled() -> bool:
+    """当前动效开关状态。"""
+    return _animations_enabled
 
 
 def fade_in_widget(
     widget: QWidget,
     duration_ms: int = 150,
     easing: QEasingCurve.Type = QEasingCurve.Type.OutCubic,
-) -> QPropertyAnimation:
+) -> QPropertyAnimation | None:
     """让 widget 从透明淡入到不透明，动画结束后移除 opacity effect。
 
-    返回值是运行中的动画对象，调用方必须持有引用（如挂到 self 属性）
-    直至动画结束，防止被 GC 回收。
+    返回运行中的动画对象（调用方持有引用防 GC）；动效关闭时直接返回
+    None 且不设置 effect（终态即时可达，功能不受影响）。
 
     Args:
         widget: 目标控件（动画期间短暂挂 QGraphicsOpacityEffect）
         duration_ms: 淡入时长（毫秒）
         easing: 缓动曲线
     """
+    if not _animations_enabled:
+        return None
+
+    # 防竞态：同 widget 连续触发时停掉旧动画——QPropertyAnimation.stop()
+    # 不发 finished，旧动画的 effect 清理回调不会误删新 effect。
+    old = widget.property("_fade_anim")
+    if isinstance(old, QPropertyAnimation):
+        old.stop()
+
     effect = QGraphicsOpacityEffect(widget)
     widget.setGraphicsEffect(effect)
 
@@ -49,27 +79,32 @@ def fade_in_widget(
     anim.setEasingCurve(easing)
     anim.finished.connect(lambda: widget.setGraphicsEffect(None))
     anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
+    widget.setProperty("_fade_anim", anim)
     return anim
 
 
 def animate_property(
-    target: object,
+    parent: QObject,
     setter: Callable[[float], None],
-    duration_ms: int = 250,
+    duration_ms: int = 200,
     easing: QEasingCurve.Type = QEasingCurve.Type.OutCubic,
-) -> QVariantAnimation:
+) -> QVariantAnimation | None:
     """通用数值动画：0.0 → 1.0 插值，逐帧回调 setter(value)。
 
     用于非 QObject property 的目标（如 pyqtgraph 曲线的 QGraphicsItem
     opacity——它不是 QObject property，QPropertyAnimation 无法驱动）。
 
     Args:
-        target: 持有返回值的宿主对象（防止动画被 GC 回收）
+        parent: 持有动画的 QObject（防止动画被 GC 回收；调用方通常传 self）
         setter: 每帧接收 0.0~1.0 插值的回调
         duration_ms: 动画时长
         easing: 缓动曲线
     """
-    anim = QVariantAnimation(target)  # type: ignore[arg-type]
+    if not _animations_enabled:
+        setter(1.0)  # 关闭动效时直接落终态
+        return None
+
+    anim = QVariantAnimation(parent)
     anim.setDuration(duration_ms)
     anim.setStartValue(0.0)
     anim.setEndValue(1.0)

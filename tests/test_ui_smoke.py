@@ -206,10 +206,12 @@ def test_u05_emoji_single_source(sample_window):
     assert "Segoe UI Emoji" in generate_qss("light")
 
     # app 源码（除 ui_text.py 外）无散落 emoji 字面量
+    # （含 ✓ U+2713——main_window CSV 导出提示曾绕过 EMOJI 收敛）
     import pathlib
 
-    literal = re.compile(r"[📒🔧🌙☀️📌🔄⚠️💾]")
-    for py in pathlib.Path("app").glob("*.py"):
+    literal = re.compile(r"[📒🔧🌙☀️📌🔄⚠️💾✓]")
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    for py in app_dir.glob("*.py"):
         if py.name == "ui_text.py":
             continue
         text = py.read_text(encoding="utf-8")
@@ -250,6 +252,26 @@ def test_u06_motion_feedback(sample_window, monkeypatch):
     fade_in_widget(box, duration_ms=50)
     QTest.qWait(120)
     assert box.graphicsEffect() is None
+
+
+def test_u06_motion_global_switch(qapp):
+    """U-06：全局动效开关关闭时 fade_in 不设 effect、属性动画直接落终态。"""
+    from PySide6.QtWidgets import QFrame
+
+    from app import motion
+
+    motion.set_animations_enabled(False)
+    try:
+        box = QFrame()
+        assert motion.fade_in_widget(box, duration_ms=50) is None
+        assert box.graphicsEffect() is None  # 不挂 effect，功能完整
+
+        seen: list[float] = []
+        anim = motion.animate_property(QFrame(), seen.append, duration_ms=50)
+        assert anim is None
+        assert seen == [1.0]  # 终态即时可达
+    finally:
+        motion.set_animations_enabled(True)
 
 
 def test_u07_ui_minor_fixes(sample_window):

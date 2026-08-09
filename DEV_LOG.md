@@ -34,6 +34,12 @@
 
 ## 日志正文
 
+### 2026-08-09 | 修复 | U 系列 code-review 评审修复（U-08，314/314）
+- 双轴评审（Standards + Spec + Falsify 维度，2 子代理并行）结果：无崩溃级问题；3 处真实规格偏差 + 若干标准项
+- **修复**：① 动效全局开关——`motion.set_animations_enabled`（settings 键 `animations`，默认 true），关闭时 fade_in 不挂 effect、属性动画直接落终态（U-06 验收「系统关闭动画时全部动效失效」以设置项实现，注册表检测不做）；② `fade_in_widget` 竞态防护——同 widget 连续触发先 stop 旧动画（QPropertyAnimation.stop 不发 finished，旧清理回调不会误删新 effect）；③ `animate_property` 参数收紧 `QObject`（去 type: ignore）；④ `exchangePage` 包名标签内联 14→15px（QSS 已改 15 但内联优先级更高，U-02 归位失真——DEV_LOG 上一版记录失真已更正）；⑤ `EMOJI['ok']` 收敛 main_window CSV 提示（字面量 ✓ 清零，测试 regex 补 ✓ + Path 绝对化）；⑥ 曲线动画 250→200ms（feedback-only 上限）
+- **裁决/取舍**：`app/motion.py`/`ui_text.py` 不注册进 `app/__init__.py`——与 `fetch_worker.py` 同例（内部工具模块不进包表面）；U-01 迷你趋势/窄窗口响应式堆叠不做（验收未列项 + 实测 680px 可用，DEV_LOG 记取舍）
+- 测试 +1（动效全局开关）；pytest 314/314 ✅
+
 ### 2026-08-09 | 实现 | U-01~U-06 UI 视觉打磨（finesse-ui 审计落地，313/313）
 - **U-01 KPI 磁贴**（`b5d230e`）：汇总从裸 QLabel 升级为卡片磁贴——`_split_kpi_text` 拆「说明行（11px caption）+ 数值行（22px 信号色）」；`summary_style` 升级（正常 22px/700、数据不足 16px 灰）；输入卡限宽 520 与 KPI 卡并排（顶部两栏），宽窗口不再全宽拉伸
 - **U-02 排版刻度**（`251baec`）：QSS 顶部注释固化刻度（display 18-22 / section 15-16 / body 12-13 / meta 10-11）；按钮两级（QPushButton 默认 11px/500 = secondary，saveBtn/queryBtn 13px/600 = primary；themeBtn 等 10→11、refreshBtn 12→11）；页面标题 `pageTitleLabel` 16px 与应用名 18px 分层；craftProduct 18→16、tierLabel/exchangePackageLabel 14→15；**图表弹性翻转**——chart min 200、max 220 封顶移除、chart_card stretch 0→1、table_card 1→0（H-01「表格独占弹性」决策推翻：趋势图优先趋势阅读），30 天视图超高改 `_DaySubTable` vertical AsNeeded 内部滚动兜底（原 AlwaysOff 会裁剪行）
