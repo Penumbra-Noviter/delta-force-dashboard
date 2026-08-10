@@ -181,7 +181,7 @@ class MainWindow(QMainWindow):
         if self.current_account is not None:
             self._refresh_account_combo()
         else:
-            self.sidebar.set_account_area_visible(False)
+            self.sidebar.hide_account_area()
 
         # 初始渲染
         self.refresh_display()

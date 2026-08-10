@@ -1349,19 +1349,32 @@ def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path)
 # ── Y-05. 账号切换（运行中切换 + 记账页整体重载 + 落盘）──
 
 
-def _two_account_env(acc):
-    """预置双账号：主账号 2 条、小号 1 条（不同日期，便于断言切换后数据源）。"""
+def _two_account_dates() -> dict:
+    """双账号测试日期集：主账号 -2/-1 天、小号 -3 天（相对 now，不含今日）。
+
+    「测试数据相对 now」纪律（S3 评审修复）：保存/今日状态断言不与墙钟耦合。
+    """
+    today = datetime.now()
+    return {
+        "main_dates": [
+            (today - timedelta(days=2)).strftime(DATE_FORMAT),
+            (today - timedelta(days=1)).strftime(DATE_FORMAT),
+        ],
+        "xiao_date": (today - timedelta(days=3)).strftime(DATE_FORMAT),
+    }
+
+
+def _two_account_env(acc, dates: dict) -> None:
+    """预置双账号：主账号 2 条、小号 1 条（日期由 _two_account_dates 提供）。"""
     _save_account_record(
         acc,
         "主账号",
         {
-            "2026-08-01": {"cash": 100.0, "warehouse": 200.0},
-            "2026-08-02": {"cash": 150.0, "warehouse": 250.0},
+            dates["main_dates"][0]: {"cash": 100.0, "warehouse": 200.0},
+            dates["main_dates"][1]: {"cash": 150.0, "warehouse": 250.0},
         },
     )
-    _save_account_record(
-        acc, "小号", {"2026-08-05": {"cash": 500.0, "warehouse": 900.0}}
-    )
+    _save_account_record(acc, "小号", {dates["xiao_date"]: {"cash": 500.0, "warehouse": 900.0}})
 
 
 def _select_account(win, name):
@@ -1376,7 +1389,8 @@ def _select_account(win, name):
 
 def test_switch_account_reloads_all_views(account_window_factory, tmp_path):
     """切换 → 换 DataStore/logic + refresh_display 全量刷新（表格/汇总/今日状态/标题/下拉）。"""
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     assert win.table._left_table.rowCount() == 1
     assert win.table._right_table.rowCount() == 1  # 主账号 2 条 → 1+1
 
@@ -1385,8 +1399,8 @@ def test_switch_account_reloads_all_views(account_window_factory, tmp_path):
 
         assert win.current_account == "小号"
         assert win.store.data_file == tmp_path / "accounts" / "小号" / "data.json"
-        assert win.logic.get_record("2026-08-05") is not None
-        assert win.logic.get_record("2026-08-01") is None  # 旧账号数据不可见
+        assert win.logic.get_record(dates["xiao_date"]) is not None
+        assert win.logic.get_record(dates["main_dates"][0]) is None  # 旧账号数据不可见
         # 表格刷新：小号 1 条 → 1+0
         assert win.table._left_table.rowCount() == 1
         assert win.table._right_table.rowCount() == 0
@@ -1406,7 +1420,8 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
     from app.main_window import MainWindow
     from settings_store import SettingsStore
 
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     _select_account(win, "小号")
     win.close()
 
@@ -1419,7 +1434,7 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
     )
     try:
         assert win2.current_account == "小号"
-        assert win2.logic.get_record("2026-08-05") is not None
+        assert win2.logic.get_record(dates["xiao_date"]) is not None
         assert win2._title_label.text() == "Delta Force Dashboard · 小号"
         assert win2.sidebar.account_combo.currentText() == "小号"
     finally:
@@ -1428,8 +1443,10 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
 
 def test_switch_cancels_edit_state(account_window_factory):
     """切换时取消编辑模式（防跨账号污染）：退出编辑、字段清空。"""
-    win, acc = account_window_factory(setup=_two_account_env)
-    win.input_panel.set_edit_mode("2026-08-02", 150.0, 250.0)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
+    edit_date = dates["main_dates"][1]
+    win.input_panel.set_edit_mode(edit_date, 150.0, 250.0)
     assert win.input_panel.is_editing()
 
     try:
@@ -1447,8 +1464,10 @@ def test_switch_cancels_edit_state(account_window_factory):
 
 def test_switch_cancels_reuse_state(account_window_factory):
     """切换时取消复用模式（防跨账号污染）：退出复用、字段清空。"""
-    win, acc = account_window_factory(setup=_two_account_env)
-    win.input_panel.set_reuse_hint("2026-08-02 的数据", 150.0, 250.0)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
+    reuse_date = dates["main_dates"][1]
+    win.input_panel.set_reuse_hint(f"{reuse_date} 的数据", 150.0, 250.0)
     assert win.input_panel.is_reusing()
 
     try:
@@ -1465,7 +1484,8 @@ def test_switch_cancels_reuse_state(account_window_factory):
 
 def test_switch_save_lands_in_new_account(account_window_factory, tmp_path):
     """切换后保存即时落在新账号文件；原账号文件不变。"""
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     _select_account(win, "小号")
 
     win.input_panel.fill_values(100, 300)
@@ -1479,7 +1499,7 @@ def test_switch_save_lands_in_new_account(account_window_factory, tmp_path):
         (tmp_path / "accounts" / "主账号" / "data.json").read_text(encoding="utf-8")
     )
     assert win.today not in saved_main  # 主账号文件不变
-    assert set(saved_main) == {"2026-08-01", "2026-08-02"}
+    assert set(saved_main) == set(dates["main_dates"])  # 主账号原有记录不变
     win.close()
 
 
@@ -1487,7 +1507,8 @@ def test_switch_delete_lands_in_new_account(account_window_factory, monkeypatch,
     """切换后删除即时落在新账号文件；原账号文件不变。"""
     from PySide6.QtWidgets import QMessageBox
 
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     monkeypatch.setattr(
         QMessageBox,
         "question",
@@ -1495,16 +1516,16 @@ def test_switch_delete_lands_in_new_account(account_window_factory, monkeypatch,
     )
     _select_account(win, "小号")
 
-    win.table.delete_requested.emit("2026-08-05")
+    win.table.delete_requested.emit(dates["xiao_date"])
 
     saved_xiao = json.loads(
         (tmp_path / "accounts" / "小号" / "data.json").read_text(encoding="utf-8")
     )
-    assert "2026-08-05" not in saved_xiao  # 小号记录被删
+    assert dates["xiao_date"] not in saved_xiao  # 小号记录被删
     saved_main = json.loads(
         (tmp_path / "accounts" / "主账号" / "data.json").read_text(encoding="utf-8")
     )
-    assert set(saved_main) == {"2026-08-01", "2026-08-02"}  # 主账号不变
+    assert set(saved_main) == set(dates["main_dates"])  # 主账号不变
     win.close()
 
 
@@ -1512,7 +1533,8 @@ def test_switch_export_uses_new_account(account_window_factory, monkeypatch, tmp
     """切换后 CSV 导出作用于新账号（导出内容 = 小号数据）。"""
     from PySide6.QtWidgets import QFileDialog
 
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     out = tmp_path / "export.csv"
     monkeypatch.setattr(
         QFileDialog,
@@ -1524,14 +1546,15 @@ def test_switch_export_uses_new_account(account_window_factory, monkeypatch, tmp
     win.sidebar.export_btn.click()
 
     text = out.read_text(encoding="utf-8-sig")
-    assert "2026-08-05" in text  # 小号记录
-    assert "2026-08-01" not in text  # 主账号独有记录不出现
+    assert dates["xiao_date"] in text  # 小号记录
+    assert dates["main_dates"][0] not in text  # 主账号独有记录不出现
     win.close()
 
 
 def test_switch_same_account_noop(account_window_factory, monkeypatch):
     """选择当前账号本身 → no-op：不换 store/logic、不落盘。"""
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     old_store = win.store
     old_logic = win.logic
     save_calls = []
@@ -1551,7 +1574,8 @@ def test_switch_same_account_noop(account_window_factory, monkeypatch):
 
 def test_switch_unknown_account_ignored(account_window_factory):
     """目标账号不在列表（防御）→ 忽略，状态不变。"""
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     old_store = win.store
 
     try:
@@ -1565,7 +1589,8 @@ def test_switch_unknown_account_ignored(account_window_factory):
 
 def test_switch_does_not_touch_profit_page(account_window_factory):
     """利润页零改动：切换不重建 profit_page、不触碰其状态。"""
-    win, acc = account_window_factory(setup=_two_account_env)
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
     before = win.profit_page
 
     try:

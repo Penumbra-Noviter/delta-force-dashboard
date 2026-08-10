@@ -129,11 +129,15 @@ class Sidebar(QWidget):
         )
         self.account_combo.blockSignals(False)
 
-    def set_account_area_visible(self, visible: bool) -> None:
-        """显示/隐藏整个账号区（注入 store 模式无账号概念时隐藏，Y-04）。"""
-        self.account_title.setVisible(visible)
-        self.account_combo.setVisible(visible)
-        self.new_account_btn.setVisible(visible)
+    def hide_account_area(self) -> None:
+        """隐藏整个账号区（S2 评审修复：唯一语义是隐藏）。
+
+        注入 store 模式无账号概念时由 MainWindow 调用；无 True 分支，
+        故简化为无参方法（原 set_account_area_visible(visible) 移除）。
+        """
+        self.account_title.hide()
+        self.account_combo.hide()
+        self.new_account_btn.hide()
 
     @property
     def current_index(self) -> int:

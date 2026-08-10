@@ -99,6 +99,71 @@ def test_create_account_rejects_non_string(tmp_path):
     assert store.list_accounts() == []
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["abc\x00def", "a\x1f b", "制表\t符", "换行\n名"],
+)
+def test_create_account_rejects_control_characters(tmp_path, name):
+    """含控制字符（ord < 32，如 NUL/tab/换行）→ 拒绝、可读原因、零目录（F1）。"""
+    store = AccountStore(tmp_path / "accounts")
+    reason = store.create_account(name)
+    assert isinstance(reason, str) and reason
+    assert store.list_accounts() == []
+    assert not (tmp_path / "accounts").exists() or not list((tmp_path / "accounts").iterdir())
+
+
+def test_create_account_rejects_overlong_name(tmp_path):
+    """超过 64 字符 → 拒绝、可读原因、零目录（F1 长度上限）。"""
+    store = AccountStore(tmp_path / "accounts")
+    reason = store.create_account("长" * 65)
+    assert isinstance(reason, str) and "64" in reason
+    assert store.list_accounts() == []
+
+
+def test_create_account_accepts_name_at_length_limit(tmp_path):
+    """恰好 64 字符 → 合法（长度上限边界，F1）。"""
+    store = AccountStore(tmp_path / "accounts")
+    assert store.create_account("号" * 64) is None
+    assert (tmp_path / "accounts" / ("号" * 64)).is_dir()
+
+
+def test_create_account_mkdir_oserror_returns_reason(tmp_path, monkeypatch):
+    """mkdir 失败（OSError）→ 返回可读原因、不抛异常、不产生目录（F1）。"""
+    from pathlib import Path
+
+    def _boom(self, *a, **kw):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "mkdir", _boom)
+    store = AccountStore(tmp_path / "accounts")
+    reason = store.create_account("小号")
+    assert isinstance(reason, str) and ("创建" in reason or "失败" in reason)
+    assert store.list_accounts() == []
+
+
+def test_ensure_default_account_mkdir_oserror_warns(tmp_path, monkeypatch, caplog):
+    """_ensure_default_account mkdir 失败 → warning 日志 + 仍返回主账号名（F2）。"""
+    from pathlib import Path
+
+    def _boom(self, *a, **kw):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "mkdir", _boom)
+    store = AccountStore(tmp_path / "accounts")
+    with caplog.at_level("WARNING"):
+        name = store.resolve_account(None)
+    assert name == DEFAULT_ACCOUNT_NAME  # 兜底仍返回主账号，启动路径不崩溃
+    assert any("创建失败" in rec.message for rec in caplog.records)
+
+
+def test_resolve_rejects_illegal_existing_dir_name(tmp_path):
+    """目录存在但目录名非法（点开头）→ 拒绝并回退主账号（F3）。"""
+    store = AccountStore(tmp_path / "accounts")
+    (store.accounts_dir / ".dot").mkdir(parents=True)
+    assert store.resolve_account(".dot") == DEFAULT_ACCOUNT_NAME
+    assert (store.accounts_dir / DEFAULT_ACCOUNT_NAME).is_dir()
+
+
 def test_create_account_accepts_chinese_and_spaces(tmp_path):
     """合法名（中文 / 空格在中间）→ 成功。"""
     store = AccountStore(tmp_path / "accounts")
