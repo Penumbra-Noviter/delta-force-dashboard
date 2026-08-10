@@ -37,18 +37,26 @@ MIGRATED_V2_MARKER_NAME = ".migrated_v2"
 
 # H1：Windows 目录名禁用字符（目录名即账号名，必须 sanitize）。
 _FORBIDDEN_CHARS = set('\\/:*?"<>|')
+# F1 评审修复：账号名长度上限（保守值，远小于 Windows 255 字符单目录名上限）。
+MAX_ACCOUNT_NAME_LEN = 64
 
 
 def validate_account_name(name: str) -> str | None:
     """校验账号名：合法返回 None，否则返回可读拒绝原因。
 
-    拒绝规则（H1）：非文本、空名（空串/纯空白）、含 ``\\ / : * ? " < > |``、
-    首尾为空格或点。中文 / 字母 / 数字 / 中间空格均合法。
+    拒绝规则（H1 + F1 评审修复）：非文本、空名（空串/纯空白）、
+    含控制字符（ord < 32，如 NUL / tab / 换行）、超过 64 字符、
+    含 ``\\ / : * ? " < > |``、首尾为空格或点。
+    中文 / 字母 / 数字 / 中间空格均合法。
     """
     if not isinstance(name, str):
         return "账号名必须是文本"
     if not name.strip():
         return "账号名不能为空"
+    if any(ord(ch) < 32 for ch in name):
+        return "账号名不能包含控制字符"
+    if len(name) > MAX_ACCOUNT_NAME_LEN:
+        return f"账号名过长（最多 {MAX_ACCOUNT_NAME_LEN} 字符）"
     if any(ch in _FORBIDDEN_CHARS for ch in name):
         return "账号名不能包含 \\ / : * ? \" < > | 字符"
     if name != name.strip():
@@ -88,13 +96,19 @@ class AccountStore:
 
         新账号从空数据开始（H5）：只创建目录，不写 data.json，
         首次 ``DataStore.load()`` 自然得到空库 ``{}``。
+        mkdir 失败（F1 评审修复：权限/磁盘 OSError）→ 记录 warning
+        并返回可读原因，不向 UI 抛异常。
         """
         reason = validate_account_name(name)
         if reason is not None:
             return reason
         if name in self.list_accounts():
             return f"账号「{name}」已存在"
-        (self.accounts_dir / name).mkdir(parents=True, exist_ok=True)
+        try:
+            (self.accounts_dir / name).mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning("账号目录创建失败：%s（%s）", name, e)
+            return f"账号目录创建失败：{e}"
         logger.info("已创建账号：%s", name)
         return None
 
@@ -103,9 +117,15 @@ class AccountStore:
 
         兜底规则（决策 3）：current 缺失 / 非字符串 / 指向不存在目录 →
         回退「主账号」；accounts/ 为空或主账号目录缺失 → 自动创建
-        「主账号」目录（空数据，H3）。
+        「主账号」目录（空数据，H3）。F3 评审修复：目录存在但目录名
+        非法（如手工创建的点开头目录）同样回退，不直接采用。
         """
-        if isinstance(current, str) and current and (self.accounts_dir / current).is_dir():
+        if (
+            isinstance(current, str)
+            and current
+            and validate_account_name(current) is None
+            and (self.accounts_dir / current).is_dir()
+        ):
             return current
         return self._ensure_default_account()
 
@@ -173,9 +193,17 @@ class AccountStore:
             logger.warning("v2 迁移完成标记写入失败: %s", e)
 
     def _ensure_default_account(self) -> str:
-        """确保默认账号目录存在（幂等），返回「主账号」。"""
+        """确保默认账号目录存在（幂等），返回「主账号」。
+
+        mkdir 失败（F2 评审修复：权限/磁盘 OSError）→ warning 日志、
+        仍返回主账号名——启动路径的解析兜底不因目录创建失败而崩溃。
+        """
         default_dir = self.accounts_dir / DEFAULT_ACCOUNT_NAME
         if not default_dir.is_dir():
-            default_dir.mkdir(parents=True, exist_ok=True)
-            logger.info("已创建默认账号目录：%s", DEFAULT_ACCOUNT_NAME)
+            try:
+                default_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                logger.warning("默认账号目录创建失败: %s", e)
+            else:
+                logger.info("已创建默认账号目录：%s", DEFAULT_ACCOUNT_NAME)
         return DEFAULT_ACCOUNT_NAME
