@@ -8,6 +8,12 @@
 
 ## 滚动摘要（2026-08-10）
 
+- **二轮 code-review + 打包（08-10）**：三轴评审再发现 1×P1（F-P1 切换路径漏校验 → 非法目录选中后重启静默失联，已实测）+ 3×P2（casefold 重名假成功 / SP2 迁移半成品永久跳过 / AST 防复发测试名不副实）→ `0eb9bbf` 全修（list_accounts 过滤非法目录 + 切换双保险、迁移失败清半成品可重试、真 AST 解析）；483/483 绿、覆盖率 92.82%；重新打包 `dist/Delta Force Dashboard/` 67M，offscreen 烟测通过
+- **打包（08-10 19:05）**：Y 系列后重新 PyInstaller 打包，`dist/Delta Force Dashboard/` 67M（exe 6.86MB + `_internal/`）；offscreen 烟测通过（exe 存活 12s）；**真实环境 v2 迁移实测通过**——`accounts/主账号/` 完整迁移（15 条数据一致、4 份备份复制、`.migrated_v2` marker 写入、源文件保留未删）
+- **知识库蒸馏（08-10）**：新经验 `输入映射文件路径的校验边界.md`（Y 系列 F1 实证：控制字符/长度上限/mkdir OSError）；persona 并入该稳定模式
+
+## 滚动摘要（2026-08-10）
+
 - **打包（08-10 19:05）**：Y 系列后重新 PyInstaller 打包，`dist/Delta Force Dashboard/` 67M（exe 6.86MB + `_internal/`）；offscreen 烟测通过（exe 存活 12s）；**真实环境 v2 迁移实测通过**——`accounts/主账号/` 完整迁移（15 条数据一致、4 份备份复制、`.migrated_v2` marker 写入、源文件保留未删）
 - **知识库蒸馏（08-10）**：新经验 `输入映射文件路径的校验边界.md`（Y 系列 F1 实证：控制字符/长度上限/mkdir OSError）；persona 并入该稳定模式
 
