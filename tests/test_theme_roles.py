@@ -262,3 +262,22 @@ def test_exchange_apply_theme_reresolves_labels(qapp, theme_guard) -> None:
             assert theme_mod.get_color(cfg.color) in page._cards[i]._pkg_label.styleSheet(), (
                 f"{theme} 下 apply_theme 后第 {i} 卡标签未用当前主题色"
             )
+
+
+def test_exchange_apply_theme_updates_separator(qapp, theme_guard) -> None:
+    """apply_theme() 用当前主题 SEPARATOR 色刷新卡片分隔线。
+
+    Z-01（U-03 遗留）：分隔线同为构建期内联样式，主题切换后残留构建时色
+    ——SEPARATOR 双主题值不同（light #d6d3cc / dark rgba(255,255,255,.06)），
+    亮→暗切换后暗面残留浅色线，直到窗口重建。
+    """
+    from app.exchange_page import ExchangePage
+
+    page = ExchangePage()
+    for theme in theme_mod.THEMES:
+        theme_mod.set_theme(theme)
+        page.apply_theme()
+        for i, card in enumerate(page._cards):
+            assert theme_mod.get_color("SEPARATOR") in card._sep.styleSheet(), (
+                f"{theme} 下 apply_theme 后第 {i} 卡分隔线未用当前主题色"
+            )

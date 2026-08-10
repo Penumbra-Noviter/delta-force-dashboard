@@ -8,6 +8,7 @@
 
 ## 滚动摘要（2026-08-10）
 
+- **Z-01 主题联动收尾（08-10）**：U-03 遗留闭环——兑换页 SEPARATOR 分隔线构建期冻结（双主题值不同，亮→暗切换暗面残留浅线）→ `apply_theme()` 补齐运行期刷新 + 双主题单元用例 + 集成断言，Falsify 红验证通过；**484/484 绿**、覆盖率 96%；crafting_page 遗留注记核实不成立（全 QSS 选择器自动联动）；`.scratch/multi-account/`（Y 系列工作文件）经确认 git rm 清理；活跃表清零
 - **二轮 code-review + 打包（08-10）**：三轴评审再发现 1×P1（F-P1 切换路径漏校验 → 非法目录选中后重启静默失联，已实测）+ 3×P2（casefold 重名假成功 / SP2 迁移半成品永久跳过 / AST 防复发测试名不副实）→ `0eb9bbf` 全修（list_accounts 过滤非法目录 + 切换双保险、迁移失败清半成品可重试、真 AST 解析）；483/483 绿、覆盖率 92.82%；重新打包 `dist/Delta Force Dashboard/` 67M，offscreen 烟测通过
 - **打包（08-10 19:05）**：Y 系列后重新 PyInstaller 打包，`dist/Delta Force Dashboard/` 67M（exe 6.86MB + `_internal/`）；offscreen 烟测通过（exe 存活 12s）；**真实环境 v2 迁移实测通过**——`accounts/主账号/` 完整迁移（15 条数据一致、4 份备份复制、`.migrated_v2` marker 写入、源文件保留未删）
 - **知识库蒸馏（08-10）**：新经验 `输入映射文件路径的校验边界.md`（Y 系列 F1 实证：控制字符/长度上限/mkdir OSError）；persona 并入该稳定模式
@@ -21,7 +22,7 @@
 
 - **Y 系列完成 — 账号切换（多账号记账，2026-08-10，Y-01~Y-05：`c816de2`/`9296c40`/`0da9b09`/`c1b5525`/`37b8fb4` + code-review 修复 `09fa722`，merge `900f50a`/`39d9595`）**：只动记账部分，利润模块零改动；存储 `~/Delta Force Dashboard/accounts/<账号名>/data.json`（复用 DataStore 原子写/滚动备份/损坏自愈），旧 `data.json` 复制迁移为「主账号」（`.migrated_v2` marker 幂等、不删源），操作集仅新建+切换，`current_account` 持久化于 settings.json，侧边栏账号区（下拉+新建按钮）；共识：H1 账号名 sanitize / H2 目录名即账号名 / H3 兜底回主账号+空库自建 / H4 利润零改动 / H5 新账号空库；**477/477 测试绿，覆盖率 92.75%**（account_store 98% / main_window 92% / sidebar 99%）；code-review 三轴评审修复（F1 账号名控制字符/长度上限 + mkdir OSError 兜底、F2/F3 兜底防护、S2 `hide_account_area()` 简化、S3 测试动态日期）；活跃表清零，TO-TICKETS Y 系列已归档
 
-  #### Y 系列逐工单摘要（吸收自 `.scratch/multi-account/progress.md`）
+  #### Y 系列逐工单摘要（原 `.scratch/multi-account/progress.md`，已吸收归档并清理）
   - **Y-01 账号存储层（`c816de2`）**：`account_store.py` 业务模块——`AccountStore(accounts_dir=DATA_DIR/accounts)`：list_accounts（目录扫描，缺失/空→[]，稳定排序）/ create_account（返回 None=成功/可读拒绝原因；H5 空库起步只建目录）/ resolve_account（None/非字符串/目录不存在→回退主账号并自建空目录）/ new_store/account_dir（DataStore 路径注入，原子写/损坏恢复/滚动备份继承）；`DEFAULT_ACCOUNT_NAME=主账号`、`ACCOUNTS_DIR_NAME=accounts`、`validate_account_name`（空名/重名交给 create/禁用字符/首尾空格或点/非文本）；ADR-0005 落档；test_account_store.py 30 用例（list 三态/create 拒绝 14 非法名 parametrize/resolve 四态/DataStore 注入/全新环境），全部 tmp_path 显式注入；全量 421/421
   - **Y-02 旧数据迁移（`9296c40`）**：`migrate_legacy_to_default(data_dir=None)`——accounts/ 不存在 **且** data_dir/data.json 存在 → 复制 data.json + 全部 `data.json.bak*` 到 accounts/主账号/ 并写 `.migrated_v2`；accounts/ 已存在（含空）→ 一律不迁移不覆盖；marker 存在 → 幂等跳过；复制非移动、永不删源（O-22 铁律）；OSError → warning 不中断、不写 marker；main.py 接线在 O-22 迁移之后、MainWindow 构造之前（AST 顺序断言防复发）；+9 用例；全量 431/431
   - **Y-03 启动解析当前账号（`0da9b09`）**：MainWindow 注入 seam 定案——`__init__` 新增 `account_store` 参数，**仅当未注入 store/logic 时才走账号解析**（生产默认路径）：settings.current_account → resolve_account 兜底 → new_store 构造 DataStore；注入模式保持现状（current_account=None，零目录触碰）；`_save_settings` 合并 current_account（注入模式不写 key）；`_update_account_title` 标题栏显示「Delta Force Dashboard · <账号名>」；settings_store.py 零改动；+8 用例（account_window_factory 注入完整解析链路 + UI 层 AST 防复发——main_window/sidebar 不得含 "accounts" 字面量）；全量 439/439
@@ -62,6 +63,12 @@
 ---
 
 ## 日志正文
+
+### 2026-08-10 | 修复 | Z-01 兑换页 SEPARATOR 分隔线主题联动（U-03 遗留闭环，484/484）
+- **背景**：U-03 遗留「兑换页 SEPARATOR 同为构建期样式（主题切换不更新），建议另开工单」——本次核实时确认：SEPARATOR 双主题值不同（light `#d6d3cc` / dark `rgba(255,255,255,.06)`），`_build_package_card` 构建期解析冻结 → 亮→暗切换后暗面残留浅色分隔线直到窗口重建（crafting_page 核实无此问题：全走 QSS objectName 选择器随 refresh_theme 更新，唯一内联是主题无关 font-size——memory 遗留注记不成立，已澄清）
+- **改动**：`_build_package_card` 分隔线引用存 `card._sep`；`apply_theme()` 循环内补齐 `_sep` 运行期刷新（增量更新不重建，模式同包标签）
+- **测试**：`tests/test_theme_roles.py` 新增双主题循环用例（set_theme + apply_theme → 断言分隔线含当前主题 SEPARATOR）+ `test_ui_smoke.py` `test_theme_toggle_updates_exchange_labels` 扩展集成断言（theme_btn 点击链路）；Falsify 红验证：临时摘掉刷新 → 2 测试实红 → 恢复全绿（测试非恒真）
+- 测试 483→**484**；覆盖率 96%（含测试自身）；doc_sync 同步；.scratch/multi-account（Y 系列工作文件，git 已跟踪）经确认后 `git rm` 清理——内容已完整归档（DEV_LOG 逐工单摘要 + TO-TICKETS 归档表 + 二轮评审修复节）
 
 ### 2026-08-09 | 实现 | U-03 色彩角色系统化（kickoff 全流程：Implement + code-review 三轴，391/391）
 - **键收敛**：7 包色收敛单一装饰键 `PACKAGE_COLOR_0~6`（删 CHART_SERIES_*/PACKAGE_COLOR_* 双套键；CHART_SERIES 键名撒谎——只服务兑换页包色、chart_widget 不引用）；亮暗同值键不抽常亮色（保留双主题定义防 Locality 坑）

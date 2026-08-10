@@ -12,7 +12,7 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-10）：Y/U/V/W 系列已归档，当前无活跃工单。
+> 活跃表（2026-08-10）：Y/U/V/W/Z 系列已归档，当前无活跃工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
@@ -20,6 +20,26 @@
 ---
 
 ## 工单详情
+
+### Z 系列（2026-08-10，主题联动收尾，来源：U-03 遗留）
+
+#### Z-01：兑换页 SEPARATOR 分隔线主题联动
+
+**目标**：U-03 评审遗留——兑换页卡片分隔线为构建期内联样式，主题切换后不刷新（light `#d6d3cc` / dark `rgba(255,255,255,.06)` 双主题值不同，亮→暗切换后暗面残留浅色线，直到窗口重建）。
+
+**具体改动**：
+1. `app/exchange_page.py` — `_build_package_card` 分隔线引用存入 `card._sep`；`apply_theme()` 在现有包标签刷新循环内补齐 SEPARATOR 色刷新（运行期 `get_color`，增量更新不重建，模式同 chart_widget.apply_theme）
+2. `tests/test_theme_roles.py` — 新增用例：双主题循环 set_theme + apply_theme 后断言全部卡片 `_sep` 样式含当前主题 SEPARATOR 值
+3. `tests/test_ui_smoke.py` — `test_theme_toggle_updates_exchange_labels` 扩展分隔线断言（集成链路：theme_btn.click → refresh_theme → apply_theme）
+
+**影响范围**：`app/exchange_page.py`、`tests/test_theme_roles.py`、`tests/test_ui_smoke.py`
+
+**验收标准**：
+- [ ] 双主题下 apply_theme 后分隔线样式含当前主题 SEPARATOR 色值
+- [ ] UI 集成链路（主题按钮点击）下分隔线随主题更新
+- [ ] pytest 全绿
+
+---
 
 ### U 系列 — UI 视觉打磨（2026-08-09，来源：finesse-ui 审计）
 
@@ -270,6 +290,12 @@
 ---
 
 ## 已完成归档
+
+### Z 系列（2026-08-10，主题联动收尾，来源：U-03 遗留）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| Z-01 | 兑换页 SEPARATOR 分隔线主题联动 — `_build_package_card` 分隔线引用存 `card._sep`；`apply_theme()` 循环内补齐分隔线运行期刷新（构建期冻结 → 亮→暗切换残留浅色线，SEPARATOR 双主题值不同已实证）；`tests/test_theme_roles.py` 新增双主题循环用例 + `test_ui_smoke.py` 集成断言扩展（theme_btn 点击链路）；Falsify 红验证（摘刷新 → 2 测试实红 → 恢复全绿）；测试 483→484 | 修复（主题联动） | 2026-08-10 | 本提交 |
 
 ### Y 系列（2026-08-10，多账号记账，kickoff 2026-08-10 基线 `e5a62c2`；功能 merge `900f50a` + 评审修复 merge `39d9595`）
 

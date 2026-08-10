@@ -621,11 +621,19 @@ def test_theme_toggle_updates_exchange_labels(sample_window):
         assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
             f"dark 下第 {i} 卡标签残留构建期色（apply_theme 链路未生效）"
         )
+    for i, card in enumerate(exchange._cards):
+        assert get_color("SEPARATOR") in card._sep.styleSheet(), (
+            f"dark 下第 {i} 卡分隔线残留构建期色（Z-01 未生效）"
+        )
 
     win.sidebar.theme_btn.click()  # 切回 light
     for i, cfg in enumerate(_PACKAGE_CONFIG):
         assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
             f"light 下第 {i} 卡标签未随主题重解析"
+        )
+    for i, card in enumerate(exchange._cards):
+        assert get_color("SEPARATOR") in card._sep.styleSheet(), (
+            f"light 下第 {i} 卡分隔线未随主题重解析"
         )
 
 
