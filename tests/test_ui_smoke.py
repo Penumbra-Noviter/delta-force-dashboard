@@ -1193,17 +1193,86 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
     win.close()
 
 
+def _find_accounts_literals(source: str) -> list[tuple[int, str]]:
+    """AST 提取源码中所有含 "accounts" 的字符串字面量（含 f-string 分段）。
+
+    F-P2 评审修复：真 AST 检查（ast.parse + ast.walk），文本检查可绕过的
+    单引号 / f-string / 拼接变体均被捕获；返回 (行号, 字面量) 列表用于定位。
+    docstring（模块/类/函数首条 Expr 常量）是文档引用业务层方法名
+    （list_accounts / set_accounts）的合法位置，不计入拼装嫌疑。
+    """
+    import ast
+
+    tree = ast.parse(source)
+    docstrings = _collect_docstring_nodes(tree)
+    found = []
+    for node in ast.walk(tree):
+        if node in docstrings:
+            continue
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if "accounts" in node.value:
+                found.append((node.lineno, node.value))
+        elif isinstance(node, ast.JoinedStr):
+            for part in node.values:
+                if (
+                    isinstance(part, ast.Constant)
+                    and isinstance(part.value, str)
+                    and "accounts" in part.value
+                ):
+                    found.append((part.lineno, part.value))
+    return found
+
+
+def _collect_docstring_nodes(tree) -> set:
+    """收集模块/类/函数 docstring 节点（各定义体首条 Expr-Constant 字符串）。"""
+    import ast
+
+    nodes = set()
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+        ):
+            continue
+        body = node.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            nodes.add(body[0].value)
+    return nodes
+
+
 def test_ui_layers_do_not_build_account_paths():
-    """AST 防复发：UI 层（main_window / sidebar）不得直接拼装账号路径。"""
+    """AST 防复发：UI 层（main_window / sidebar）不得直接拼装账号路径。
+
+    F-P2 评审修复：真 AST 提取字符串字面量与 f-string 分段（原裸文本检查
+    可被单引号 / f-string 绕过，ast 零使用）；引用账号目录常量同样拦截。
+    """
     import pathlib
 
     app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
     for name in ("main_window.py", "sidebar.py"):
-        text = (app_dir / name).read_text(encoding="utf-8")
-        assert '"accounts"' not in text, f"{name} 含账号目录名字面量（必须走 account_store）"
-        assert "ACCOUNTS_DIR_NAME" not in text, (
+        source = (app_dir / name).read_text(encoding="utf-8")
+        assert _find_accounts_literals(source) == [], (
+            f"{name} 含账号目录名字面量（必须走 account_store）"
+        )
+        assert "ACCOUNTS_DIR_NAME" not in source, (
             f"{name} 引用账号目录常量（必须走 account_store）"
         )
+
+
+def test_accounts_literal_detection_catches_quote_variants():
+    """F-P2：AST 检查能抓到单引号 / f-string / 拼接变体（文本检查可绕过的形态）。"""
+    snippet = (
+        "def evil(x):\n"
+        "    a = 'accounts'            # 单引号变体\n"
+        "    b = f\"{x}/accounts\"      # f-string 变体\n"
+        "    c = 'sub/' + 'accounts'   # 拼接变体\n"
+    )
+    found = _find_accounts_literals(snippet)
+    assert len(found) >= 3, f"变体未被 AST 检查捕获：{found}"
 
 
 # ── Y-04. 侧边栏账号区（下拉框 + 新建账号 + 命名对话框）────
@@ -1572,15 +1641,24 @@ def test_switch_same_account_noop(account_window_factory, monkeypatch):
         win.close()
 
 
-def test_switch_unknown_account_ignored(account_window_factory):
-    """目标账号不在列表（防御）→ 忽略，状态不变。"""
+def test_switch_unknown_account_ignored(account_window_factory, monkeypatch):
+    """目标账号不在列表（防御）→ 忽略；越界 index 产生空名 → 非法名提示（不切换）。"""
+    from PySide6.QtWidgets import QMessageBox
+
     dates = _two_account_dates()
     win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
     old_store = win.store
 
     try:
-        win.sidebar.account_combo.activated.emit(99)  # 越界 index → 空文本
+        win.sidebar.account_combo.activated.emit(99)  # 越界 index → 空文本（非法名）
 
+        assert warnings  # 非法名（空）给可读提示（F-P1 防御分支）
         assert win.current_account == "主账号"
         assert win.store is old_store
     finally:
@@ -1597,5 +1675,52 @@ def test_switch_does_not_touch_profit_page(account_window_factory):
         _select_account(win, "小号")
 
         assert win.profit_page is before  # 同一对象，未被触碰
+    finally:
+        win.close()
+
+
+def test_switch_rejects_illegal_account_with_warning(account_window_factory, monkeypatch):
+    """F-P1 防御：非法账号名（绕过列表过滤直接触发）→ 拒绝切换 + 可读提示 + 零写入。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    dates = _two_account_dates()
+    win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
+    (acc.accounts_dir / ".dot").mkdir()  # 手工非法目录
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+    old_store = win.store
+
+    try:
+        win.sidebar.account_selected.emit(".dot")  # 直接 emit（绕过下拉过滤）
+
+        assert warnings, "非法账号必须给出可读提示"
+        assert win.current_account == "主账号"  # 不切换
+        assert win.store is old_store  # 不重载
+        assert not (acc.accounts_dir / ".dot" / "data.json").exists()  # 零写入
+    finally:
+        win.close()
+
+
+def test_startup_combo_excludes_illegal_accounts(account_window_factory):
+    """F-P1 一致性：启动后下拉列表不含非法目录（过滤与 resolve 兜底行为一致）。"""
+    dates = _two_account_dates()
+
+    def _setup(a):
+        _two_account_env(a, dates)
+        (a.accounts_dir / ".dot").mkdir()
+
+    win, acc = account_window_factory(setup=_setup)
+
+    try:
+        items = [
+            win.sidebar.account_combo.itemText(i)
+            for i in range(win.sidebar.account_combo.count())
+        ]
+        assert ".dot" not in items
+        assert win.current_account == "主账号"  # 解析兜底不受非法目录干扰
     finally:
         win.close()

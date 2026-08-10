@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.chart_widget import ChartWidget
-from account_store import AccountStore
+from account_store import AccountStore, validate_account_name
 from config import (
     DATA_DIR,
     DATE_FORMAT,
@@ -320,11 +320,19 @@ class MainWindow(QMainWindow):
         删除 / CSV 导出随后即时落盘到新 store；取消未保存的编辑 / 复用状态，
         防止跨账号污染。选择当前账号本身 → no-op（不重载、不落盘）。
         利润页零改动（本方法不触碰 profit_page 任何状态）。
+        F-P1 评审修复：切换前补 validate_account_name 校验——非法名（如手工
+        创建的非法目录被绕过过滤直接触发）拒绝切换并给可读提示，与启动路径
+        resolve_account 行为一致，杜绝「写入非法目录 → 重启静默失联」。
         """
         if self.current_account is None:
             return  # 注入模式无账号概念（账号区已隐藏，防御）
         if name == self.current_account:
             return  # 同账号 no-op
+        if validate_account_name(name) is not None:
+            QMessageBox.warning(
+                self, "无法切换账号", f"账号「{name}」名称不合法，已忽略"
+            )
+            return
         if name not in self._account_store.list_accounts():
             return  # 目标账号不存在（防御：下拉数据来自业务层，正常不会发生）
 

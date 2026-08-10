@@ -57,6 +57,20 @@ def test_list_accounts_returns_dir_names_sorted(tmp_path):
     assert store.list_accounts() == ["主账号", "小号"]
 
 
+def test_list_accounts_filters_illegal_dir_names(tmp_path):
+    """F-P1：非法目录名（点开头）不列为账号（与 resolve/create 校验语义一致）。
+
+    手工创建的非法目录从账号发现中剔除，杜绝「选中非法目录 → 写入 → 重启
+    静默失联」路径；spec H2「目录名 = 账号名」语义保留（仅加 sanitize 边界）。
+    注：Windows 会剥掉目录名尾空格（"bad name " → "bad name"），故尾空格
+    变体不可构造，非法目录以点开头为代表（Windows 可创建）。
+    """
+    store = AccountStore(tmp_path / "accounts")
+    store.create_account("主账号")
+    (store.accounts_dir / ".dot").mkdir()
+    assert store.list_accounts() == ["主账号"]
+
+
 # ── create_account：新建账号（H5 空库起步）─────────────────
 
 
@@ -76,6 +90,20 @@ def test_create_account_duplicate_rejected(tmp_path):
     reason = store.create_account("小号")
     assert isinstance(reason, str) and "已存在" in reason
     assert len(store.list_accounts()) == 1
+
+
+def test_create_account_rejects_casefold_duplicate(tmp_path):
+    """Windows 大小写不敏感：已存在 Abc 时 abc → 拒绝并给出可读原因（二轮评审）。
+
+    此前 mkdir 在大小写变体上是 no-op，create 静默返回 None（假成功无提示）。
+    注：Windows 上 (accounts/"abc").exists() 恒真（大小写不敏感解析），
+    目录唯一性以 list_accounts 为准。
+    """
+    store = AccountStore(tmp_path / "accounts")
+    assert store.create_account("Abc") is None
+    reason = store.create_account("abc")
+    assert isinstance(reason, str) and "已存在" in reason
+    assert store.list_accounts() == ["Abc"]  # 原目录保留，无新增
 
 
 @pytest.mark.parametrize(
@@ -411,6 +439,41 @@ def test_migrate_oserror_warns_not_raises(tmp_path, monkeypatch, caplog):
     assert any("迁移失败" in rec.message for rec in caplog.records)
     assert not (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
     assert (tmp_path / "data.json").exists()  # 源不动
+
+
+def test_migrate_failure_cleans_partial_copy_and_retry_succeeds(tmp_path, monkeypatch):
+    """SP2：copy2 中途失败 → 半成品清理（恢复触发条件）；下次启动重试成功。"""
+    import shutil
+
+    _write_json(tmp_path / "data.json", {"v": 1})
+    _write_json(tmp_path / "data.json.bak.1", {"bak1": 1})
+    store = AccountStore(tmp_path / "accounts")
+
+    calls = {"n": 0}
+    real_copy2 = shutil.copy2
+
+    def _flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 2:  # data.json 复制成功、bak.1 复制失败
+            raise OSError("disk full")
+        return real_copy2(src, dst)
+
+    monkeypatch.setattr(shutil, "copy2", _flaky)
+
+    store.migrate_legacy_to_default(tmp_path)
+
+    # 半成品清理：无 accounts/主账号 残留、无 marker、源保留（铁律）
+    assert not (tmp_path / "accounts").exists(), "accounts/ 残留导致永久跳过"
+    assert not (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
+    assert (tmp_path / "data.json").exists()
+    assert (tmp_path / "data.json.bak.1").exists()
+
+    # 下次启动重试成功（触发条件恢复）
+    store.migrate_legacy_to_default(tmp_path)
+    default_dir = tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME
+    assert (default_dir / "data.json").exists()
+    assert (default_dir / "data.json.bak.1").exists()
+    assert (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
 
 
 def test_migrate_logs_info_on_success(tmp_path, caplog):

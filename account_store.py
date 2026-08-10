@@ -82,13 +82,17 @@ class AccountStore:
         """扫描 accounts 目录返回账号名列表（目录名 = 账号名，稳定排序）。
 
         目录缺失或为空 → ``[]``（不创建目录）。
+        F-P1 评审修复：目录名非法的条目（如手工创建的点开头/尾空格目录）
+        不列为账号——与 resolve_account / create_account 的校验语义一致，
+        杜绝「选中非法目录 → 写入 → 重启静默失联」路径（spec H2「目录名 =
+        账号名」的账号发现语义保留，仅加 sanitize 边界）。
         """
         if not self.accounts_dir.is_dir():
             return []
         return sorted(
             entry.name
             for entry in self.accounts_dir.iterdir()
-            if entry.is_dir()
+            if entry.is_dir() and validate_account_name(entry.name) is None
         )
 
     def create_account(self, name: str) -> str | None:
@@ -98,12 +102,15 @@ class AccountStore:
         首次 ``DataStore.load()`` 自然得到空库 ``{}``。
         mkdir 失败（F1 评审修复：权限/磁盘 OSError）→ 记录 warning
         并返回可读原因，不向 UI 抛异常。
+        二轮评审：重名检测含 casefold 变体（Windows 大小写不敏感）——
+        已有 "Abc" 时新建 "abc" 此前 mkdir 是 no-op 静默假成功，现明确拒绝。
         """
         reason = validate_account_name(name)
         if reason is not None:
             return reason
-        if name in self.list_accounts():
-            return f"账号「{name}」已存在"
+        existing = {n.casefold(): n for n in self.list_accounts()}
+        if name.casefold() in existing:
+            return f"账号「{name}」已存在（与「{existing[name.casefold()]}」重名）"
         try:
             (self.accounts_dir / name).mkdir(parents=True, exist_ok=True)
         except OSError as e:
@@ -175,11 +182,28 @@ class AccountStore:
                 shutil.copy2(src, dst)
         except OSError as e:
             logger.warning("v2 旧数据迁移失败（数据仍在原位置，不影响启动）: %s", e)
+            self._cleanup_failed_migration(accounts_dir, default_dir)
             return
         self._write_v2_marker(accounts_dir)
         logger.info("已迁移旧数据到默认账号「%s」：%s", DEFAULT_ACCOUNT_NAME, default_dir)
 
     # ── 内部方法 ────────────────────────────────────────
+
+    def _cleanup_failed_migration(
+        self, accounts_dir: Path, default_dir: Path
+    ) -> None:
+        """清理迁移失败产生的半成品（SP2 评审修复），恢复重试触发条件。
+
+        迁移触发条件保证 accounts/ 在本次调用前不存在，故 default_dir 与
+        accounts/ 均为本次创建；失败时删除本次产生的副本目录，绝不碰源文件
+        （O-22 源保留铁律），下次启动可重新迁移。清理失败仅 warning。
+        """
+        try:
+            shutil.rmtree(default_dir, ignore_errors=True)
+            if accounts_dir.exists() and not any(accounts_dir.iterdir()):
+                accounts_dir.rmdir()
+        except OSError as e:
+            logger.warning("v2 迁移失败清理不完整: %s", e)
 
     def _write_v2_marker(self, accounts_dir: Path) -> None:
         """写 ``.migrated_v2`` 完成标记（幂等；失败仅 warning，不影响主流程）。"""
