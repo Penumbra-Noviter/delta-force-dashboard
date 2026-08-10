@@ -83,8 +83,8 @@ Delta Force Dashboard/
 ├── main.py                  ← [主入口] PySide6 QApplication + 单实例保证 + 应用图标
 ├── app/
 │   ├── __init__.py          ← app 包标记
-│   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流
-│   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮，L-01，~98 行）
+│   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流（含账号区 Y-03/Y-04/Y-05）
+│   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮 + 顶部账号区 Y-04，L-01，~98 行）
 │   ├── registry.py          ← 插件式 Widget 注册系统（AppWidget + WidgetRegistry，~54 行）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
@@ -95,6 +95,7 @@ Delta Force Dashboard/
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
 │   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
+├── account_store.py         ← [多账号（Y 系列）] AccountStore 账号目录管理 + 校验 + v2 迁移（ADR-0005）
 ├── signals.py               ← [领域信号] RateSignal + PnLSignal 共享叶子（零依赖，D-01 收敛点）
 ├── config.py                ← [基础配置] 路径、日期格式、字体、THEMES 色板
 ├── data_store.py            ← [持久化] DataStore — JSON 原子写入 + 滚动备份
@@ -180,7 +181,11 @@ Delta Force Dashboard/
 | <!--AUTO:sig:app/main_window.py:MainWindow._delete_record-->`_delete_record(date_str)`<!--/AUTO--> | 确认对话框 → 删除数据 → 持久化 → 刷新 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._toggle_theme-->`_toggle_theme()`<!--/AUTO--> | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._toggle_pin-->`_toggle_pin()`<!--/AUTO--> | 切换窗口置顶状态 |
-| <!--AUTO:sig:app/main_window.py:MainWindow._save_settings-->`_save_settings()`<!--/AUTO--> | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._save_settings-->`_save_settings()`<!--/AUTO--> | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02）；Y-03：注入模式外合并 `current_account` 落盘（Y-03，重启回到当前账号） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._update_account_title-->`_update_account_title()`<!--/AUTO--> | 记账页标题栏显示「Delta Force Dashboard · <账号名>」（Y-03；注入模式保持原标题） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._refresh_account_combo-->`_refresh_account_combo()`<!--/AUTO--> | 账号区下拉列表与业务层账号状态同步（`sidebar.set_accounts`，blockSignals 不触发选择信号，Y-04） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._create_account-->`_create_account()`<!--/AUTO--> | 新建账号：QInputDialog 命名 → `AccountStore.create_account` 校验（非法名可读提示、零目录）→ 刷新下拉；当前账号不变（决策 6）；注入模式防御 return（Y-04） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._on_account_selected-->`_on_account_selected(name)`<!--/AUTO--> | 切换账号（Y-05）：目标账号 new_store + 重载 logic → cancel_edit/clear_fields/cancel_reuse 防跨账号污染 → count-up 归零 → refresh_display 全量刷新 → 标题/下拉同步 → `_save_settings` 落盘；同账号 no-op；利润页零触碰 |
 
 #### 信号连接
 
@@ -192,6 +197,8 @@ Delta Force Dashboard/
 | `TableWidget` | `delete_requested` | `MainWindow._delete_record()` |
 | QAction (Enter) | `triggered` | `MainWindow.save_today()` |
 | QAction (Esc) | `triggered` | `MainWindow._clear_focused_input()` |
+| `Sidebar` | `account_selected(str)` | `MainWindow._on_account_selected()`（Y-05 账号切换） |
+| `Sidebar` | `create_account_requested()` | `MainWindow._create_account()`（Y-04 新建账号） |
 
 ---
 
@@ -417,7 +424,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | `DATA_FILE` | `DATA_DIR/data.json` | 数据文件路径 |
 | `BACKUP_FILE` | `DATA_DIR/data.json.bak` | 备份文件基础路径 |
 | `SETTINGS_FILE` | `DATA_DIR/settings.json` | 设置文件路径 |
-| `LOG_FILE` | `DATA_DIR/profit_calculator.log` | 日志文件路径 |
+| `LOG_FILE` | `DATA_DIR/delta_force_dashboard.log` | 日志文件路径 |
 | `DATE_FORMAT` | `"%Y-%m-%d"` | 日期格式 |
 | `WEEK_DAYS` | `7` | 视图默认窗口（启动默认 7，录入条数语义；J 系列与保留上限解耦） |
 | `RETENTION_LIMIT` | `30` | 存储保留上限（`rotate_weekly` 默认值；满 30 不删、第 31 条才删最旧，J 系列） |
@@ -515,6 +522,39 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
+### 4.15 `account_store.py` — 多账号存储层（Y 系列，<!--AUTO:lines:account_store.py-->~174 行<!--/AUTO-->）
+
+**布局约定（ADR-0005）**：`accounts/<账号名>/data.json`，目录名即账号名，无 `accounts.json` 元数据文件；每账号复用 `DataStore(data_file, backup_file)` 路径注入，原子写 / 损坏恢复 / 滚动备份全部继承。UI 层不得直接拼装账号路径——所有账号文件系统操作收敛到本模块。
+
+| 常量 | 值 | 说明 |
+|------|-----|------|
+| `DEFAULT_ACCOUNT_NAME` | `"主账号"` | 默认账号：首次升级 / 兜底回退落点（H1 共识） |
+| `ACCOUNTS_DIR_NAME` | `"accounts"` | 账号根目录名（位于统一数据目录 DATA_DIR 下） |
+| `MIGRATED_V2_MARKER_NAME` | `".migrated_v2"` | v2 迁移完成标记（存在即跳过，幂等） |
+| `MAX_ACCOUNT_NAME_LEN` | `64` | 账号名长度上限（F1 评审修复，远小于 Windows 255 单目录名上限） |
+
+#### 函数：`validate_account_name(name)`
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:account_store.py:validate_account_name-->`validate_account_name(name)`<!--/AUTO--> | 校验账号名：合法返回 None，否则返回可读拒绝原因——非文本 / 空名 / 控制字符（ord<32，F1）/ 超 64 字符 / 含 `\ / : * ? " < > \|` / 首尾空格或点；中文 / 数字 / 中间空格合法 |
+
+#### 类：`AccountStore`
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:account_store.py:AccountStore.__init__-->`__init__(accounts_dir)`<!--/AUTO--> | 账号目录路径（测试显式注入 tmp_path，生产默认 `DATA_DIR/accounts`） |
+| <!--AUTO:sig:account_store.py:AccountStore.list_accounts-->`list_accounts()`<!--/AUTO--> | 扫描 accounts 目录返回账号名列表（目录名=账号名，稳定排序）；目录缺失/空 → `[]`（不创建目录） |
+| <!--AUTO:sig:account_store.py:AccountStore.create_account-->`create_account(name)`<!--/AUTO--> | 新建账号：成功返回 None / 拒绝返回可读原因（不产生任何目录）；新账号空数据起步（H5，只建目录不写 data.json）；mkdir OSError → warning + 可读原因（F1） |
+| <!--AUTO:sig:account_store.py:AccountStore.resolve_account-->`resolve_account(current)`<!--/AUTO--> | 解析当前账号：current 缺失/非字符串/目录不存在/目录名非法（F3）→ 回退主账号并自建空目录（H3）；accounts 空 → 自动建主账号 |
+| <!--AUTO:sig:account_store.py:AccountStore.account_dir-->`account_dir(name)`<!--/AUTO--> | 账号目录路径（业务层唯一拼装点，UI 禁止直接拼装） |
+| <!--AUTO:sig:account_store.py:AccountStore.new_store-->`new_store(name)`<!--/AUTO--> | 以账号路径注入构造 DataStore（原子写 / 损坏恢复 / 滚动备份全继承） |
+| <!--AUTO:sig:account_store.py:AccountStore.migrate_legacy_to_default-->`migrate_legacy_to_default(data_dir=None)`<!--/AUTO--> | v2 旧数据迁移（Y-02）：accounts/ 不存在 **且** 旧 data.json 存在 → 复制 data.json + 全部 `data.json.bak*` 到 accounts/主账号/ 并写 `.migrated_v2`；accounts/ 已存在（含空）/marker 存在 → 跳过；复制非移动、永不删源（O-22 铁律）；OSError → warning 不中断不写 marker；data_dir 缺省 = accounts_dir 父目录（生产 DATA_DIR），测试显式注入 |
+
+**main.py 接线（Y-02）**：v2 迁移在 O-22 `migrate_legacy_data` 之后、MainWindow 构造之前（AST 顺序断言防复发）。
+
+---
+
 ## 五、依赖关系
 
 ### 5.1 外部依赖
@@ -554,6 +594,7 @@ main.py
 | `app/chart_widget.py` | `app.theme`, `formatting`, `pyqtgraph`, `PySide6` |
 | `app/theme.py` | `signals`（`RateSignal`，零依赖叶子） |
 | `calculator.py` | `config`, `formatting` |
+| `account_store.py` | `config`, `data_store` |
 | `presentation.py` | `config`, `formatting`, `signals` |
 | `data_store.py` | `config` |
 | `settings_store.py` | `json_file`, `config` |
@@ -587,9 +628,13 @@ main.py
 {
   "geometry": "hex-encoded QByteArray",
   "pinned": false,
-  "theme": "light"
+  "theme": "light",
+  "current_account": "主账号"
 }
 ```
+
+- `current_account`（Y-03）：最近使用的账号名，启动时经 `AccountStore.resolve_account` 解析（缺失/非法/目录不存在 → 回退主账号）；注入模式（测试）不写此 key
+- 账号数据存储于 `DATA_DIR/accounts/<账号名>/data.json`（ADR-0005，目录名即账号名）
 
 ### 6.3 备份文件
 
@@ -628,7 +673,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->78<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14） |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->78<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->26<!--/AUTO--> | 数据模型 + OV 响应解析 |
 | `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->15<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/offscreen 守卫/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |

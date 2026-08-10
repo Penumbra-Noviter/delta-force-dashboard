@@ -34,7 +34,13 @@
 
 | 波 | 时长 | 并行数 | 回退/冲突 | 增量审核 findings |
 |----|------|--------|-----------|-------------------|
-| 1  | —    | 1（串行） | — | 期末统一三轴 |
+| 1  | ~35min | 1（串行） | 0 | 期末三轴：Standards 3×P2 / Spec 0 / Falsify 1×P1(F1)+3×P2+1×P3 |
+
+## code-review 处置（2026-08-10）
+
+- 固定点 4fc4019，无 P0；F1 P1（账号名控制字符/超长 → mkdir OSError，已实测）→ 派回 Implement 修复中
+- P2 一并修：F2（_ensure_default_account OSError 防护）、F3（resolve_account 命中目录补校验）、S2（set_account_area_visible 简化）、S3（固定日期改相对 now）
+- 备忘不修：S1（mkdir+logger 重复，判断级）、F4/F5（已确认安全）
 
 ## 现状指针
 

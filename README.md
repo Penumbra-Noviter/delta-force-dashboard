@@ -18,8 +18,9 @@
 - **今日未录入提醒** — 今日尚未记录时标题栏常驻提示，保存后自动消失
 - **亮 / 暗双主题** — 亮色 Sage Ledger 青绿暖纸 + 暗色 Midnight & Amber 琥珀午夜，降低长时间使用疲劳
 - **窗口置顶** — 可将窗口固定在最前，方便边操作其他软件边录入
-- **数据安全** — JSON 原子写入 + 滚动备份 + 损坏自动恢复 + 运行日志（`profit_calculator.log`）
+- **数据安全** — JSON 原子写入 + 滚动备份 + 损坏自动恢复 + 运行日志（`delta_force_dashboard.log`）
 - **单实例运行** — 防止多开冲突
+- **多账号记账** — 侧边栏账号区可新建 / 切换多个账号，各账号独立数据（`accounts/<账号名>/data.json`，目录即账号名），旧数据自动复制迁移为「主账号」（永不删源）；当前账号持久化于 `settings.json`，重启自动回到上次账号
 
 ---
 
@@ -50,7 +51,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（305 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
+| 测试框架 | pytest（477 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -113,6 +114,7 @@ delta-force-dashboard/
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出
 │   └── theme.py             # 主题色板 + QSS 样式表生成
 ├── calculator.py            # 业务逻辑（DayRecord + 盈亏计算）
+├── account_store.py         # 多账号存储层（账号目录管理 + 校验 + 旧数据迁移）
 ├── config.py                # 路径、日期格式、数据保留条数（RETENTION_LIMIT=30）
 ├── data_store.py            # JSON 持久化（原子写入 + 备份）
 ├── formatting.py            # 金额格式化与输入解析
@@ -121,7 +123,7 @@ delta-force-dashboard/
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（305 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（477 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）

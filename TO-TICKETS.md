@@ -12,7 +12,7 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-09）：U/V/W 系列已归档，当前无活跃工单。
+> 活跃表（2026-08-10）：Y/U/V/W 系列已归档，当前无活跃工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
@@ -270,6 +270,17 @@
 ---
 
 ## 已完成归档
+
+### Y 系列（2026-08-10，多账号记账，kickoff 2026-08-10 基线 `e5a62c2`；功能 merge `900f50a` + 评审修复 merge `39d9595`）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| Y-01 | 账号存储层 — `account_store.py` 业务模块（`AccountStore(accounts_dir=DATA_DIR/accounts)`：list_accounts 目录扫描/稳定排序、create_account 返回 None=成功/可读拒绝原因（H5 空库起步只建目录）、resolve_account 兜底回退主账号 + 空库自建、new_store/account_dir DataStore 路径注入继承原子写/损坏恢复/滚动备份；`DEFAULT_ACCOUNT_NAME=主账号`、`ACCOUNTS_DIR_NAME=accounts`、`validate_account_name` 校验）；ADR-0005 落档；test_account_store.py 30 用例（list 三态/create 14 非法名 parametrize/resolve 四态/DataStore 注入/全新环境，全 tmp_path 显式注入） | 功能（新增） | 2026-08-10 | `c816de2` |
+| Y-02 | 旧数据迁移 — `migrate_legacy_to_default(data_dir=None)`：accounts/ 不存在 **且** 旧 data.json 存在 → 复制 data.json + 全部 `data.json.bak*` 到 accounts/主账号/ 并写 `.migrated_v2` marker；accounts/ 已存在（含空）/marker 存在 → 跳过（幂等）；复制非移动永不删源（O-22 铁律）；OSError → warning 不中断不写 marker；main.py 接线（O-22 迁移之后、MainWindow 构造之前，AST 顺序断言防复发）；+9 用例 | 功能（数据迁移） | 2026-08-10 | `9296c40` |
+| Y-03 | 启动解析当前账号 — MainWindow 注入 seam 定案（`__init__` 新增 `account_store` 参数；**仅当未注入 store/logic 时才走账号解析**）：settings.current_account → resolve_account 兜底（缺失/非字符串/目录不存在 → 回退主账号）→ new_store 构造 DataStore；`_save_settings` 合并 current_account（注入模式不写 key，geometry/pinned/theme 不丢）；`_update_account_title` 标题栏「Delta Force Dashboard · <账号名>」；settings_store.py 零改动；+8 用例（account_window_factory 注入完整解析链路 + UI 层 AST 防复发——main_window/sidebar 不得含 "accounts" 字面量） | 功能（新增） | 2026-08-10 | `0da9b09` |
+| Y-04 | 侧边栏账号区 — sidebar 顶部账号区（「👤 账号」标题 + QComboBox account_combo + 「➕ 新建账号」按钮），信号 account_selected(str)/create_account_requested()；`set_accounts(names, current)`（blockSignals 防程序刷新误触发）/`set_account_area_visible()`；130px 宽度保持（不动 width()==130 断言）；MainWindow `_create_account`（QInputDialog 命名 → create_account 校验，非法名 QMessageBox 可读提示、零目录 → 刷新列表，当前账号不变决策 6，注入模式防御 return）；`app/ui_text.py` EMOJI 扩展 account/new_account；账号区 QSS；+19 用例 | 功能（UI） | 2026-08-10 | `c1b5525` |
+| Y-05 | 账号切换 — `_on_account_selected(name)` 接线 sidebar.account_selected：目标账号 new_store + 重载 logic → cancel_edit/clear_fields/cancel_reuse（防跨账号污染）→ count-up 上一帧归零（数据源更换不做误导动画）→ refresh_display 全量刷新（表格/曲线/汇总/今日状态）→ 标题 + 下拉选中同步 → `_save_settings` 落盘 current_account；同账号 no-op（不重载不落盘）；未知账号/注入模式防御 return；利润页零触碰；+10 用例 | 功能（UI） | 2026-08-10 | `37b8fb4` |
+| Y 系列评审修复 | code-review 三轴（固定点 `4fc4019`）：F1 `validate_account_name` 补控制字符拒绝（ord<32）+ `MAX_ACCOUNT_NAME_LEN=64`（65 拒/64 边界合法）+ create_account mkdir try/except OSError → 可读原因；F2 `_ensure_default_account` mkdir OSError → warning 仍返回主账号名（启动兜底不崩）；F3 resolve_account 命中目录分支补 validate_account_name（非法目录名回退主账号）；S2 `set_account_area_visible(visible)` 简化为无参 `hide_account_area()`；S3 `_two_account_env` 固定日期改相对 now（保存/删除断言与墙钟解耦）；不改动 S1/F4/F5（已确认安全）；+9 用例；全量 477/477、覆盖率 92.75% | 修复（评审） | 2026-08-10 | `09fa722` |
 
 ### W 系列（2026-08-09，微交互打磨，来源：U-06 遗留方向）
 
