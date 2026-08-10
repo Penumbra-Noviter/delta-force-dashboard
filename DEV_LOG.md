@@ -6,6 +6,12 @@
 
 ---
 
+## 滚动摘要（2026-08-10）
+
+- **Y 系列进行中 — 账号切换（多账号记账，kickoff 2026-08-10，基线 `e5a62c2`）**：只动记账部分，利润模块零改动；存储 `~/Delta Force Dashboard/accounts/<账号名>/data.json`（复用 DataStore 原子写/滚动备份/损坏自愈），旧 `data.json` 复制迁移为「主账号」（marker 幂等、不删源），操作集仅新建+切换，`current_account` 持久化于 settings.json，侧边栏账号区（下拉+新建按钮）；共识：H1 账号名 sanitize / H2 目录名即账号名 / H3 兜底回主账号+空库自建 / H4 利润零改动 / H5 新账号空库
+- **知识库预检召回轨迹（kickoff）**：persona（`项目/Profit Calculator/persona.md`，2026-08-09 版）+ 精读 5 条：`测试夹具污染真实用户数据`（tmp_path 显式注入）/ `打包覆盖丢数据`（复制非移动+marker，不删源）/ `共享约定先查全局引用`（data.json 引用点先 grep 全局）/ `空环境首启即崩`（全新环境首次运行单独测）/ `存储保留与展示窗口解耦`；守卫反查通过（全库经验均有 summary）；其余笔记仅扫摘要未精读
+
+---
 ## 滚动摘要（2026-08-09）
 
 - **U-03 色彩角色系统化（08-09，kickoff 全流程）**：7 包色收敛单一装饰键 `PACKAGE_COLOR_0~6`（删 CHART_SERIES_*/PACKAGE_COLOR_* 双套键）+ 亮暗明度带量化（light L 0.20-0.32 / dark L 0.72-0.84，S≥0.55，两两 ΔE76≥25）+ 装饰≠语义（dark 曾与 FG_POS/FG_NEG 完全同值已修）；`tests/test_theme_roles.py` 8 机器断言（目检降级）；code-review 三轴 Falsify 抓到主题切换包标签色残留（ExchangePage.apply_theme 修复）；**活跃表清零——全部工单完成**；测试 379→**391**，覆盖率 92%
