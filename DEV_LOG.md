@@ -8,6 +8,11 @@
 
 ## 滚动摘要（2026-08-10）
 
+- **打包（08-10 19:05）**：Y 系列后重新 PyInstaller 打包，`dist/Delta Force Dashboard/` 67M（exe 6.86MB + `_internal/`）；offscreen 烟测通过（exe 存活 12s）；**真实环境 v2 迁移实测通过**——`accounts/主账号/` 完整迁移（15 条数据一致、4 份备份复制、`.migrated_v2` marker 写入、源文件保留未删）
+- **知识库蒸馏（08-10）**：新经验 `输入映射文件路径的校验边界.md`（Y 系列 F1 实证：控制字符/长度上限/mkdir OSError）；persona 并入该稳定模式
+
+## 滚动摘要（2026-08-10）
+
 - **Y 系列完成 — 账号切换（多账号记账，2026-08-10，Y-01~Y-05：`c816de2`/`9296c40`/`0da9b09`/`c1b5525`/`37b8fb4` + code-review 修复 `09fa722`，merge `900f50a`/`39d9595`）**：只动记账部分，利润模块零改动；存储 `~/Delta Force Dashboard/accounts/<账号名>/data.json`（复用 DataStore 原子写/滚动备份/损坏自愈），旧 `data.json` 复制迁移为「主账号」（`.migrated_v2` marker 幂等、不删源），操作集仅新建+切换，`current_account` 持久化于 settings.json，侧边栏账号区（下拉+新建按钮）；共识：H1 账号名 sanitize / H2 目录名即账号名 / H3 兜底回主账号+空库自建 / H4 利润零改动 / H5 新账号空库；**477/477 测试绿，覆盖率 92.75%**（account_store 98% / main_window 92% / sidebar 99%）；code-review 三轴评审修复（F1 账号名控制字符/长度上限 + mkdir OSError 兜底、F2/F3 兜底防护、S2 `hide_account_area()` 简化、S3 测试动态日期）；活跃表清零，TO-TICKETS Y 系列已归档
 
   #### Y 系列逐工单摘要（吸收自 `.scratch/multi-account/progress.md`）
