@@ -312,6 +312,40 @@ class MainWindow(QMainWindow):
         logger.info("已新建账号：%s", name)
         self._refresh_account_combo()
 
+    def _on_account_selected(self, name: str) -> None:
+        """切换账号：换 DataStore/logic → 取消编辑/复用 → 全量刷新 → 标题/落盘同步。
+
+        决策链（spec）：切换时用目标账号路径构造新 DataStore 并重新加载 logic，
+        随后整页刷新（表格 / 曲线 / 汇总 / 今日状态 / 标题栏账号名）；保存 /
+        删除 / CSV 导出随后即时落盘到新 store；取消未保存的编辑 / 复用状态，
+        防止跨账号污染。选择当前账号本身 → no-op（不重载、不落盘）。
+        利润页零改动（本方法不触碰 profit_page 任何状态）。
+        """
+        if self.current_account is None:
+            return  # 注入模式无账号概念（账号区已隐藏，防御）
+        if name == self.current_account:
+            return  # 同账号 no-op
+        if name not in self._account_store.list_accounts():
+            return  # 目标账号不存在（防御：下拉数据来自业务层，正常不会发生）
+
+        self.current_account = name
+        self.store = self._account_store.new_store(name)
+        self.logic = ProfitCalculatorLogic(self.store.load())
+
+        # 取消编辑/复用态，防止旧账号输入污染新账号视图（Y-05 验收标准 3）
+        self.input_panel.cancel_edit()
+        self.input_panel.clear_fields()
+        self.input_panel.cancel_reuse()
+        # KPI count-up 上一帧归零：账号切换是数据源更换，数字直接落终态
+        # （不做「旧账号数值滚动到新账号数值」的误导动画，Y-05 风险点）
+        self._last_summary_total = None
+        self._last_cash_delta = None
+
+        self.refresh_display()
+        self._update_account_title()
+        self._refresh_account_combo()  # 下拉选中态同步（set_accounts 不触发选择信号）
+        self._save_settings()  # current_account 落盘，重启回到新账号
+
     def closeEvent(self, event) -> None:
         # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
         if self.input_panel.is_editing() or self.input_panel.is_reusing():
@@ -402,8 +436,9 @@ class MainWindow(QMainWindow):
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
-        # Y-04：账号区——新建账号（命名对话框）；下拉选择切换在 Y-05 接线
+        # Y-04：账号区——新建账号（命名对话框）；下拉选择切换（Y-05 接线）
         self.sidebar.create_account_requested.connect(self._create_account)
+        self.sidebar.account_selected.connect(self._on_account_selected)
 
         # 键盘快捷键
         save_shortcut = QAction(self)
