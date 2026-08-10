@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.chart_widget import ChartWidget
+from account_store import AccountStore
 from config import (
     DATA_DIR,
     DATE_FORMAT,
@@ -131,12 +132,34 @@ class MainWindow(QMainWindow):
     def __init__(self, store: DataStore | None = None,
                  logic: ProfitCalculatorLogic | None = None,
                  settings_store: SettingsStore | None = None,
-                 registry: WidgetRegistry | None = None) -> None:
+                 registry: WidgetRegistry | None = None,
+                 account_store: AccountStore | None = None) -> None:
         super().__init__()
 
-        self.store = store or DataStore()
-        self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
+        self._settings = self.settings_store.load()
+        self._theme = self._settings.get("theme", "light")
+        set_theme(self._theme)
+        # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
+        set_animations_enabled(self._settings.get("animations", True))
+
+        # Y-03：账号解析。注入 seam 定案——仅当未注入 store/logic 时才走账号解析
+        # （生产默认路径，从 settings.current_account 解析并构造对应账号 DataStore）；
+        # 注入 store/logic 保持现状（既有 ~15 个注入测试零改动、零真实目录触碰）。
+        # 测试显式注入 account_store/settings_store 即可让完整解析链路落在 tmp_path。
+        if store is None and logic is None:
+            self._account_store = account_store or AccountStore()
+            self.current_account = self._account_store.resolve_account(
+                self._settings.get("current_account")
+            )
+            self.store = self._account_store.new_store(self.current_account)
+            self.logic = ProfitCalculatorLogic(self.store.load())
+        else:
+            self._account_store = account_store  # 注入模式不参与解析
+            self.current_account = None
+            self.store = store or DataStore()
+            self.logic = logic or ProfitCalculatorLogic(self.store.load())
+
         self._registry = registry or self._default_registry()
         self.today = datetime.now().strftime(DATE_FORMAT)
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
@@ -145,17 +168,14 @@ class MainWindow(QMainWindow):
         # W-01：KPI count-up 的上一帧数值（None = 尚未渲染过/数据不足）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
-        self._settings = self.settings_store.load()
-        self._theme = self._settings.get("theme", "light")
-        set_theme(self._theme)
-        # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
-        set_animations_enabled(self._settings.get("animations", True))
 
         self._setup_window()
         self.sidebar = Sidebar()
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
+        # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
+        self._update_account_title()
 
         # 初始渲染
         self.refresh_display()
@@ -234,12 +254,28 @@ class MainWindow(QMainWindow):
 
         MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
         self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
-        编码收敛到 settings_store.encode_settings 纯函数（候选 3）。
+        编码收敛到 settings_store.encode_settings 纯函数（候选 3）；
+        Y-03：current_account 在纯函数输出上合并（注入模式无账号 → 不写 key）。
         """
         settings = encode_settings(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
+        if self.current_account is not None:
+            settings["current_account"] = self.current_account
         self.settings_store.save(settings)
+
+    def _update_account_title(self) -> None:
+        """记账页标题栏显示当前账号名（Y-03，随账号区状态同步）。
+
+        注入模式（current_account is None，无账号概念）保持原标题，
+        既有注入测试零破坏。
+        """
+        if self.current_account is not None:
+            self._title_label.setText(
+                f"Delta Force Dashboard · {self.current_account}"
+            )
+        else:
+            self._title_label.setText("Delta Force Dashboard")
 
     def closeEvent(self, event) -> None:
         # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
