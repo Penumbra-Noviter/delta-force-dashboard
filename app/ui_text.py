@@ -13,6 +13,8 @@ __all__ = ["EMOJI"]
 EMOJI: dict[str, str] = {
     "nav_ledger": "📒",   # 侧边栏：记账页
     "nav_profit": "🔧",   # 侧边栏：利润页
+    "account": "👤",      # 侧边栏账号区标题（Y-04）
+    "new_account": "➕",  # 侧边栏：新建账号按钮（Y-04）
     "theme_dark": "🌙",   # 主题切换：切到暗色
     "theme_light": "☀️",  # 主题切换：切到亮色
     "pin": "📌",          # 窗口置顶

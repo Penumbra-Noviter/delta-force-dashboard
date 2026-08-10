@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -176,6 +177,11 @@ class MainWindow(QMainWindow):
         self._apply_qss()
         # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
         self._update_account_title()
+        # Y-04：账号区初始化——解析模式注入账号列表；注入模式隐藏账号区
+        if self.current_account is not None:
+            self._refresh_account_combo()
+        else:
+            self.sidebar.set_account_area_visible(False)
 
         # 初始渲染
         self.refresh_display()
@@ -277,6 +283,35 @@ class MainWindow(QMainWindow):
         else:
             self._title_label.setText("Delta Force Dashboard")
 
+    # ═══════════════════════════════════════════════════════
+    # 账号区（Y-04 / Y-05）
+    # ═══════════════════════════════════════════════════════
+
+    def _refresh_account_combo(self) -> None:
+        """账号区下拉列表与当前选中同步业务层账号状态（不触发选择信号）。"""
+        self.sidebar.set_accounts(
+            self._account_store.list_accounts(), self.current_account
+        )
+
+    def _create_account(self) -> None:
+        """新建账号：命名对话框 → 业务层校验 → 刷新下拉列表。
+
+        决策 6：新建成功后当前账号不变（留在当前账号，需手动切换）；
+        非法名（空/重名/禁用字符/首尾空格或点）由 account_store 校验
+        并以可读提示拒绝，拒绝时不产生任何目录（H1）。
+        """
+        if self.current_account is None:
+            return  # 注入模式无账号概念（账号区已隐藏，防御）
+        name, ok = QInputDialog.getText(self, "新建账号", "输入新账号名称：")
+        if not ok:
+            return
+        reason = self._account_store.create_account(name)
+        if reason is not None:
+            QMessageBox.warning(self, "无法新建账号", reason)
+            return
+        logger.info("已新建账号：%s", name)
+        self._refresh_account_combo()
+
     def closeEvent(self, event) -> None:
         # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
         if self.input_panel.is_editing() or self.input_panel.is_reusing():
@@ -367,6 +402,8 @@ class MainWindow(QMainWindow):
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
+        # Y-04：账号区——新建账号（命名对话框）；下拉选择切换在 Y-05 接线
+        self.sidebar.create_account_requested.connect(self._create_account)
 
         # 键盘快捷键
         save_shortcut = QAction(self)

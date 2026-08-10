@@ -278,6 +278,7 @@ def generate_qss(theme_name: str) -> str:
     btn_fg = t["BTN_FG"]
     btn_hover = t["BTN_BG_HOVER"]
     border_def = t["BORDER_DEFAULT"]
+    border_heavy = t["BORDER_HEAVY"]
     border_valid = t["BORDER_VALID"]
     border_invalid = t["BORDER_INVALID"]
     border_warning = t["BORDER_WARNING"]
@@ -510,6 +511,45 @@ QPushButton#themeBtn:hover, QPushButton#pinBtn:hover, QPushButton#exportBtn:hove
 QPushButton#pinBtn[active="true"] {{
     background-color: {btn_bg};
     color: {btn_fg};
+}}
+
+/* ═══════════════════════════════════════════
+   侧边栏账号区（Y-04）
+   ═══════════════════════════════════════════ */
+QLabel#accountAreaTitle {{
+    color: {fg_muted};
+    font-size: 10px;
+    font-weight: 600;
+}}
+QComboBox#accountCombo {{
+    background-color: {muted_bg};
+    color: {fg_label};
+    border: 1px solid {border_def};
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 11px;
+}}
+QComboBox#accountCombo:hover {{
+    border-color: {border_heavy};
+}}
+QComboBox#accountCombo QAbstractItemView {{
+    background-color: {card_bg};
+    color: {fg_label};
+    border: 1px solid {border_def};
+    border-radius: 8px;
+    selection-background-color: {t["SELECTION_BG"]};
+    selection-color: {t["SELECTION_FG"]};
+    outline: none;
+}}
+QPushButton#newAccountBtn {{
+    background-color: {muted_bg};
+    color: {fg_label};
+    padding: 5px 12px;
+    font-size: 11px;
+    border-radius: 8px;
+}}
+QPushButton#newAccountBtn:hover {{
+    background-color: {separator};
 }}
 
 QPushButton#refreshBtn {{

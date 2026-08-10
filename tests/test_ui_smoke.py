@@ -1204,3 +1204,143 @@ def test_ui_layers_do_not_build_account_paths():
         assert "ACCOUNTS_DIR_NAME" not in text, (
             f"{name} 引用账号目录常量（必须走 account_store）"
         )
+
+
+# ── Y-04. 侧边栏账号区（下拉框 + 新建账号 + 命名对话框）────
+
+
+def _monkeypatch_input_dialog(monkeypatch, result):
+    """命名对话框返回 (text, ok)；未调用则断言失败。"""
+    from PySide6.QtWidgets import QInputDialog
+
+    calls = []
+
+    def _fake_gettext(*a, **kw):
+        calls.append(a)
+        return result
+
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(_fake_gettext))
+    return calls
+
+
+def test_account_area_initial_state(account_window_factory):
+    """账号区就位：下拉列出全部账号且当前账号选中 + 新建按钮。"""
+    win, _ = account_window_factory(
+        setup=lambda a: (
+            _save_account_record(a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}),
+            a.create_account("小号"),
+        )
+    )
+
+    try:
+        assert not win.sidebar.account_combo.isHidden()
+        items = [
+            win.sidebar.account_combo.itemText(i)
+            for i in range(win.sidebar.account_combo.count())
+        ]
+        assert items == ["主账号", "小号"]
+        assert win.sidebar.account_combo.currentText() == "主账号"
+        assert "新建账号" in win.sidebar.new_account_btn.text()
+        assert win._title_label.text() == "Delta Force Dashboard · 主账号"
+    finally:
+        win.close()
+
+
+def test_create_account_success_appears_in_list_without_switching(
+    account_window_factory, monkeypatch
+):
+    """新建成功 → 下拉立即出现新账号；当前账号不变；新账号空库（H5）。"""
+    win, acc = account_window_factory(
+        setup=lambda a: _save_account_record(
+            a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, ("新账号", True))
+
+    win.sidebar.new_account_btn.click()
+
+    items = [
+        win.sidebar.account_combo.itemText(i)
+        for i in range(win.sidebar.account_combo.count())
+    ]
+    assert items == ["主账号", "新账号"]
+    assert win.current_account == "主账号"  # 决策 6：当前账号不变
+    assert win.sidebar.account_combo.currentText() == "主账号"
+    new_dir = acc.accounts_dir / "新账号"
+    assert new_dir.is_dir()
+    assert not (new_dir / "data.json").exists()  # H5：空库起步
+    assert win._title_label.text() == "Delta Force Dashboard · 主账号"
+    win.close()
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["", "   ", "主账号", "a/b", "a\\b", "a:b", "a*b", 'a"b', "a<b", "a>b", "a|b", " a", "a ", ".a", "a."],
+)
+def test_create_account_rejects_invalid_names(
+    account_window_factory, monkeypatch, name
+):
+    """非法名（空/重名/禁用字符/首尾空格或点）→ 可读提示、零目录产生、列表不变。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win, acc = account_window_factory(
+        setup=lambda a: (
+            _save_account_record(a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}),
+            a.create_account("小号"),
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, (name, True))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+
+    win.sidebar.new_account_btn.click()
+
+    assert warnings, "非法名必须给出可读提示"
+    assert acc.list_accounts() == ["主账号", "小号"]  # 零目录产生
+    assert win.sidebar.account_combo.count() == 2
+    assert win.current_account == "主账号"  # 当前账号不受影响
+    win.close()
+
+
+def test_create_account_cancel_is_noop(account_window_factory, monkeypatch):
+    """命名对话框取消 → 无操作（不创建、不提示）。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win, acc = account_window_factory(
+        setup=lambda a: _save_account_record(
+            a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, ("随便", False))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+
+    win.sidebar.new_account_btn.click()
+
+    assert warnings == []  # 取消不弹提示
+    assert acc.list_accounts() == ["主账号"]
+    win.close()
+
+
+def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path):
+    """注入 store（既有模式）→ 账号区隐藏（无账号概念，零破坏）。"""
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+    )
+
+    assert win.sidebar.account_combo.isHidden()
+    assert win.sidebar.new_account_btn.isHidden()
+    win.close()
