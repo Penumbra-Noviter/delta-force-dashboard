@@ -15,6 +15,7 @@ import pytest
 
 from account_store import (
     DEFAULT_ACCOUNT_NAME,
+    MIGRATED_V2_MARKER_NAME,
     AccountStore,
 )
 
@@ -208,3 +209,197 @@ def test_new_store_rotates_backups(tmp_path):
     assert (account_dir / "data.json.bak").exists()
     for i in range(1, 4):
         assert (account_dir / f"data.json.bak.{i}").exists()
+
+
+# ── migrate_legacy_to_default：v2 旧数据迁移（Y-02）────────
+#
+# 触发条件（决策 2）：accounts/ 不存在 **且** data_dir/data.json 存在 →
+# 复制 data.json + 全部 data.json.bak* 到 accounts/主账号/，写 accounts/.migrated_v2。
+# 复制非移动、永不自动删源（O-22 铁律）；data_dir 显式注入，零真实用户目录。
+
+
+def test_migrate_copies_data_and_backups_to_default(tmp_path):
+    """触发条件满足：data.json + 全部滚动备份复制到主账号，写 .migrated_v2 标记。"""
+    _write_json(tmp_path / "data.json", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}})
+    _write_json(tmp_path / "data.json.bak", {"bak": 0})
+    _write_json(tmp_path / "data.json.bak.1", {"bak1": 1})
+    _write_json(tmp_path / "data.json.bak.2", {"bak2": 2})
+
+    store = AccountStore(tmp_path / "accounts")
+    store.migrate_legacy_to_default(tmp_path)
+
+    default_dir = tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME
+    assert json.loads((default_dir / "data.json").read_text(encoding="utf-8")) == {
+        "2026-08-01": {"cash": 1.0, "warehouse": 2.0}
+    }
+    assert json.loads((default_dir / "data.json.bak").read_text(encoding="utf-8")) == {
+        "bak": 0
+    }
+    assert json.loads(
+        (default_dir / "data.json.bak.1").read_text(encoding="utf-8")
+    ) == {"bak1": 1}
+    assert json.loads(
+        (default_dir / "data.json.bak.2").read_text(encoding="utf-8")
+    ) == {"bak2": 2}
+    assert (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
+
+
+def test_migrate_preserves_source_files(tmp_path):
+    """复制非移动：迁移后源 data.json 与全部备份保留且内容不变。"""
+    _write_json(tmp_path / "data.json", {"v": 1})
+    _write_json(tmp_path / "data.json.bak.1", {"bak1": 1})
+
+    AccountStore(tmp_path / "accounts").migrate_legacy_to_default(tmp_path)
+
+    assert json.loads((tmp_path / "data.json").read_text(encoding="utf-8")) == {"v": 1}
+    assert json.loads((tmp_path / "data.json.bak.1").read_text(encoding="utf-8")) == {
+        "bak1": 1
+    }
+
+
+def test_migrate_skips_when_accounts_exists_empty(tmp_path):
+    """accounts/ 已存在但为空 → 一律不迁移：不建主账号、无 marker、源保留。"""
+    _write_json(tmp_path / "data.json", {"v": 1})
+    accounts_dir = tmp_path / "accounts"
+    accounts_dir.mkdir()
+
+    AccountStore(accounts_dir).migrate_legacy_to_default(tmp_path)
+
+    assert not (accounts_dir / DEFAULT_ACCOUNT_NAME).exists()
+    assert not (accounts_dir / MIGRATED_V2_MARKER_NAME).exists()
+    assert (tmp_path / "data.json").exists()  # 源保留
+
+
+def test_migrate_skips_when_accounts_exists_and_does_not_overwrite(tmp_path):
+    """accounts/ 已有账号目录 → 不迁移、不覆盖任何已有账号数据。"""
+    _write_json(tmp_path / "data.json", {"old": 1})
+    store = AccountStore(tmp_path / "accounts")
+    store.create_account("小号")
+    store.new_store("小号").save({"2026-08-02": {"cash": 9.0, "warehouse": 9.0}})
+
+    store.migrate_legacy_to_default(tmp_path)
+
+    assert not (tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME).exists()
+    assert json.loads(
+        (tmp_path / "accounts" / "小号" / "data.json").read_text(encoding="utf-8")
+    ) == {"2026-08-02": {"cash": 9.0, "warehouse": 9.0}}
+    assert (tmp_path / "data.json").exists()  # 源保留
+
+
+def test_migrate_idempotent_when_marker_present(tmp_path):
+    """marker 存在 → 跳过：二次运行不重复复制、目标数据不被覆盖（幂等）。"""
+    _write_json(tmp_path / "data.json", {"v": 1})
+    store = AccountStore(tmp_path / "accounts")
+    store.migrate_legacy_to_default(tmp_path)
+    assert (tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME / "data.json").exists()
+
+    # 篡改源与目标：二次运行不得覆盖目标已有数据
+    _write_json(tmp_path / "data.json", {"v": "改过了"})
+    _write_json(tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME / "data.json", {"kept": 2})
+
+    store.migrate_legacy_to_default(tmp_path)
+
+    assert json.loads(
+        (tmp_path / "accounts" / DEFAULT_ACCOUNT_NAME / "data.json").read_text(
+            encoding="utf-8"
+        )
+    ) == {"kept": 2}
+    assert json.loads((tmp_path / "data.json").read_text(encoding="utf-8")) == {
+        "v": "改过了"
+    }
+
+
+def test_migrate_noop_on_fresh_environment(tmp_path):
+    """全新环境（无 accounts、无旧 data.json）→ 无迁移、无 marker、无目录产生。"""
+    store = AccountStore(tmp_path / "accounts")
+    store.migrate_legacy_to_default(tmp_path)
+
+    assert store.list_accounts() == []
+    assert not (tmp_path / "accounts").exists()
+    assert not (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
+
+
+def test_migrate_noop_without_legacy_data(tmp_path):
+    """data_dir 存在但无 data.json（如空安装残留目录）→ 无迁移、无 marker。"""
+    (tmp_path / "unused.txt").write_text("x", encoding="utf-8")
+
+    store = AccountStore(tmp_path / "accounts")
+    store.migrate_legacy_to_default(tmp_path)
+
+    assert not (tmp_path / "accounts").exists()
+
+
+def test_migrate_oserror_warns_not_raises(tmp_path, monkeypatch, caplog):
+    """迁移中途 OSError → warning 日志、不抛异常、不写 marker、源保留。"""
+    import shutil
+
+    _write_json(tmp_path / "data.json", {"v": 1})
+
+    def _boom(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(shutil, "copy2", _boom)
+
+    with caplog.at_level("WARNING"):
+        AccountStore(tmp_path / "accounts").migrate_legacy_to_default(tmp_path)
+
+    assert any("迁移失败" in rec.message for rec in caplog.records)
+    assert not (tmp_path / "accounts" / MIGRATED_V2_MARKER_NAME).exists()
+    assert (tmp_path / "data.json").exists()  # 源不动
+
+
+def test_migrate_logs_info_on_success(tmp_path, caplog):
+    """成功迁移记录 info 日志（可观测）。"""
+    _write_json(tmp_path / "data.json", {"v": 1})
+
+    with caplog.at_level("INFO"):
+        AccountStore(tmp_path / "accounts").migrate_legacy_to_default(tmp_path)
+
+    assert any("主账号" in rec.message and "迁移" in rec.message for rec in caplog.records)
+
+
+# ── main() 启动接线：v2 迁移顺序（Y-02 验收标准 7）────────
+#
+# O-22 旧目录迁移先执行（填充统一目录 data.json），v2 迁移在其后、
+# MainWindow 构造之前。AST 静态断言防顺序回归（沿用 test_migration 先例）。
+
+
+def _main_ast():
+    import ast as ast_mod
+    import inspect
+
+    import main as main_mod
+
+    source = inspect.getsource(main_mod)
+    tree = ast_mod.parse(source)
+    funcs = [
+        n for n in tree.body if isinstance(n, ast_mod.FunctionDef) and n.name == "main"
+    ]
+    assert len(funcs) == 1
+    return funcs[0]
+
+
+def _call_lineno(node, name):
+    """返回函数体内第一个调用名匹配（Attribute.attr 或 Name.id）的行号。"""
+    import ast as ast_mod
+
+    for child in ast_mod.walk(node):
+        if not isinstance(child, ast_mod.Call):
+            continue
+        func = child.func
+        if isinstance(func, ast_mod.Attribute) and func.attr == name:
+            return child.lineno
+        if isinstance(func, ast_mod.Name) and func.id == name:
+            return child.lineno
+    raise AssertionError(f"main() 中未找到 {name}(...) 调用")
+
+
+def test_main_wires_v2_migration_after_o22_before_window():
+    """v2 迁移在 O-22 migrate_legacy_data 之后、MainWindow 构造之前。"""
+    main_fn = _main_ast()
+    o22 = _call_lineno(main_fn, "migrate_legacy_data")
+    v2 = _call_lineno(main_fn, "migrate_legacy_to_default")
+    window = _call_lineno(main_fn, "MainWindow")
+    assert o22 < v2 < window, (
+        f"顺序必须为 O-22（L{o22}）→ v2（L{v2}）→ MainWindow（L{window}）"
+    )

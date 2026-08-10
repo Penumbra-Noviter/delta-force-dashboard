@@ -19,6 +19,7 @@ from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication
 
 from app import MainWindow
+from account_store import AccountStore
 from config import (
     DATA_DIR,
     _APP_DIR as APP_DIR,
@@ -160,6 +161,11 @@ def main() -> None:
     # 迁移完成后提示旧数据源可手动清理（F-02）：仅打日志，删除须用户手动确认。
     log_legacy_cleanup_hint(LEGACY_DATA_DIR, DATA_DIR)
     log_legacy_cleanup_hint(APP_DIR, DATA_DIR)
+
+    # v2 迁移（Y-02）：统一目录 data.json → accounts/主账号/（复制非移动）。
+    # 必须在 O-22 之后（旧目录先填充统一目录 data.json）、MainWindow 构造之前
+    # （窗口从解析出的账号路径构造 store）。幂等：accounts/.migrated_v2 存在即跳过。
+    AccountStore().migrate_legacy_to_default()
 
     window = MainWindow()
     window.show()
