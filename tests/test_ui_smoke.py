@@ -1038,3 +1038,539 @@ def test_cash_summary_label_follows_view(view_switch_window):
     btn30 = next(b for b in win.table._view_buttons if b.property("days") == 30)
     btn30.click()
     assert "最近30条现金总变化" in win._cash_summary_caption.text()
+
+
+# ── Y-03. 启动解析当前账号（current_account 持久化 + 兜底恢复）──
+#
+# seam 定案：仅当未注入 store/logic 时才走账号解析（生产默认路径）；注入
+# account_store + settings_store 让完整解析链路落在 tmp_path，零真实用户目录。
+
+
+@pytest.fixture
+def account_window_factory(qapp, settings_guard, tmp_path):
+    """构造走账号解析路径的 MainWindow 工厂（注入 AccountStore/SettingsStore）。
+
+    setup(acc) 在窗口构造前调用，用于预置账号/数据（窗口构造即解析 current_account）。
+    """
+    from account_store import AccountStore
+    from app.main_window import MainWindow
+    from settings_store import SettingsStore
+
+    def _make(settings_data=None, setup=None):
+        acc = AccountStore(tmp_path / "accounts")
+        if setup is not None:
+            setup(acc)
+        settings_file = tmp_path / "settings.json"
+        if settings_data is not None:
+            settings_file.write_text(
+                json.dumps(settings_data, ensure_ascii=False), encoding="utf-8"
+            )
+        win = MainWindow(account_store=acc, settings_store=SettingsStore(settings_file))
+        return win, acc
+
+    return _make
+
+
+def _save_account_record(acc, name, data):
+    """向指定账号写入一条记录（通过 DataStore 注入，验证账号隔离）。"""
+    acc.create_account(name)
+    acc.new_store(name).save(data)
+
+
+def test_startup_resolves_saved_current_account(account_window_factory, tmp_path):
+    """settings.current_account 指向存在的账号 → 启动落在该账号：store 路径 / 数据 / 标题。"""
+    win, acc = account_window_factory(
+        settings_data={"current_account": "小号"},
+        setup=lambda a: _save_account_record(
+            a, "小号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        ),
+    )
+
+    try:
+        assert win.current_account == "小号"
+        assert win.store.data_file == tmp_path / "accounts" / "小号" / "data.json"
+        assert win.logic.get_record("2026-08-01") is not None
+        assert "小号" in win._title_label.text()
+    finally:
+        win.close()
+
+
+def test_startup_falls_back_when_current_account_missing(account_window_factory):
+    """settings 无 current_account（首次升级/全新安装）→ 回退主账号并自动建目录。"""
+    win, acc = account_window_factory(settings_data={})
+
+    try:
+        assert win.current_account == "主账号"
+        assert (acc.accounts_dir / "主账号").is_dir()
+        assert win.store.load() == {}  # 主账号空库起步（H3/H5）
+        assert "主账号" in win._title_label.text()
+    finally:
+        win.close()
+
+
+def test_startup_falls_back_when_current_account_invalid(account_window_factory):
+    """current_account 指向不存在目录 → 回退主账号。"""
+    win, acc = account_window_factory(settings_data={"current_account": "已删除"})
+    acc.create_account("小号")
+
+    try:
+        assert win.current_account == "主账号"
+    finally:
+        win.close()
+
+
+def test_startup_falls_back_when_current_account_not_string(account_window_factory):
+    """current_account 非字符串（损坏/手改 settings）→ 回退主账号。"""
+    win, _ = account_window_factory(settings_data={"current_account": 123})
+
+    try:
+        assert win.current_account == "主账号"
+    finally:
+        win.close()
+
+
+def test_startup_creates_default_account_when_accounts_empty(account_window_factory):
+    """accounts/ 为空 → 自动创建主账号空数据（resolve_account 兜底）。"""
+    win, acc = account_window_factory(settings_data={"current_account": "小号"})
+
+    try:
+        assert win.current_account == "主账号"
+        assert (acc.accounts_dir / "主账号").is_dir()
+    finally:
+        win.close()
+
+
+def test_close_persists_current_account_with_other_settings(account_window_factory):
+    """关窗落盘回读：current_account 写入 settings.json，geometry/pinned/theme 不丢。"""
+    win, acc = account_window_factory(
+        settings_data={"current_account": "小号"},
+        setup=lambda a: _save_account_record(
+            a, "小号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        ),
+    )
+
+    win.sidebar.theme_btn.click()  # 触发状态变更（theme 落盘路径）
+    win.close()
+
+    saved = json.loads(
+        (acc.accounts_dir.parent / "settings.json").read_text(encoding="utf-8")
+    )
+    assert saved.get("current_account") == "小号"
+    assert saved.get("theme") == "dark"  # 与 encode_settings 输出合并，不丢
+    assert "geometry" in saved
+    assert "pinned" in saved
+
+
+def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path):
+    """注入 store（既有模式）→ 跳过账号解析：resolve 不被调用、无账号概念、标题不变。"""
+    from account_store import AccountStore
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+
+    calls = {"resolve": 0, "new_store": 0}
+
+    class SpyStore(AccountStore):
+        def resolve_account(self, current):
+            calls["resolve"] += 1
+            return super().resolve_account(current)
+
+        def new_store(self, name):
+            calls["new_store"] += 1
+            return super().new_store(name)
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        account_store=SpyStore(tmp_path / "accounts"),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+    )
+
+    assert calls["resolve"] == 0
+    assert calls["new_store"] == 0
+    assert win.current_account is None
+    assert win._title_label.text() == "Delta Force Dashboard"  # 标题保持原样
+    assert not (tmp_path / "accounts").exists()  # 零真实目录触碰
+    win.close()
+
+
+def test_ui_layers_do_not_build_account_paths():
+    """AST 防复发：UI 层（main_window / sidebar）不得直接拼装账号路径。"""
+    import pathlib
+
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    for name in ("main_window.py", "sidebar.py"):
+        text = (app_dir / name).read_text(encoding="utf-8")
+        assert '"accounts"' not in text, f"{name} 含账号目录名字面量（必须走 account_store）"
+        assert "ACCOUNTS_DIR_NAME" not in text, (
+            f"{name} 引用账号目录常量（必须走 account_store）"
+        )
+
+
+# ── Y-04. 侧边栏账号区（下拉框 + 新建账号 + 命名对话框）────
+
+
+def _monkeypatch_input_dialog(monkeypatch, result):
+    """命名对话框返回 (text, ok)；未调用则断言失败。"""
+    from PySide6.QtWidgets import QInputDialog
+
+    calls = []
+
+    def _fake_gettext(*a, **kw):
+        calls.append(a)
+        return result
+
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(_fake_gettext))
+    return calls
+
+
+def test_account_area_initial_state(account_window_factory):
+    """账号区就位：下拉列出全部账号且当前账号选中 + 新建按钮。"""
+    win, _ = account_window_factory(
+        setup=lambda a: (
+            _save_account_record(a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}),
+            a.create_account("小号"),
+        )
+    )
+
+    try:
+        assert not win.sidebar.account_combo.isHidden()
+        items = [
+            win.sidebar.account_combo.itemText(i)
+            for i in range(win.sidebar.account_combo.count())
+        ]
+        assert items == ["主账号", "小号"]
+        assert win.sidebar.account_combo.currentText() == "主账号"
+        assert "新建账号" in win.sidebar.new_account_btn.text()
+        assert win._title_label.text() == "Delta Force Dashboard · 主账号"
+    finally:
+        win.close()
+
+
+def test_create_account_success_appears_in_list_without_switching(
+    account_window_factory, monkeypatch
+):
+    """新建成功 → 下拉立即出现新账号；当前账号不变；新账号空库（H5）。"""
+    win, acc = account_window_factory(
+        setup=lambda a: _save_account_record(
+            a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, ("新账号", True))
+
+    win.sidebar.new_account_btn.click()
+
+    items = [
+        win.sidebar.account_combo.itemText(i)
+        for i in range(win.sidebar.account_combo.count())
+    ]
+    assert items == ["主账号", "新账号"]
+    assert win.current_account == "主账号"  # 决策 6：当前账号不变
+    assert win.sidebar.account_combo.currentText() == "主账号"
+    new_dir = acc.accounts_dir / "新账号"
+    assert new_dir.is_dir()
+    assert not (new_dir / "data.json").exists()  # H5：空库起步
+    assert win._title_label.text() == "Delta Force Dashboard · 主账号"
+    win.close()
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["", "   ", "主账号", "a/b", "a\\b", "a:b", "a*b", 'a"b', "a<b", "a>b", "a|b", " a", "a ", ".a", "a."],
+)
+def test_create_account_rejects_invalid_names(
+    account_window_factory, monkeypatch, name
+):
+    """非法名（空/重名/禁用字符/首尾空格或点）→ 可读提示、零目录产生、列表不变。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win, acc = account_window_factory(
+        setup=lambda a: (
+            _save_account_record(a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}),
+            a.create_account("小号"),
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, (name, True))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+
+    win.sidebar.new_account_btn.click()
+
+    assert warnings, "非法名必须给出可读提示"
+    assert acc.list_accounts() == ["主账号", "小号"]  # 零目录产生
+    assert win.sidebar.account_combo.count() == 2
+    assert win.current_account == "主账号"  # 当前账号不受影响
+    win.close()
+
+
+def test_create_account_cancel_is_noop(account_window_factory, monkeypatch):
+    """命名对话框取消 → 无操作（不创建、不提示）。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win, acc = account_window_factory(
+        setup=lambda a: _save_account_record(
+            a, "主账号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        )
+    )
+    _monkeypatch_input_dialog(monkeypatch, ("随便", False))
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        staticmethod(lambda *a, **kw: warnings.append(a)),
+    )
+
+    win.sidebar.new_account_btn.click()
+
+    assert warnings == []  # 取消不弹提示
+    assert acc.list_accounts() == ["主账号"]
+    win.close()
+
+
+def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path):
+    """注入 store（既有模式）→ 账号区隐藏（无账号概念，零破坏）。"""
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+    )
+
+    assert win.sidebar.account_combo.isHidden()
+    assert win.sidebar.new_account_btn.isHidden()
+    win.close()
+
+
+# ── Y-05. 账号切换（运行中切换 + 记账页整体重载 + 落盘）──
+
+
+def _two_account_env(acc):
+    """预置双账号：主账号 2 条、小号 1 条（不同日期，便于断言切换后数据源）。"""
+    _save_account_record(
+        acc,
+        "主账号",
+        {
+            "2026-08-01": {"cash": 100.0, "warehouse": 200.0},
+            "2026-08-02": {"cash": 150.0, "warehouse": 250.0},
+        },
+    )
+    _save_account_record(
+        acc, "小号", {"2026-08-05": {"cash": 500.0, "warehouse": 900.0}}
+    )
+
+
+def _select_account(win, name):
+    """通过下拉框真实信号链路选择账号（activated → account_selected → MainWindow）。"""
+    combo = win.sidebar.account_combo
+    for i in range(combo.count()):
+        if combo.itemText(i) == name:
+            combo.activated.emit(i)
+            return
+    raise AssertionError(f"下拉框没有账号 {name!r}")
+
+
+def test_switch_account_reloads_all_views(account_window_factory, tmp_path):
+    """切换 → 换 DataStore/logic + refresh_display 全量刷新（表格/汇总/今日状态/标题/下拉）。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    assert win.table._left_table.rowCount() == 1
+    assert win.table._right_table.rowCount() == 1  # 主账号 2 条 → 1+1
+
+    try:
+        _select_account(win, "小号")
+
+        assert win.current_account == "小号"
+        assert win.store.data_file == tmp_path / "accounts" / "小号" / "data.json"
+        assert win.logic.get_record("2026-08-05") is not None
+        assert win.logic.get_record("2026-08-01") is None  # 旧账号数据不可见
+        # 表格刷新：小号 1 条 → 1+0
+        assert win.table._left_table.rowCount() == 1
+        assert win.table._right_table.rowCount() == 0
+        # 汇总磁贴刷新（小号 total=900 ≠ 主账号 total=250）
+        assert win._summary_label.text() != ""
+        # 今日状态刷新（小号无今日记录 → 提示可见）
+        assert not win._today_status_label.isHidden()
+        # 标题与下拉选中同步
+        assert win._title_label.text() == "Delta Force Dashboard · 小号"
+        assert win.sidebar.account_combo.currentText() == "小号"
+    finally:
+        win.close()
+
+
+def test_switch_persists_and_restarts_into_new_account(account_window_factory, tmp_path):
+    """切换后关窗落盘 current_account；重启（同 settings 文件）回到新账号（回读断言）。"""
+    from app.main_window import MainWindow
+    from settings_store import SettingsStore
+
+    win, acc = account_window_factory(setup=_two_account_env)
+    _select_account(win, "小号")
+    win.close()
+
+    saved = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
+    assert saved.get("current_account") == "小号"
+
+    # 重启：同一 accounts/settings 路径重新构造 → 回到小号
+    win2 = MainWindow(
+        account_store=acc, settings_store=SettingsStore(tmp_path / "settings.json")
+    )
+    try:
+        assert win2.current_account == "小号"
+        assert win2.logic.get_record("2026-08-05") is not None
+        assert win2._title_label.text() == "Delta Force Dashboard · 小号"
+        assert win2.sidebar.account_combo.currentText() == "小号"
+    finally:
+        win2.close()
+
+
+def test_switch_cancels_edit_state(account_window_factory):
+    """切换时取消编辑模式（防跨账号污染）：退出编辑、字段清空。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    win.input_panel.set_edit_mode("2026-08-02", 150.0, 250.0)
+    assert win.input_panel.is_editing()
+
+    try:
+        _select_account(win, "小号")
+
+        assert not win.input_panel.is_editing()
+        assert win.input_panel.get_editing_date() is None
+        assert win.input_panel.get_cash_raw() == ""
+        assert win.input_panel.get_warehouse_raw() == ""
+        assert win.input_panel.save_btn.text() == "保存今日数据"
+    finally:
+        win.input_panel.cancel_edit()  # 红阶段防御：切换未实现时避免关窗确认框挂起
+        win.close()
+
+
+def test_switch_cancels_reuse_state(account_window_factory):
+    """切换时取消复用模式（防跨账号污染）：退出复用、字段清空。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    win.input_panel.set_reuse_hint("2026-08-02 的数据", 150.0, 250.0)
+    assert win.input_panel.is_reusing()
+
+    try:
+        _select_account(win, "小号")
+
+        assert not win.input_panel.is_reusing()
+        assert win.input_panel.get_cash_raw() == ""
+        assert win.input_panel.get_warehouse_raw() == ""
+        assert win.input_panel.reuse_btn.text() == "复用昨日"
+    finally:
+        win.input_panel.cancel_reuse()  # 红阶段防御：避免关窗确认框挂起
+        win.close()
+
+
+def test_switch_save_lands_in_new_account(account_window_factory, tmp_path):
+    """切换后保存即时落在新账号文件；原账号文件不变。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    _select_account(win, "小号")
+
+    win.input_panel.fill_values(100, 300)
+    win.save_today()
+
+    saved_xiao = json.loads(
+        (tmp_path / "accounts" / "小号" / "data.json").read_text(encoding="utf-8")
+    )
+    assert win.today in saved_xiao  # 今日记录写入小号
+    saved_main = json.loads(
+        (tmp_path / "accounts" / "主账号" / "data.json").read_text(encoding="utf-8")
+    )
+    assert win.today not in saved_main  # 主账号文件不变
+    assert set(saved_main) == {"2026-08-01", "2026-08-02"}
+    win.close()
+
+
+def test_switch_delete_lands_in_new_account(account_window_factory, monkeypatch, tmp_path):
+    """切换后删除即时落在新账号文件；原账号文件不变。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win, acc = account_window_factory(setup=_two_account_env)
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(lambda *a, **kw: QMessageBox.StandardButton.Yes),
+    )
+    _select_account(win, "小号")
+
+    win.table.delete_requested.emit("2026-08-05")
+
+    saved_xiao = json.loads(
+        (tmp_path / "accounts" / "小号" / "data.json").read_text(encoding="utf-8")
+    )
+    assert "2026-08-05" not in saved_xiao  # 小号记录被删
+    saved_main = json.loads(
+        (tmp_path / "accounts" / "主账号" / "data.json").read_text(encoding="utf-8")
+    )
+    assert set(saved_main) == {"2026-08-01", "2026-08-02"}  # 主账号不变
+    win.close()
+
+
+def test_switch_export_uses_new_account(account_window_factory, monkeypatch, tmp_path):
+    """切换后 CSV 导出作用于新账号（导出内容 = 小号数据）。"""
+    from PySide6.QtWidgets import QFileDialog
+
+    win, acc = account_window_factory(setup=_two_account_env)
+    out = tmp_path / "export.csv"
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *a, **kw: (str(out), "CSV 文件 (*.csv)")),
+    )
+    _select_account(win, "小号")
+
+    win.sidebar.export_btn.click()
+
+    text = out.read_text(encoding="utf-8-sig")
+    assert "2026-08-05" in text  # 小号记录
+    assert "2026-08-01" not in text  # 主账号独有记录不出现
+    win.close()
+
+
+def test_switch_same_account_noop(account_window_factory, monkeypatch):
+    """选择当前账号本身 → no-op：不换 store/logic、不落盘。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    old_store = win.store
+    old_logic = win.logic
+    save_calls = []
+    monkeypatch.setattr(win.settings_store, "save", lambda s: save_calls.append(s))
+
+    try:
+        _select_account(win, "主账号")  # 当前就是主账号
+
+        assert win.store is old_store  # 对象引用不变（未重载）
+        assert win.logic is old_logic
+        assert win.current_account == "主账号"
+        assert save_calls == []  # 不落盘
+        assert win._title_label.text() == "Delta Force Dashboard · 主账号"
+    finally:
+        win.close()
+
+
+def test_switch_unknown_account_ignored(account_window_factory):
+    """目标账号不在列表（防御）→ 忽略，状态不变。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    old_store = win.store
+
+    try:
+        win.sidebar.account_combo.activated.emit(99)  # 越界 index → 空文本
+
+        assert win.current_account == "主账号"
+        assert win.store is old_store
+    finally:
+        win.close()
+
+
+def test_switch_does_not_touch_profit_page(account_window_factory):
+    """利润页零改动：切换不重建 profit_page、不触碰其状态。"""
+    win, acc = account_window_factory(setup=_two_account_env)
+    before = win.profit_page
+
+    try:
+        _select_account(win, "小号")
+
+        assert win.profit_page is before  # 同一对象，未被触碰
+    finally:
+        win.close()

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.chart_widget import ChartWidget
+from account_store import AccountStore
 from config import (
     DATA_DIR,
     DATE_FORMAT,
@@ -131,12 +133,34 @@ class MainWindow(QMainWindow):
     def __init__(self, store: DataStore | None = None,
                  logic: ProfitCalculatorLogic | None = None,
                  settings_store: SettingsStore | None = None,
-                 registry: WidgetRegistry | None = None) -> None:
+                 registry: WidgetRegistry | None = None,
+                 account_store: AccountStore | None = None) -> None:
         super().__init__()
 
-        self.store = store or DataStore()
-        self.logic = logic or ProfitCalculatorLogic(self.store.load())
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
+        self._settings = self.settings_store.load()
+        self._theme = self._settings.get("theme", "light")
+        set_theme(self._theme)
+        # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
+        set_animations_enabled(self._settings.get("animations", True))
+
+        # Y-03：账号解析。注入 seam 定案——仅当未注入 store/logic 时才走账号解析
+        # （生产默认路径，从 settings.current_account 解析并构造对应账号 DataStore）；
+        # 注入 store/logic 保持现状（既有 ~15 个注入测试零改动、零真实目录触碰）。
+        # 测试显式注入 account_store/settings_store 即可让完整解析链路落在 tmp_path。
+        if store is None and logic is None:
+            self._account_store = account_store or AccountStore()
+            self.current_account = self._account_store.resolve_account(
+                self._settings.get("current_account")
+            )
+            self.store = self._account_store.new_store(self.current_account)
+            self.logic = ProfitCalculatorLogic(self.store.load())
+        else:
+            self._account_store = account_store  # 注入模式不参与解析
+            self.current_account = None
+            self.store = store or DataStore()
+            self.logic = logic or ProfitCalculatorLogic(self.store.load())
+
         self._registry = registry or self._default_registry()
         self.today = datetime.now().strftime(DATE_FORMAT)
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
@@ -145,17 +169,19 @@ class MainWindow(QMainWindow):
         # W-01：KPI count-up 的上一帧数值（None = 尚未渲染过/数据不足）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
-        self._settings = self.settings_store.load()
-        self._theme = self._settings.get("theme", "light")
-        set_theme(self._theme)
-        # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
-        set_animations_enabled(self._settings.get("animations", True))
 
         self._setup_window()
         self.sidebar = Sidebar()
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
+        # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
+        self._update_account_title()
+        # Y-04：账号区初始化——解析模式注入账号列表；注入模式隐藏账号区
+        if self.current_account is not None:
+            self._refresh_account_combo()
+        else:
+            self.sidebar.set_account_area_visible(False)
 
         # 初始渲染
         self.refresh_display()
@@ -234,12 +260,91 @@ class MainWindow(QMainWindow):
 
         MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
         self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
-        编码收敛到 settings_store.encode_settings 纯函数（候选 3）。
+        编码收敛到 settings_store.encode_settings 纯函数（候选 3）；
+        Y-03：current_account 在纯函数输出上合并（注入模式无账号 → 不写 key）。
         """
         settings = encode_settings(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
+        if self.current_account is not None:
+            settings["current_account"] = self.current_account
         self.settings_store.save(settings)
+
+    def _update_account_title(self) -> None:
+        """记账页标题栏显示当前账号名（Y-03，随账号区状态同步）。
+
+        注入模式（current_account is None，无账号概念）保持原标题，
+        既有注入测试零破坏。
+        """
+        if self.current_account is not None:
+            self._title_label.setText(
+                f"Delta Force Dashboard · {self.current_account}"
+            )
+        else:
+            self._title_label.setText("Delta Force Dashboard")
+
+    # ═══════════════════════════════════════════════════════
+    # 账号区（Y-04 / Y-05）
+    # ═══════════════════════════════════════════════════════
+
+    def _refresh_account_combo(self) -> None:
+        """账号区下拉列表与当前选中同步业务层账号状态（不触发选择信号）。"""
+        self.sidebar.set_accounts(
+            self._account_store.list_accounts(), self.current_account
+        )
+
+    def _create_account(self) -> None:
+        """新建账号：命名对话框 → 业务层校验 → 刷新下拉列表。
+
+        决策 6：新建成功后当前账号不变（留在当前账号，需手动切换）；
+        非法名（空/重名/禁用字符/首尾空格或点）由 account_store 校验
+        并以可读提示拒绝，拒绝时不产生任何目录（H1）。
+        """
+        if self.current_account is None:
+            return  # 注入模式无账号概念（账号区已隐藏，防御）
+        name, ok = QInputDialog.getText(self, "新建账号", "输入新账号名称：")
+        if not ok:
+            return
+        reason = self._account_store.create_account(name)
+        if reason is not None:
+            QMessageBox.warning(self, "无法新建账号", reason)
+            return
+        logger.info("已新建账号：%s", name)
+        self._refresh_account_combo()
+
+    def _on_account_selected(self, name: str) -> None:
+        """切换账号：换 DataStore/logic → 取消编辑/复用 → 全量刷新 → 标题/落盘同步。
+
+        决策链（spec）：切换时用目标账号路径构造新 DataStore 并重新加载 logic，
+        随后整页刷新（表格 / 曲线 / 汇总 / 今日状态 / 标题栏账号名）；保存 /
+        删除 / CSV 导出随后即时落盘到新 store；取消未保存的编辑 / 复用状态，
+        防止跨账号污染。选择当前账号本身 → no-op（不重载、不落盘）。
+        利润页零改动（本方法不触碰 profit_page 任何状态）。
+        """
+        if self.current_account is None:
+            return  # 注入模式无账号概念（账号区已隐藏，防御）
+        if name == self.current_account:
+            return  # 同账号 no-op
+        if name not in self._account_store.list_accounts():
+            return  # 目标账号不存在（防御：下拉数据来自业务层，正常不会发生）
+
+        self.current_account = name
+        self.store = self._account_store.new_store(name)
+        self.logic = ProfitCalculatorLogic(self.store.load())
+
+        # 取消编辑/复用态，防止旧账号输入污染新账号视图（Y-05 验收标准 3）
+        self.input_panel.cancel_edit()
+        self.input_panel.clear_fields()
+        self.input_panel.cancel_reuse()
+        # KPI count-up 上一帧归零：账号切换是数据源更换，数字直接落终态
+        # （不做「旧账号数值滚动到新账号数值」的误导动画，Y-05 风险点）
+        self._last_summary_total = None
+        self._last_cash_delta = None
+
+        self.refresh_display()
+        self._update_account_title()
+        self._refresh_account_combo()  # 下拉选中态同步（set_accounts 不触发选择信号）
+        self._save_settings()  # current_account 落盘，重启回到新账号
 
     def closeEvent(self, event) -> None:
         # O-13：编辑/复用模式未保存时弹确认框，No 则拦截关窗，避免改动静默丢失
@@ -331,6 +436,9 @@ class MainWindow(QMainWindow):
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
+        # Y-04：账号区——新建账号（命名对话框）；下拉选择切换（Y-05 接线）
+        self.sidebar.create_account_requested.connect(self._create_account)
+        self.sidebar.account_selected.connect(self._on_account_selected)
 
         # 键盘快捷键
         save_shortcut = QAction(self)
