@@ -58,9 +58,17 @@ class FetchPageBase(QWidget):
     #: 日志文案前缀（子类覆盖，如「制造产物」「弹药包」）
     _page_name = "数据页面"
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 client: KkrbClient | None = None) -> None:
+        """构造数据页。
+
+        Args:
+            parent: 父控件。
+            client: 共享 KkrbClient 实例（C2-02 注入 seam）；None → 自建
+                （现状兼容，既有直构用例零改动）。
+        """
         super().__init__(parent)
-        self._client = KkrbClient()
+        self._client = client or KkrbClient()
         self._load_state = LoadState()
         self._shut_down = False
         self._worker: FetchWorker | None = None
@@ -165,6 +173,14 @@ class FetchPageBase(QWidget):
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._data = []
         self._refresh_btn.setEnabled(True)
+        self._render_error()
+
+    def _render_error(self) -> None:
+        """错误态渲染钩子（C2-05）。
+
+        默认实现 = 空态渲染（等价 ``_render_data([])``，错误路径行为与
+        现状逐字节等价）；子类可覆盖为与空态可区分的错误文案。
+        """
         self._render_data([])
 
     # ── 公开接口 ────────────────────────────────────────
@@ -181,15 +197,11 @@ class FetchPageBase(QWidget):
     def preload(self) -> None:
         """后台预加载数据（启动时调用，消除首次展示的加载闪烁）。
 
-        幂等：测试（offscreen）模式、不可加载态（加载中/已加载）或已关闭
-        均直接返回；预加载失败不弹窗，仅记录日志，用户可手动刷新重试。
+        幂等：不可加载态（加载中/已加载）或已关闭均直接返回；
+        预加载失败不弹窗，仅记录日志，用户可手动刷新重试。
+        C2-03：不再读取环境变量哨兵——测试模式经构造注入 stub client
+        压制网络（见 tests/conftest.make_stub_client）。
         """
-        import os
-
-        # offscreen 守卫：测试模式（QT_QPA_PLATFORM=offscreen）不启动后台
-        # 线程，避免测试环境出现真实网络请求与线程泄漏。
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
-            return
         # 幂等：已关闭 / 已加载（预加载只做一次）/ 加载中（can_load 挡重入）
         if self._shut_down or self._load_state.is_loaded or not self._load_state.can_load():
             return

@@ -56,6 +56,7 @@ from app.ui_text import EMOJI
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+from kkrb_client import KkrbClient
 from presentation import (
     format_saved_indicator,
     format_signed_money,
@@ -63,13 +64,20 @@ from presentation import (
 )
 from settings_store import (
     SettingsStore,
+    _encode_window_state,
     decode_geometry_hex,
     decode_legacy_geometry,
-    encode_settings,
 )
 from signals import RateSignal
 
 logger = logging.getLogger(__name__)
+
+# ── 设置键模块常量（C3-11：窗口层设置读写收敛，键清单归 SettingsStore）──
+_KEY_GEOMETRY = "geometry"
+_KEY_PINNED = "pinned"
+_KEY_THEME = "theme"
+_KEY_ANIMATIONS = "animations"
+_KEY_CURRENT_ACCOUNT = "current_account"
 
 # DPI scaling on Windows
 if platform.system() == "Windows":
@@ -134,15 +142,16 @@ class MainWindow(QMainWindow):
                  logic: ProfitCalculatorLogic | None = None,
                  settings_store: SettingsStore | None = None,
                  registry: WidgetRegistry | None = None,
-                 account_store: AccountStore | None = None) -> None:
+                 account_store: AccountStore | None = None,
+                 client: KkrbClient | None = None) -> None:
         super().__init__()
 
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self._settings = self.settings_store.load()
-        self._theme = self._settings.get("theme", "light")
+        self._theme = self._settings.get(_KEY_THEME, "light")
         set_theme(self._theme)
         # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
-        set_animations_enabled(self._settings.get("animations", True))
+        set_animations_enabled(self._settings.get(_KEY_ANIMATIONS, True))
 
         # Y-03：账号解析。注入 seam 定案——仅当未注入 store/logic 时才走账号解析
         # （生产默认路径，从 settings.current_account 解析并构造对应账号 DataStore）；
@@ -151,7 +160,7 @@ class MainWindow(QMainWindow):
         if store is None and logic is None:
             self._account_store = account_store or AccountStore()
             self.current_account = self._account_store.resolve_account(
-                self._settings.get("current_account")
+                self._settings.get(_KEY_CURRENT_ACCOUNT)
             )
             self.store = self._account_store.new_store(self.current_account)
             self.logic = ProfitCalculatorLogic(self.store.load())
@@ -170,11 +179,19 @@ class MainWindow(QMainWindow):
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
 
+        # C2-02：kkrb API 客户端注入 seam——None → 自建（生产唯一创建点）；
+        # 注入 fake 后利润页两子模块共享同一实例（01 加锁保证并发安全）。
+        self._client = client or KkrbClient()
+
         self._setup_window()
         self.sidebar = Sidebar()
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
+        # C1-08：registry 组件已全部入树后收集主题刷新器并首次应用
+        # （E2：sidebar 首帧主题完整，不依赖首次切换）
+        self._collect_theme_refreshers()
+        self._apply_theme_refreshers()
         # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
         self._update_account_title()
         # Y-04：账号区初始化——解析模式注入账号列表；注入模式隐藏账号区
@@ -193,7 +210,7 @@ class MainWindow(QMainWindow):
         self._preload_timer.start(500)
 
         # 恢复置顶状态
-        if self._settings.get("pinned", False):
+        if self._settings.get(_KEY_PINNED, False):
             self._toggle_pin()
 
         self.input_panel.focus_cash()
@@ -226,7 +243,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(680, 650)
 
         # 恢复上次几何（候选 3：解析收敛到 settings_store 纯函数）
-        saved_geo = self._settings.get("geometry", "")
+        saved_geo = self._settings.get(_KEY_GEOMETRY, "")
         geo_ok = False
         if isinstance(saved_geo, str) and saved_geo:
             raw = decode_geometry_hex(saved_geo)
@@ -256,19 +273,20 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _save_settings(self) -> None:
-        """编码当前窗口状态并委托 SettingsStore 原子落盘（D-02）。
+        """合并更新设置并原子落盘（C3-11：走 settings_store.update，未知键保留）。
 
-        MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
-        self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
-        编码收敛到 settings_store.encode_settings 纯函数（候选 3）；
-        Y-03：current_account 在纯函数输出上合并（注入模式无账号 → 不写 key）。
+        patch = 窗口状态编码（几何/置顶/主题）+ animations 启动值（运行期
+        内存，启动值即运行值——纳入持久化闭环）+ current_account（账号模式
+        才写，注入模式无账号概念不写 key）；update 返回值回写 self._settings，
+        后续读取走运行期内存。文件中原有未知键（patch 之外）由 update 保留。
         """
-        settings = encode_settings(
+        patch = _encode_window_state(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
+        patch[_KEY_ANIMATIONS] = self._settings.get(_KEY_ANIMATIONS, True)
         if self.current_account is not None:
-            settings["current_account"] = self.current_account
-        self.settings_store.save(settings)
+            patch[_KEY_CURRENT_ACCOUNT] = self.current_account
+        self._settings = self.settings_store.update(patch)
 
     def _update_account_title(self) -> None:
         """记账页标题栏显示当前账号名（Y-03，随账号区状态同步）。
@@ -401,8 +419,8 @@ class MainWindow(QMainWindow):
         self._date_label = dashboard._date_label
         self._stack.addWidget(dashboard)
 
-        # ── Page 1：利润（制造产物 + 兑换利润）──
-        self.profit_page = ProfitPage()
+        # ── Page 1：利润（制造产物 + 兑换利润，共享同一 client）──
+        self.profit_page = ProfitPage(client=self._client)
         self._stack.addWidget(self.profit_page)
 
         # ── 侧边栏导航切换 ──
@@ -475,7 +493,32 @@ class MainWindow(QMainWindow):
     def _apply_qss(self) -> None:
         qss = generate_qss(self._theme)
         self.setStyleSheet(qss)
-        self.sidebar.apply_theme()
+        # C1-08：sidebar 由 _theme_refreshers 统一调用（启动期已应用，
+        # E2）；此处不再直插，避免双路径
+
+    def _collect_theme_refreshers(self) -> None:
+        """启动期遍历子树收集具 apply_theme 的组件（自顶向下、父拥有子树）。
+
+        节点有 apply_theme 即收集且不再下钻——profit_page 入列时
+        crafting/exchange 不得重复入列（防双扇出）；新组件只要实现
+        apply_theme 即自动纳入刷新（C1-08 契约）。
+        """
+        self._theme_refreshers: list[QWidget] = []
+
+        def walk(widget: QWidget) -> None:
+            if hasattr(widget, "apply_theme"):
+                self._theme_refreshers.append(widget)
+                return
+            for obj in widget.children():
+                if isinstance(obj, QWidget):
+                    walk(obj)
+
+        walk(self)
+
+    def _apply_theme_refreshers(self) -> None:
+        """统一调用全部主题刷新器（启动期与 refresh_theme 共用）。"""
+        for widget in self._theme_refreshers:
+            widget.apply_theme()
 
     def _toggle_theme(self) -> None:
         self._theme = "dark" if self._theme == "light" else "light"
@@ -484,23 +527,34 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     def refresh_theme(self) -> None:
-        """仅刷新主题视觉样式，不重新加载数据。
+        """仅刷新主题视觉样式，不重新加载数据（C1-08）。
 
-        主题切换时，get_color() 已返回新主题色值，全部 UI 组件
-        通过调用自身的 apply_theme 方法增量更新颜色，无需重新获取数据。
+        主题切换与数据刷新彻底解耦：QSS 重生成 + 按钮文字 + 置顶样式 +
+        树遍历收集的 refreshers 统一调用；不再调用 table.draw /
+        _update_summary / _update_today_status（数据渲染路径零触碰）。
+        KPI 磁贴颜色由 _apply_kpi_styles 承担（signal 重算，不动文本/动画）。
         """
         self._apply_qss()
         self._update_theme_btn_text()
         self._update_pin_btn_style()
-        self.input_panel.apply_theme()
-        self.chart.apply_theme()
-        # 兑换页包标签为内联样式，构建期冻结——主题切换后需重解析（U-03 评审修复）
-        self.profit_page.exchange_page.apply_theme()
-        # 表格用当前数据重绘（get_color 自动取新主题色）
-        records = self._get_records()
-        self._update_summary()
-        self._update_today_status()
-        self.table.draw(records, self.today)
+        self._apply_theme_refreshers()
+        self._apply_kpi_styles()
+
+    def _apply_kpi_styles(self) -> None:
+        """重算两 KPI 磁贴的 signal 并重应用 summary_style（C1-08 E1）。
+
+        纯内存读（logic.summary / cash_summary，零 I/O）；不动数值文本、
+        不触发 count-up 动画（不调用 _set_kpi_value）——主题切换只换色。
+        """
+        count, total = self.logic.summary(self._view_n)
+        _, signal = format_window_text(count, total, "总盈亏", self._view_n)
+        self._summary_label.setStyleSheet(summary_style(signal))
+
+        cash_count, cash_delta = self.logic.cash_summary(self._view_n)
+        _, cash_signal = format_window_text(
+            cash_count, cash_delta, "现金总变化", self._view_n
+        )
+        self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
 
     # ═══════════════════════════════════════════════════════
     # 置顶
@@ -728,8 +782,7 @@ class MainWindow(QMainWindow):
         预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
         offscreen 测试模式跳过预加载的守卫同样在 preload() 内部。
         """
-        self.profit_page.crafting_page.preload()
-        self.profit_page.exchange_page.preload()
+        self.profit_page.preload()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。

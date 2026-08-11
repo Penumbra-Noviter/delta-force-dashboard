@@ -414,6 +414,10 @@ class TableWidget(QWidget):
     ) -> None:
         super().__init__(parent)
         self._view_days = default_view
+        # C1-07：最近一次 draw 的缓存（apply_theme 基于它重渲染，零重新取数）；
+        # None = 从未绘制（apply_theme 只刷按钮样式）
+        self._last_records: list | None = None
+        self._last_today: str = ""
 
         # 视图切换栏（按钮组 7/30，Q8：进表内、emit 信号）
         self._layout = QVBoxLayout(self)
@@ -519,6 +523,23 @@ class TableWidget(QWidget):
         # 绘制右表：传入左表最后一条记录的仓库值作为 prev_warehouse
         prev = left_records[-1][1].warehouse if left_records else None
         self._right_table.draw(right_records, today, prev_warehouse=prev)
+
+        # C1-07：缓存本次绘制入参（apply_theme 基于缓存重渲染，零取数）
+        self._last_records = records
+        self._last_today = today
+
+    def apply_theme(self) -> None:
+        """主题切换后基于缓存重渲染行内颜色（C1-07，不触发任何取数）。
+
+        视图按钮样式 + 复用 _DaySubTable.draw 渲染路径从缓存重算
+        （幂等：文本不变，仅颜色随当前主题重解析）；从未 draw 时
+        仅刷新按钮样式（表格本为空）。get_color 在方法体内解析，
+        避免 import 期冻结（AST 防复发检查）。
+        """
+        self._update_view_btn_styles()
+        if self._last_records is None:
+            return
+        self.draw(self._last_records, self._last_today)
 
     def _on_view_toggled(self) -> None:
         """按钮组切换：更新当前视图条数并 emit view_changed(int)。

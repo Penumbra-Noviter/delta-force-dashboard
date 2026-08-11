@@ -33,10 +33,17 @@ __all__ = []
 
 @pytest.fixture
 def main_window(qapp, settings_guard, tmp_path):
-    """带临时数据文件的 MainWindow（不触碰真实 data.json）。"""
-    from app.main_window import MainWindow
+    """带临时数据文件的 MainWindow（不触碰真实 data.json）。
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
+    C2-03：构造注入 stub client——利润页预加载零真实网络。
+    """
+    from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        client=make_stub_client(),
+    )
     yield win
     win.close()
 

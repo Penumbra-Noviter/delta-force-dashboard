@@ -281,3 +281,112 @@ def test_exchange_apply_theme_updates_separator(qapp, theme_guard) -> None:
             assert theme_mod.get_color("SEPARATOR") in card._sep.styleSheet(), (
                 f"{theme} 下 apply_theme 后第 {i} 卡分隔线未用当前主题色"
             )
+
+
+# ── C1-06. get_color 未知键 warning ───────────────────────
+
+
+def test_get_color_unknown_key_warns(caplog) -> None:
+    """C1-06：未知键返回 "" 且记录 warning（含键名），不 raise（防御语义保持）。"""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.theme"):
+        assert theme_mod.get_color("不存在的键") == ""
+        assert theme_mod.get_color("NON_EXISTENT_KEY") == ""
+
+    messages = [r.message for r in caplog.records]
+    assert any("不存在的键" in m for m in messages), f"warning 应含键名：{messages}"
+    assert any("NON_EXISTENT_KEY" in m for m in messages), f"warning 应含键名：{messages}"
+
+
+def test_get_color_known_keys_no_warning(caplog) -> None:
+    """C1-06：双主题全部已知键调用零 warning（既有消费者 caplog 干净）。"""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.theme"):
+        for name, palette in theme_mod.THEMES.items():
+            theme_mod.set_theme(name)
+            for key in palette:
+                assert theme_mod.get_color(key) != ""
+    assert [r for r in caplog.records] == [], f"已知键不应产生 warning：{caplog.records}"
+
+
+# ── C1-09. AST 全键守卫（双主题键完整性机器证伪）─────────
+
+
+def _collect_get_color_literal_keys(source: str) -> set[str]:
+    """AST 提取 get_color(<字符串字面量>) 的键（变量/表达式传入的调用排除）。"""
+    import ast
+
+    tree = ast.parse(source)
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "get_color"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            keys.add(node.args[0].value)
+    return keys
+
+
+def _collect_package_config_color_keys(source: str) -> set[str]:
+    """AST 提取 exchange_page._PACKAGE_CONFIG 的 color 字段（第 3 个位置参数）字面量。"""
+    import ast
+
+    tree = ast.parse(source)
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_PackageConfig"
+            and len(node.args) >= 3
+            and isinstance(node.args[2], ast.Constant)
+            and isinstance(node.args[2].value, str)
+        ):
+            keys.add(node.args[2].value)
+    return keys
+
+
+def _collect_color_key_literals(source: str) -> set[str]:
+    """AST 提取源码中 color_key="<字面量>" 的键（chart series 配置）。"""
+    import ast
+
+    tree = ast.parse(source)
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if (
+                    kw.arg == "color_key"
+                    and isinstance(kw.value, ast.Constant)
+                    and isinstance(kw.value.value, str)
+                ):
+                    keys.add(kw.value.value)
+    return keys
+
+
+def test_all_referenced_theme_keys_exist_in_both_themes() -> None:
+    """C1-09 AST 全键守卫：app/ 下 get_color 字面量 + _PACKAGE_CONFIG + 图表 color_key
+    → 双主题（light/dark）均存在且非空（漏改键即红，防静默失效）。"""
+    import pathlib
+
+    app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
+    keys: set[str] = set()
+    for py in sorted(app_dir.glob("*.py")):
+        source = py.read_text(encoding="utf-8")
+        keys |= _collect_get_color_literal_keys(source)
+        if py.name == "exchange_page.py":
+            keys |= _collect_package_config_color_keys(source)
+        if py.name == "chart_widget.py":
+            keys |= _collect_color_key_literals(source)
+
+    assert keys, "未收集到任何主题键（守卫空转，需排查扫描逻辑）"
+    for name, palette in theme_mod.THEMES.items():
+        for key in sorted(keys):
+            assert key in palette, f"{name} 缺主题键 {key}（被 app/ 源码引用）"
+            assert palette[key] != "", f"{name} 下 {key} 为空值"

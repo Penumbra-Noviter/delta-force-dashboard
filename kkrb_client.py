@@ -17,6 +17,7 @@ __all__ = [
 ]
 
 import logging
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -53,6 +54,7 @@ class KkrbClient:
         self._opener = build_opener(HTTPCookieProcessor(self._cookie_jar))
         self._csrf_token: str | None = None
         self._cache: dict[str, tuple[float, Any]] = {}  # url → (timestamp, data)
+        self._lock = threading.Lock()  # 共享 client 并发安全（握手恰一次、缓存无脏读）
 
     # ── 公开接口 ────────────────────────────────────────
 
@@ -122,33 +124,39 @@ class KkrbClient:
     # ── HTTP 请求 ───────────────────────────────────────
 
     def _post_json(self, url: str) -> Any:
-        """发送 POST 请求并解析 JSON 响应（带 TTL 缓存）。"""
-        # 缓存命中且未过期 → 直接返回
-        now = time.monotonic()
-        if url in self._cache:
-            cached_at, data = self._cache[url]
-            if now - cached_at < _CACHE_TTL:
-                return data
+        """发送 POST 请求并解析 JSON 响应（带 TTL 缓存）。
 
-        token = self._ensure_csrf()
-        headers = {
-            "User-Agent": self._user_agent(),
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-CSRF-Token": token,
-            "X-Requested-With": "XMLHttpRequest",
-        }
-        data = b""
-        req = Request(url, data=data, headers=headers, method="POST")
-        try:
-            with self._opener.open(req, timeout=_TIMEOUT) as resp:
-                body = resp.read().decode("utf-8", errors="replace")
-            data = self._parse_json(body)
-            self._cache[url] = (time.monotonic(), data)
-            return data
-        except (OSError, ValueError) as e:
-            msg = f"POST {url} 失败: {e}"
-            logger.error(msg)
-            raise KkrbError(msg) from e
+        整个方法（缓存检查 + CSRF 握手 + POST + 缓存写入）持锁执行：
+        共享 client 被多线程并发调用时握手恰一次、缓存无脏读
+        （spec C2-01；_ensure_csrf 仅在本方法内被调用，无锁内重入）。
+        """
+        with self._lock:
+            # 缓存命中且未过期 → 直接返回
+            now = time.monotonic()
+            if url in self._cache:
+                cached_at, data = self._cache[url]
+                if now - cached_at < _CACHE_TTL:
+                    return data
+
+            token = self._ensure_csrf()
+            headers = {
+                "User-Agent": self._user_agent(),
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-CSRF-Token": token,
+                "X-Requested-With": "XMLHttpRequest",
+            }
+            data = b""
+            req = Request(url, data=data, headers=headers, method="POST")
+            try:
+                with self._opener.open(req, timeout=_TIMEOUT) as resp:
+                    body = resp.read().decode("utf-8", errors="replace")
+                data = self._parse_json(body)
+                self._cache[url] = (time.monotonic(), data)
+                return data
+            except (OSError, ValueError) as e:
+                msg = f"POST {url} 失败: {e}"
+                logger.error(msg)
+                raise KkrbError(msg) from e
 
     # ── 辅助 ────────────────────────────────────────────
 

@@ -71,12 +71,18 @@ def make_sample_data() -> dict:
 
 @pytest.fixture
 def sample_window(qapp, settings_guard, tmp_path):
-    """带样本数据的 MainWindow（不触碰真实 data.json / settings.json）。"""
+    """带样本数据的 MainWindow（不触碰真实 data.json / settings.json）。
+
+    C2-03：构造注入 stub client——利润页懒加载/预加载零真实网络
+    （不再依赖 offscreen 哨兵）。
+    """
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(make_sample_data()),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -178,9 +184,12 @@ def test_u02_type_scale(sample_window):
     assert win.table._left_table.rowHeight(0) == 26
 
 
-def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monkeypatch):
-    """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。"""
-    import os
+def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path):
+    """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。
+
+    C2-03：构造注入带数据的 stub client——预加载走真实后台线程，
+    线程内立即返回伪造数据，零真实网络。
+    """
     import time
 
     from PySide6.QtTest import QTest
@@ -188,24 +197,18 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
     from data_store import DataStore
-    from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
-
-    # offscreen-t 绕过 preload 的 offscreen 守卫；伪造网络数据避免真实 HTTP
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    monkeypatch.setattr(
-        KkrbClient,
-        "fetch_ov_data",
-        lambda self: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
-    )
-    monkeypatch.setattr(
-        KkrbClient,
-        "fetch_ammo_package_data",
-        lambda self: [AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)],
-    )
+    from kkrb_client import AmmoPackageItem, CraftingProduct
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
         logic=ProfitCalculatorLogic(make_sample_data()),
+        client=make_stub_client(
+            ov_impl=lambda: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
+            ammo_impl=lambda: [
+                AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)
+            ],
+        ),
     )
     win.show()
 
@@ -224,18 +227,13 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
     win.close()
 
 
-def test_page_switch_loop_no_crash(sample_window, monkeypatch):
+def test_page_switch_loop_no_crash(sample_window):
     """U-11 回归：点利润 → 切回记账 → 再点利润 反复 20 次不崩溃。
 
     用户报告此操作序列闪退（根因：切页淡入的 QGraphicsOpacityEffect 挂
     QStackedWidget 页面，快速 hide/show 触发 Qt 崩溃路径——已移除切页动画）。
     """
     from PySide6.QtTest import QTest
-
-    from kkrb_client import KkrbClient
-
-    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
-    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
 
     win = sample_window
     win.show()
@@ -354,7 +352,7 @@ def test_u05_emoji_single_source(sample_window):
         assert not literal.search(text), f"{py.name} 含散落 emoji 字面量"
 
 
-def test_u06_motion_feedback(sample_window, monkeypatch):
+def test_u06_motion_feedback(sample_window):
     """U-06：曲线绘制动画触发 + fade_in_widget 契约（effect 移除、竞态安全）。
 
     注：页面切换淡入已移除（QStackedWidget + QGraphicsOpacityEffect 快速切页
@@ -364,11 +362,6 @@ def test_u06_motion_feedback(sample_window, monkeypatch):
     from PySide6.QtWidgets import QFrame
 
     from app.motion import fade_in_widget
-    from kkrb_client import KkrbClient
-
-    # 切页会触发利润页懒加载 → 屏蔽真实网络请求
-    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
-    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
 
     win = sample_window
     win.show()
@@ -526,6 +519,7 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
     """保存后触发裁剪：状态提示展示自动删除（O-14，J 系列上限 30 条）。"""
     from app.main_window import MainWindow
     from config import RETENTION_LIMIT
+    from tests.conftest import make_stub_client
 
     today = datetime.now()
     # 31 个日期键（含今天），超出保留上限 RETENTION_LIMIT 1 条 → 触发裁剪
@@ -537,6 +531,7 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     assert len(win.logic.data) == RETENTION_LIMIT + 1
 
@@ -637,6 +632,132 @@ def test_theme_toggle_updates_exchange_labels(sample_window):
         )
 
 
+# ── 8.5 注入 seam + 共享 client + 单出口扇出（C2-02）──────
+
+
+def test_main_window_shares_single_injected_client(qapp, settings_guard, tmp_path):
+    """C2-02：MainWindow(client=fake) → 利润页两子页 _client 同一实例（共享 client）。"""
+    from types import SimpleNamespace
+
+    from app.main_window import MainWindow
+
+    fake = SimpleNamespace()
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=fake,
+    )
+    assert win.profit_page.crafting_page._client is fake
+    assert win.profit_page.exchange_page._client is fake
+    win.close()
+
+
+def test_shared_client_concurrent_preload_no_errors(
+    qapp, settings_guard, tmp_path, monkeypatch
+):
+    """C2-02 ⑦：共享 client 两页并发 preload 无异常。
+
+    两子页各自后台线程同时向同一 client 取数（线程重叠由 fetch 内 sleep 保证）；
+    依赖 01 的锁保证线程安全（握手恰一次已在 01 覆盖），此处断言无异常 + 双页 loaded。
+    """
+    import time
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+    from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
+
+    calls: list[str] = []
+    client = KkrbClient()
+    monkeypatch.setattr(
+        client,
+        "fetch_ov_data",
+        lambda: (
+            time.sleep(0.02), calls.append("ov"),
+            [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
+        )[2],
+    )
+    monkeypatch.setattr(
+        client,
+        "fetch_ammo_package_data",
+        lambda: (
+            time.sleep(0.02), calls.append("ammo"),
+            [AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)],
+        )[2],
+    )
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=client,
+    )
+    assert win.profit_page.crafting_page._client is client
+    assert win.profit_page.exchange_page._client is client
+
+    win.profit_page.preload()  # 扇出两子页，各自后台线程并发取数
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        QTest.qWait(50)
+        qapp.processEvents()
+        if (
+            win.profit_page.crafting_page.is_loaded
+            and win.profit_page.exchange_page.is_loaded
+        ):
+            break
+    assert win.profit_page.crafting_page.is_loaded
+    assert win.profit_page.exchange_page.is_loaded
+    assert sorted(calls) == ["ammo", "ov"]
+    win.close()
+
+
+def test_startup_preload_fans_out_via_profit_page(qapp, settings_guard, tmp_path):
+    """C2-02：启动 500ms 定时器回调走 profit_page.preload() 单出口（不再直插两子页）。"""
+    import time
+
+    from types import SimpleNamespace
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=SimpleNamespace(),
+    )
+    calls: list[str] = []
+    win.profit_page.preload = lambda: calls.append("preload")  # type: ignore[method-assign]
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and not calls:
+        QTest.qWait(50)
+        qapp.processEvents()
+    assert calls == ["preload"]
+    win.close()
+
+
+def test_profit_page_access_whitelist_in_main_window() -> None:
+    """C2-02 ⑥：main_window.py 中 `profit_page.` 后只允许 refresh/preload/apply_theme/shutdown。
+
+    单出口契约（spec 4.2.7 + E5）：此后若在 main_window 直插
+    profit_page.crafting_page 等子页访问即被 AST 证伪；扫描限 app/ 源码，
+    测试文件对子页的直接访问不受限。
+    """
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    allowed = {"refresh", "preload", "apply_theme", "shutdown"}
+    tree = ast.parse(inspect.getsource(mw))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        # 形如 `X.profit_page.Y` 的属性链：外层 attr 必须落在白名单
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute):
+            if node.value.attr == "profit_page" and node.attr not in allowed:
+                offenders.append(f"L{node.lineno}: profit_page.{node.attr}")
+    assert offenders == [], f"main_window 直插 profit_page 子页访问：{offenders}"
+
+
 # ── 9. 窗口置顶 ──────────────────────────────────────────
 
 
@@ -675,6 +796,58 @@ def test_settings_persistence(sample_window, tmp_path):
     assert saved.get("theme") == "dark"  # 默认 light → 点击一次 → dark
     assert saved.get("pinned") is True
     assert "geometry" in saved
+    assert saved.get("animations") is True  # 默认 true 纳入持久化闭环（C3-11）
+    assert "current_account" not in saved  # 注入模式无账号概念，不写该键（C3-11）
+
+
+def test_animations_false_persists_through_close(qapp, tmp_path):
+    """C3-11 往返回归：animations=false 预置 → 构造 → closeEvent → 落盘仍 false。
+
+    旧实现 _save_settings 全量覆盖写不写 animations——启动读取的 false
+    偏好首次落盘即丢；update 流程必须保留（可证伪回归）。
+    """
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(json.dumps({"animations": False}), encoding="utf-8")
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.close()
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("animations") is False, (
+        f"animations=false 偏好必须往返保留，实际落盘 {saved.get('animations')!r}"
+    )
+
+
+def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
+    """C3-11：预置 custom 未知键 → 主题切换 + 关窗 → 落盘仍含 custom（端到端保留）。"""
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(json.dumps({"custom": 1}), encoding="utf-8")
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.sidebar.theme_btn.click()  # _toggle_theme → _save_settings
+    win.close()                    # closeEvent → _save_settings
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("custom") == 1, f"未知键 custom 必须端到端保留：{saved}"
+    assert saved.get("theme") == "dark"
 
 
 # ── 11. 窗口几何恢复 ─────────────────────────────────────
@@ -684,6 +857,7 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
     """旧格式（Tkinter）geometry 恢复无 crash。"""
     import app.main_window as mw
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     test_file = tmp_path / "settings_old.json"
     monkeypatch.setattr(mw, "SETTINGS_FILE", test_file)
@@ -692,7 +866,10 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        client=make_stub_client(),
+    )
     win.close()
 
 
@@ -700,6 +877,7 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
     """新格式（空 geometry / hex）恢复无 crash。"""
     import app.main_window as mw
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     test_file = tmp_path / "settings_new.json"
     monkeypatch.setattr(mw, "SETTINGS_FILE", test_file)
@@ -708,7 +886,10 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        client=make_stub_client(),
+    )
     win.close()
 
 
@@ -843,6 +1024,7 @@ def test_export_csv_failure_shows_warning(sample_window, monkeypatch, tmp_path):
 def window_without_today(qapp, settings_guard, tmp_path):
     """数据不含今日记录的 MainWindow（触发「今日未录入」提醒）。"""
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     data = make_sample_data()
     today_str = datetime.now().strftime(DATE_FORMAT)
@@ -850,6 +1032,7 @@ def window_without_today(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -965,6 +1148,7 @@ def view_switch_window(qapp, settings_guard, tmp_path):
     """
     from app.main_window import MainWindow
     from data_store import DataStore
+    from tests.conftest import make_stub_client
 
     today = datetime.now()
     data = {}
@@ -974,6 +1158,7 @@ def view_switch_window(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -1063,6 +1248,7 @@ def account_window_factory(qapp, settings_guard, tmp_path):
     from account_store import AccountStore
     from app.main_window import MainWindow
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     def _make(settings_data=None, setup=None):
         acc = AccountStore(tmp_path / "accounts")
@@ -1073,7 +1259,11 @@ def account_window_factory(qapp, settings_guard, tmp_path):
             settings_file.write_text(
                 json.dumps(settings_data, ensure_ascii=False), encoding="utf-8"
             )
-        win = MainWindow(account_store=acc, settings_store=SettingsStore(settings_file))
+        win = MainWindow(
+            account_store=acc,
+            settings_store=SettingsStore(settings_file),
+            client=make_stub_client(),
+        )
         return win, acc
 
     return _make
@@ -1175,6 +1365,7 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
     from app.main_window import MainWindow
     from data_store import DataStore
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     calls = {"resolve": 0, "new_store": 0}
 
@@ -1191,6 +1382,7 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         account_store=SpyStore(tmp_path / "accounts"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
 
     assert calls["resolve"] == 0
@@ -1412,10 +1604,12 @@ def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path)
     from app.main_window import MainWindow
     from data_store import DataStore
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
 
     assert win.sidebar.account_combo.isHidden()
@@ -1496,6 +1690,7 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
     """切换后关窗落盘 current_account；重启（同 settings 文件）回到新账号（回读断言）。"""
     from app.main_window import MainWindow
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     dates = _two_account_dates()
     win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
@@ -1507,7 +1702,9 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
 
     # 重启：同一 accounts/settings 路径重新构造 → 回到小号
     win2 = MainWindow(
-        account_store=acc, settings_store=SettingsStore(tmp_path / "settings.json")
+        account_store=acc,
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
     try:
         assert win2.current_account == "小号"
@@ -1732,3 +1929,158 @@ def test_startup_combo_excludes_illegal_accounts(account_window_factory):
         assert win.current_account == "主账号"  # 解析兜底不受非法目录干扰
     finally:
         win.close()
+
+
+# ── C1-08. 主题刷新契约（树遍历收集 + refresh_theme 解耦）──
+
+
+def test_theme_refreshers_collected_at_startup(sample_window):
+    """C1-08：_theme_refreshers 非空且含 sidebar/input_panel/chart/table/profit_page。"""
+    win = sample_window
+    refreshers = win._theme_refreshers
+    assert refreshers, "启动期必须收集到主题刷新器"
+    members = {id(w) for w in refreshers}
+    for expected in (win.sidebar, win.input_panel, win.chart, win.table, win.profit_page):
+        assert id(expected) in members, f"{type(expected).__name__} 未入列"
+    # 防双扇出：profit_page 入列时 crafting/exchange 不得重复入列
+    assert id(win.profit_page.crafting_page) not in members, "crafting 不应重复入列"
+    assert id(win.profit_page.exchange_page) not in members, "exchange 不应重复入列"
+
+
+def test_theme_refreshers_cover_all_apply_theme_widgets(sample_window):
+    """C1-08：树上任何具 apply_theme 的组件要么在集合中、要么其祖先在集合中（可证伪）。"""
+    from PySide6.QtWidgets import QWidget
+
+    win = sample_window
+    collected = {id(w) for w in win._theme_refreshers}
+
+    def covered(widget) -> bool:
+        node = widget
+        while node is not None:
+            if id(node) in collected:
+                return True
+            node = node.parent()
+        return False
+
+    for widget in win.findChildren(QWidget):
+        if hasattr(widget, "apply_theme"):
+            assert covered(widget), (
+                f"{type(widget).__name__} 具 apply_theme 但不在收集集合且无收集祖先"
+            )
+
+
+def test_refresh_theme_does_not_redraw_data(sample_window, monkeypatch):
+    """C1-08：refresh_theme 不触发数据渲染路径（取数与摘要零调用）。
+
+    MainWindow 层不得再直插数据渲染：_get_records 即取数入口、零调用即
+    零新数据源；_update_summary / _update_today_status 同为数据路径。
+    table.apply_theme 内部以缓存重绘（07 契约）不经过这三个入口。
+    """
+    win = sample_window
+    calls: list[str] = []
+    monkeypatch.setattr(
+        win, "_get_records", lambda: (calls.append("_get_records"), [])[1]
+    )
+    monkeypatch.setattr(
+        win, "_update_summary", lambda: calls.append("_update_summary")
+    )
+    monkeypatch.setattr(
+        win, "_update_today_status", lambda: calls.append("_update_today_status")
+    )
+    win.refresh_theme()
+    assert calls == [], f"refresh_theme 不应触碰数据渲染路径：{calls}"
+
+
+def test_refresh_theme_source_has_no_data_redraw_calls():
+    """C1-08 AST 防复发：refresh_theme 方法体不得访问 table.draw/_update_summary/_update_today_status。"""
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    tree = ast.parse(inspect.getsource(mw))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "refresh_theme":
+            for sub in ast.walk(node):
+                if (
+                    isinstance(sub, ast.Attribute)
+                    and sub.attr in {"draw", "_update_summary", "_update_today_status"}
+                ):
+                    violations.append(f"L{sub.lineno}: refresh_theme 访问 {sub.attr}")
+    assert violations == [], f"refresh_theme 不得触碰数据渲染路径：{violations}"
+
+
+def test_kpi_styles_follow_theme_toggle(sample_window):
+    """C1-08：主题切换后 KPI 磁贴数字颜色随主题变化（数值文本不受影响）。"""
+    from app.theme import get_color
+
+    win = sample_window
+    text_before = win._summary_label.text()
+    light_style = win._summary_label.styleSheet()
+
+    win.sidebar.theme_btn.click()  # light → dark
+
+    dark_style = win._summary_label.styleSheet()
+    assert dark_style != light_style, "KPI 磁贴样式必须随主题变化"
+    assert win._summary_label.text() == text_before, "数值文本不受主题切换影响"
+    # dark 下样式含当前主题信号色（样本数据总盈亏为正 → FG_POS）
+    assert get_color("FG_POS") in dark_style
+
+    win.sidebar.theme_btn.click()  # dark → light 往返
+    assert win._summary_label.styleSheet() == light_style
+
+
+def test_sidebar_themed_at_startup(sample_window):
+    """C1-08 E2：启动期 sidebar 已应用当前主题（首帧样式 = 当前主题值，不依赖首次切换）。"""
+    from app.theme import get_color
+
+    win = sample_window
+    assert get_color("MUTED_BG") in win.sidebar.styleSheet(), (
+        "sidebar 首帧样式应为当前主题值（refreshers 启动期已应用）"
+    )
+
+
+# ── C1-09. 主题全链路抽查（light→dark→light 机械回归）────
+
+
+def test_full_chain_theme_toggle_roundtrip(sample_window):
+    """C1-09：light→dark→light 循环后各抽查组件样式含当前主题色值（与 get_color 比对）。
+
+    覆盖全部渲染路径：exchange 包标签/分隔线、table 行按钮、sidebar、
+    input 面板标签、chart 曲线——主题改动必须双主题×全路径回归。
+    """
+    from app.exchange_page import _PACKAGE_CONFIG
+    from app.table_widget import COL_ACTIONS
+    from app.theme import get_color
+
+    win = sample_window
+    exchange = win.profit_page.exchange_page
+    actions = win.table._left_table.cellWidget(0, COL_ACTIONS)
+    assert actions is not None, "表格行按钮未渲染（draw 未创建操作列）"
+
+    def assert_chain_themed():
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
+            assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
+                f"{cfg.color} 包标签未随主题（当前 {get_color(cfg.color)}）"
+            )
+            assert get_color("SEPARATOR") in exchange._cards[i]._sep.styleSheet(), (
+                "分隔线未随主题"
+            )
+        assert get_color("BTN_BG") in actions._edit_btn.styleSheet(), "表格行按钮未随主题"
+        assert get_color("MUTED_BG") in win.sidebar.styleSheet(), "sidebar 未随主题"
+        assert get_color("FG_LABEL") in win.input_panel._cash_label.styleSheet(), (
+            "输入面板标签未随主题"
+        )
+        curve = win.chart._warehouse_curve
+        assert curve is not None, "仓库曲线未绘制"
+        pen_color = curve.opts["pen"].color().name().lower()
+        assert pen_color == get_color("CHART_WAREHOUSE").lower(), (
+            f"图表曲线未随主题：{pen_color} != {get_color('CHART_WAREHOUSE')}"
+        )
+
+    assert_chain_themed()          # 初始 light
+    win.sidebar.theme_btn.click()  # → dark
+    assert_chain_themed()
+    win.sidebar.theme_btn.click()  # → light（往返）
+    assert_chain_themed()

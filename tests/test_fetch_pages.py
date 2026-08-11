@@ -4,14 +4,15 @@ FetchWorker 安全关闭 + 数据页懒加载/预加载/重构 回归测试（T-
 覆盖：
 - T-01：FetchWorker.shutdown() 正常等待 / 超时逃生舱托管；请求在途时关闭
   主窗口不崩溃（"QThread: Destroyed while thread is still running" 回归）。
-- T-02：preload() 幂等、offscreen 守卫、失败路径记录日志（不静默吞错）。
+- T-02：preload() 幂等、失败路径记录日志（不静默吞错）。C2-03：preload
+  不再读 QT_QPA_PLATFORM 哨兵——各用例以构造注入 stub client 压制网络
+  （tests.conftest.make_stub_client），零真实 HTTP、零实例级私有 monkeypatch。
 - T-03：基类提炼后两页外部行为不变（懒加载、渲染、主题色收敛、_error 死状态移除）。
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from datetime import datetime
@@ -20,6 +21,7 @@ import pytest
 
 from config import DATE_FORMAT
 from data_store import DataStore
+from tests.conftest import make_stub_client
 
 __all__ = []
 
@@ -102,18 +104,17 @@ def test_fetch_worker_shutdown_timeout_detaches(qapp) -> None:
 
 
 def test_close_window_with_inflight_worker_no_crash(
-    qapp, settings_guard, tmp_path, monkeypatch
+    qapp, settings_guard, tmp_path
 ) -> None:
     """请求在途时关闭主窗口：不抛异常、线程安全回收（T-01 回归）。
 
     旧实现中 FetchWorker 只挂在页面实例上，closeEvent 不等待/停止线程，
     关窗即触发 "QThread: Destroyed while thread is still running" abort。
+    C2-03：MainWindow 构造注入 stub client，再以阻塞 stub 覆盖注入实例的
+    fetch_ov_data（实例属性赋值在注入实例上仍成立），preload 真实启动线程。
     """
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
-
-    # 绕过 preload 的 offscreen 守卫，让预加载真实启动后台线程
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
 
     blocking_fetch, release = _make_blocking_stub()
 
@@ -122,9 +123,10 @@ def test_close_window_with_inflight_worker_no_crash(
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     page = win.profit_page.crafting_page
-    page._client.fetch_ov_data = blocking_fetch  # 实例级替换为阻塞 stub
+    page._client.fetch_ov_data = blocking_fetch  # 覆盖注入实例的方法为阻塞 stub
     page.preload()
 
     worker = page._worker
@@ -142,22 +144,11 @@ def test_close_window_with_inflight_worker_no_crash(
 # ── T-02. preload() ───────────────────────────────────────
 
 
-def test_preload_skipped_offscreen(qapp) -> None:
-    """offscreen 测试模式下 preload() 不启动 worker（原守卫保留）。"""
-    from app.crafting_page import CraftingPage
-
-    page = CraftingPage()
-    page.preload()
-    assert page._worker is None
-
-
-def test_preload_idempotent(qapp, monkeypatch) -> None:
+def test_preload_idempotent(qapp) -> None:
     """preload() 幂等：加载中/已加载时重复调用不重复启动 worker。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: []
+    page = CraftingPage(client=make_stub_client())
 
     page.preload()
     first = page._worker
@@ -174,13 +165,11 @@ def test_preload_idempotent(qapp, monkeypatch) -> None:
     assert page._worker is first
 
 
-def test_refresh_after_loaded_starts_new_worker(qapp, monkeypatch) -> None:
+def test_refresh_after_loaded_starts_new_worker(qapp) -> None:
     """候选 2 回归：loaded 态点刷新（refresh）重新加载——新 worker，状态回 loading。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: []
+    page = CraftingPage(client=make_stub_client())
 
     page.preload()
     first = page._worker
@@ -197,14 +186,16 @@ def test_refresh_after_loaded_starts_new_worker(qapp, monkeypatch) -> None:
     assert page.is_loaded is True
 
 
-def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None:
+def test_preload_failure_logs_and_shows_retry(qapp, caplog) -> None:
     """preload() 失败路径：记录 warning、状态提示可重试、不静默吞错（T-02 回归）。"""
     from app.crafting_page import CraftingPage
     from kkrb_client import KkrbError
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: (_ for _ in ()).throw(KkrbError("boom"))
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
 
     with caplog.at_level(logging.WARNING, logger="app.fetch_page_base"):
         page.preload()
@@ -219,7 +210,7 @@ def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None
     assert page._refresh_btn.isEnabled()
 
 
-def test_error_label_click_retries(qapp, monkeypatch) -> None:
+def test_error_label_click_retries(qapp) -> None:
     """U-07：「点击重试」label 真实可点——点击后重新发起加载（新 worker）。"""
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
@@ -227,9 +218,11 @@ def test_error_label_click_retries(qapp, monkeypatch) -> None:
     from app.crafting_page import CraftingPage
     from kkrb_client import KkrbError
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: (_ for _ in ()).throw(KkrbError("boom"))
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
 
     page.show()  # label 可见性需父链已显示
     qapp.processEvents()
@@ -249,12 +242,11 @@ def test_error_label_click_retries(qapp, monkeypatch) -> None:
     assert page._worker is not None and page._worker is not worker
 
 
-def test_preload_after_shutdown_does_not_start(qapp, monkeypatch) -> None:
+def test_preload_after_shutdown_does_not_start(qapp) -> None:
     """shutdown() 后不再启动新预加载（关窗后迟到的定时器回调不复活线程）。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
+    page = CraftingPage(client=make_stub_client())
     page.shutdown()
     page.preload()
     assert page._worker is None
@@ -268,10 +260,13 @@ def test_crafting_page_lazy_loads_on_show(qapp) -> None:
     from app.crafting_page import CraftingPage
     from kkrb_client import CraftingProduct
 
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: [
-        CraftingProduct("技术中心", "复合弓", 24669, 39077, "晚上8点"),
-    ]
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: [
+                CraftingProduct("技术中心", "复合弓", 24669, 39077, "晚上8点"),
+            ]
+        )
+    )
 
     page.show()  # 触发 showEvent → 懒加载
     assert page._load_state.is_loading is True
@@ -284,10 +279,9 @@ def test_crafting_page_lazy_loads_on_show(qapp) -> None:
     assert page._load_state.is_loading is False
     assert page._refresh_btn.isEnabled()
     assert page._status_label.isHidden()
-    # 第一张卡片已渲染
+    # 第一张卡片已渲染（C2-04：直接引用，不再 layout.itemAt 回读）
     card = page._cards[0]
-    product_label = card.layout().itemAt(1).widget()
-    assert product_label.text() == "复合弓"
+    assert card._product_label.text() == "复合弓"
     page.hide()
 
 
@@ -296,12 +290,15 @@ def test_exchange_page_renders_best_per_package(qapp) -> None:
     from app.exchange_page import ExchangePage
     from kkrb_client import AmmoPackageItem
 
-    page = ExchangePage()
-    page._client.fetch_ammo_package_data = lambda: [
-        AmmoPackageItem("3级子弹自选包", "低利润弹", 3, 200, 100, 20000, 5000),
-        AmmoPackageItem("3级子弹自选包", "高利润弹", 3, 200, 555, 111000, 98790),
-        AmmoPackageItem("4级子弹自选包", "唯一弹", 4, 150, 1934, 290100, 258189),
-    ]
+    page = ExchangePage(
+        client=make_stub_client(
+            ammo_impl=lambda: [
+                AmmoPackageItem("3级子弹自选包", "低利润弹", 3, 200, 100, 20000, 5000),
+                AmmoPackageItem("3级子弹自选包", "高利润弹", 3, 200, 555, 111000, 98790),
+                AmmoPackageItem("4级子弹自选包", "唯一弹", 4, 150, 1934, 290100, 258189),
+            ]
+        )
+    )
 
     page.show()
     worker = page._worker
@@ -371,3 +368,296 @@ def test_pages_have_no_dead_error_state(qapp) -> None:
 
     assert not hasattr(CraftingPage(), "_error")
     assert not hasattr(ExchangePage(), "_error")
+
+
+# ── C2-04. CraftingPage 渲染对齐（直接引用 + 显式占位）──
+
+
+def test_crafting_empty_data_renders_placeholder(qapp) -> None:
+    """空数据渲染：4 卡显式占位文案（站名 —、产物 暂无数据、其余空串，spec 4.2.9）。"""
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data([])
+
+    for card in page._cards:
+        assert card._station_label.text() == "—"
+        assert card._product_label.text() == "暂无数据"
+        assert card._profit_label.text() == ""
+        assert card._price_label.text() == ""
+        assert card._sell_time_label.text() == ""
+
+
+def test_crafting_partial_data_fills_remaining_slots(qapp) -> None:
+    """部分数据（<4）：前 N 卡渲染数据，其余空槽位回占位文案（显式重置）。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import CraftingProduct
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data([CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")])
+
+    assert page._cards[0]._station_label.text() == "技术中心"
+    assert page._cards[0]._product_label.text() == "复合弓"
+    assert page._cards[0]._profit_label.text() == "总利润：¥100.00"
+    assert page._cards[0]._price_label.text() == "当前售价：¥200.00"
+    assert page._cards[0]._sell_time_label.text() == "建议出售时段：晚上8点"
+    for card in page._cards[1:]:
+        assert card._station_label.text() == "—"
+        assert card._product_label.text() == "暂无数据"
+
+
+def test_crafting_page_has_no_empty_station() -> None:
+    """_EMPTY_STATION 假领域对象已删除（空渲染零 CraftingProduct 构造）。"""
+    import app.crafting_page as cp
+
+    assert not hasattr(cp, "_EMPTY_STATION")
+
+
+def test_crafting_render_never_constructs_products() -> None:
+    """AST 防复发：crafting_page 模块零 CraftingProduct 构造调用（仅类型注解引用）。"""
+    import ast
+    import inspect
+
+    import app.crafting_page as cp
+
+    tree = ast.parse(inspect.getsource(cp))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CraftingProduct"
+        ):
+            violations.append(f"L{node.lineno}: CraftingProduct(...) 构造调用")
+    assert violations == [], f"渲染路径不应构造 CraftingProduct：{violations}"
+
+
+# ── T-04. 构造注入 client seam（C2-02）────────────────────
+
+
+def test_crafting_page_injected_client_used_by_fetch(qapp) -> None:
+    """构造注入：CraftingPage(client=fake) 后 _fetch 落在 fake 实例（断网能力）。"""
+    from types import SimpleNamespace
+
+    from app.crafting_page import CraftingPage
+
+    calls: list[str] = []
+    fake = SimpleNamespace(fetch_ov_data=lambda: (calls.append("ov"), [])[1])
+    page = CraftingPage(client=fake)
+    assert page._fetch() == []
+    assert calls == ["ov"]
+
+
+def test_exchange_page_injected_client_used_by_fetch(qapp) -> None:
+    """构造注入：ExchangePage(client=fake) 后 _fetch 落在 fake 实例。"""
+    from types import SimpleNamespace
+
+    from app.exchange_page import ExchangePage
+
+    calls: list[str] = []
+    fake = SimpleNamespace(fetch_ammo_package_data=lambda: (calls.append("ammo"), [])[1])
+    page = ExchangePage(client=fake)
+    assert page._fetch() == []
+    assert calls == ["ammo"]
+
+
+def test_pages_without_client_build_own_kkrb_client(qapp) -> None:
+    """client=None 现状兼容：自建 KkrbClient（既有直构用例语义不变）。"""
+    from kkrb_client import KkrbClient
+
+    from app.crafting_page import CraftingPage
+    from app.exchange_page import ExchangePage
+
+    assert isinstance(CraftingPage()._client, KkrbClient)
+    assert isinstance(ExchangePage()._client, KkrbClient)
+
+
+def test_profit_page_preload_fans_out_to_children(qapp) -> None:
+    """C2-02：profit_page.preload() 扇出两子页 preload（单出口，不再各页直插）。"""
+    from app.profit_page import ProfitPage
+
+    page = ProfitPage()
+    calls: list[str] = []
+    page.crafting_page.preload = lambda: calls.append("crafting")  # type: ignore[method-assign]
+    page.exchange_page.preload = lambda: calls.append("exchange")  # type: ignore[method-assign]
+    page.preload()
+    assert calls == ["crafting", "exchange"]
+
+
+# ── C2-05. 错误/空态渲染分离（_render_error 钩子）─────────
+
+
+def test_default_render_error_delegates_to_empty_render(qapp, monkeypatch) -> None:
+    """C2-05：基类默认钩子仅委托 _render_data([])（错误路径行为逐字节等价）。"""
+    from app.exchange_page import ExchangePage
+
+    page = ExchangePage(client=make_stub_client())
+    calls: list[list] = []
+    monkeypatch.setattr(page, "_render_data", lambda data: calls.append(data))
+    page._render_error()
+    assert calls == [[]]  # 默认实现 = 空态渲染，无额外行为
+
+
+def test_crafting_error_invokes_render_error_hook(qapp, monkeypatch) -> None:
+    """C2-05：制造页真实错误链路走 _render_error 钩子（spy），不再直调 _render_data。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import KkrbError
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(page, "_render_error", lambda: calls.append("error"))
+    monkeypatch.setattr(page, "_render_data", lambda data: calls.append("data"))
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    assert calls == ["error"], f"_on_fetch_error 应走 _render_error 钩子：{calls}"
+    page.hide()
+
+
+def test_crafting_error_renders_distinct_from_empty(qapp) -> None:
+    """C2-05：制造页错误卡片产物文案 ≠ 空态「暂无数据」（可证伪断言）。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import KkrbError
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    for card in page._cards:
+        assert card._product_label.text() == "加载失败，点击重试"
+        assert card._product_label.text() != "暂无数据"  # 与空态可区分
+        assert card._station_label.text() == "—"
+        assert card._profit_label.text() == ""
+        assert card._price_label.text() == ""
+        assert card._sell_time_label.text() == ""
+    page.hide()
+
+
+def test_exchange_error_path_renders_empty_state(qapp) -> None:
+    """C2-05：兑换页未覆盖钩子——错误路径渲染 == 空态（现状等价）。"""
+    from app.exchange_page import ExchangePage
+    from kkrb_client import KkrbError
+
+    page = ExchangePage(
+        client=make_stub_client(
+            ammo_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    for card in page._cards:
+        assert card._item_name.text() == "暂无数据"
+    page.hide()
+
+
+def test_crafting_generic_error_shows_network_message(qapp) -> None:
+    """C2-05 Falsify：非 KkrbError 异常走 generic 分支——网络文案 + 错误渲染钩子。"""
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(RuntimeError("timeout"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    assert page._status_label.text() == "⚠️ 网络异常，请检查连接后重试"
+    for card in page._cards:
+        assert card._product_label.text() == "加载失败，点击重试"
+    page.hide()
+
+
+# ── C1-07. apply_theme 钩子（crafting 空操作 + profit 扇出）─
+
+
+def test_crafting_apply_theme_is_noop(qapp) -> None:
+    """C1-07：CraftingPage.apply_theme() 空操作——无异常、不改变标签文本/样式。
+
+    制造卡颜色全部由 QSS 选择器驱动（generate_qss 按当前主题生成），
+    无内联冻结色需要重解析。
+    """
+    from app.crafting_page import CraftingPage
+    from kkrb_client import CraftingProduct
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data(
+        [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")]
+    )
+    before = [
+        (c._station_label.text(), c._product_label.styleSheet())
+        for c in page._cards
+    ]
+
+    page.apply_theme()  # 空操作，无异常
+
+    after = [
+        (c._station_label.text(), c._product_label.styleSheet())
+        for c in page._cards
+    ]
+    assert before == after, "apply_theme 不得改变任何标签文本/样式"
+
+
+def test_profit_apply_theme_fans_out_to_children(qapp) -> None:
+    """C1-07：profit_page.apply_theme() 扇出 crafting + exchange（spy 断言）。"""
+    from app.profit_page import ProfitPage
+
+    page = ProfitPage()
+    calls: list[str] = []
+    page.crafting_page.apply_theme = lambda: calls.append("crafting")  # type: ignore[method-assign]
+    page.exchange_page.apply_theme = lambda: calls.append("exchange")  # type: ignore[method-assign]
+    page.apply_theme()
+    assert calls == ["crafting", "exchange"]
+
+
+# ── C1-09. craft 卡内联样式无颜色字面量 ──────────────────
+
+
+def test_crafting_card_inline_style_has_no_color_literal() -> None:
+    """C1-09：制造卡内联 styleSheet 不得含颜色字面量（颜色全部 QSS 选择器驱动）。
+
+    内联样式仅允许字号/字重等字体样式；出现 #hex / rgba( 即红——
+    颜色冻结在构建期会随主题失效（C1 契约）。
+    """
+    import re
+
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    color_literal = re.compile(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(")
+    for card in page._cards:
+        for label in (
+            card._station_label,
+            card._product_label,
+            card._profit_label,
+            card._price_label,
+            card._sell_time_label,
+        ):
+            style = label.styleSheet()
+            assert not color_literal.search(style), f"内联样式含颜色字面量：{style!r}"
+            assert "color:" not in style, f"内联样式含 color 属性：{style!r}"
