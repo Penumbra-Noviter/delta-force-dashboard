@@ -64,9 +64,9 @@ from presentation import (
 )
 from settings_store import (
     SettingsStore,
-    _encode_window_state,
     decode_geometry_hex,
     decode_legacy_geometry,
+    encode_window_state,
 )
 from signals import RateSignal
 
@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         才写，注入模式无账号概念不写 key）；update 返回值回写 self._settings，
         后续读取走运行期内存。文件中原有未知键（patch 之外）由 update 保留。
         """
-        patch = _encode_window_state(
+        patch = encode_window_state(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
         patch[_KEY_ANIMATIONS] = self._settings.get(_KEY_ANIMATIONS, True)

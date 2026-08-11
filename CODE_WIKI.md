@@ -499,7 +499,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~108 行<!--/AUTO-->）
+### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~110 行<!--/AUTO-->）
 
 #### 类：`SettingsStore`
 
@@ -510,7 +510,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:settings_store.py:SettingsStore.save-->`save(settings)`<!--/AUTO--> | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题）；保留为原语，`update` 内部复用 |
 | <!--AUTO:sig:settings_store.py:SettingsStore.update-->`update(patch)`<!--/AUTO--> | **C3-10** schema 合并写入：读当前文件原始 dict → 合并 patch（未知键保留）→ 原子写 → 返回新 dict；写失败 warning 不抛（容错语义与 save 一致） |
 
-**职责边界（C3-10/C3-11）**：SettingsStore 是设置 schema 的唯一所有者——公开 `DEFAULTS`（`geometry`/`pinned`/`theme`/`animations`）与 `KNOWN_KEYS = frozenset(DEFAULTS) | {"current_account"}`；`update(patch)` 取代全量覆盖写（未知键端到端保留）。C3-11：`animations` 键纳入持久化闭环（启动值即运行值写回，关窗后动画开关不丢）；窗口层设置键收敛为 `_KEY_*` 模块常量（消灭裸字符串键，AST 守卫）；`encode_settings` 降级为模块私有 `_encode_window_state`。MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
+**职责边界（C3-10/C3-11/AA-04）**：SettingsStore 是设置 schema 的唯一所有者——公开 `DEFAULTS`（`geometry`/`pinned`/`theme`/`animations`）与 `KNOWN_KEYS = frozenset(DEFAULTS) | {"current_account"}`；`update(patch)` 取代全量覆盖写（未知键端到端保留）。C3-11：`animations` 键纳入持久化闭环（启动值即运行值写回，关窗后动画开关不丢）；窗口层设置键收敛为 `_KEY_*` 模块常量（消灭裸字符串键，AST 守卫）；窗口状态编码公开为 `encode_window_state`（AA-04：跨模块依赖与 `__all__` 声明一致，原 `_encode_window_state` 私有名已移除）。MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
 
 ---
 

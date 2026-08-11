@@ -5,7 +5,8 @@ Tests for json_file.py + settings_store.py — JSON 原子写 seam 与设置持�
 - 读取：文件缺失 → {}（静默）；解析失败 / 顶层非 dict → warning + {}；
 - 写入：原子写失败 → warning，不抛异常。
 C3-10：SettingsStore 是设置 schema 唯一所有者——DEFAULTS / KNOWN_KEYS /
-update(patch)（读-合并-原子写-返回）；encode_settings 降级为模块私有。
+update(patch)（读-合并-原子写-返回）；窗口状态编码公开命名 encode_window_state
+（AA-04：跨模块依赖与 __all__ 一致，原 encode_settings/_encode_window_state 均移除）。
 """
 
 from __future__ import annotations
@@ -299,13 +300,23 @@ def test_update_write_failure_logs_warning_no_raise(tmp_path, caplog):
     assert any("设置文件写入失败" in r.message for r in caplog.records)
 
 
-def test_encode_settings_not_public():
-    """encode_settings 不再公开：不在 __all__，模块无该属性（验收 5）。"""
+def test_encode_window_state_public():
+    """AA-04：encode_window_state 公开——跨模块依赖（main_window）与 __all__ 一致。
+
+    encode_settings 旧名与私有下划线名均不存在（验收 5 延续）；新公开名
+    入 __all__，行为与原私有实现等价（geometry hex / pinned / theme）。
+    """
     import settings_store as ss
 
     assert "encode_settings" not in ss.__all__
     assert not hasattr(ss, "encode_settings")
-    assert hasattr(ss, "_encode_window_state")  # 私有化后的名称存在
+    assert "encode_window_state" in ss.__all__
+    assert not hasattr(ss, "_encode_window_state")  # 私有名已公开化（AA-04）
+    assert ss.encode_window_state(b"\x01\x02", True, "dark") == {
+        "geometry": "0102",
+        "pinned": True,
+        "theme": "dark",
+    }
 
 
 # ── C3-11. AST 守卫：main_window 设置键访问收敛到模块常量 ──
