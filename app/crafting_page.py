@@ -88,12 +88,25 @@ class CraftingPage(FetchPageBase):
 
     # ── 渲染 ────────────────────────────────────────────
 
+    def _reset_card(self, card: QFrame, product_text: str) -> None:
+        """重置一张台位卡为占位态：站名 —、产物 product_text、其余字段清空。
+
+        AA-02：_render_data 空槽位与 _render_error 共用同一清空逻辑
+        （仅产物文案不同：「暂无数据」空态 / 「加载失败，点击重试」错误态），
+        消除两处 5 字段重置循环的重复。
+        """
+        card._station_label.setText("—")
+        card._product_label.setText(product_text)
+        card._profit_label.setText("")
+        card._price_label.setText("")
+        card._sell_time_label.setText("")
+
     def _render_data(self, data: list[CraftingProduct]) -> None:
         """将产物数据渲染到 4 个卡片。
 
-        前 ``len(data)`` 张卡按数据更新；空槽位显式重置为占位文案
-        （站名 —、产物 暂无数据、利润/价格/时段空串）——空数据渲染
-        不构造 CraftingProduct 实例（模块级假领域对象已删除）。
+        前 ``len(data)`` 张卡按数据更新；空槽位经 _reset_card 显式重置为
+        占位文案（站名 —、产物 暂无数据、利润/价格/时段空串，AA-02）——
+        空数据渲染不构造 CraftingProduct 实例（模块级假领域对象已删除）。
         """
         products = data or []
         for i, card in enumerate(self._cards):
@@ -113,24 +126,16 @@ class CraftingPage(FetchPageBase):
                     f"建议出售时段：{product.sell_time}"
                 )
             else:
-                card._station_label.setText("—")
-                card._product_label.setText("暂无数据")
-                card._profit_label.setText("")
-                card._price_label.setText("")
-                card._sell_time_label.setText("")
+                self._reset_card(card, "暂无数据")
 
     def _render_error(self) -> None:
         """错误态渲染：与空态可区分的错误文案（C2-05，spec 4.2.10）。
 
-        站名 —、产物「加载失败，点击重试」（空态为「暂无数据」）、
-        利润/价格/时段清空——用户可分辨「没数据」与「出错了」。
+        经 _reset_card 共享清空逻辑（AA-02），产物文案「加载失败，点击重试」
+        （空态为「暂无数据」）——用户可分辨「没数据」与「出错了」。
         """
         for card in self._cards:
-            card._station_label.setText("—")
-            card._product_label.setText("加载失败，点击重试")
-            card._profit_label.setText("")
-            card._price_label.setText("")
-            card._sell_time_label.setText("")
+            self._reset_card(card, "加载失败，点击重试")
 
     def apply_theme(self) -> None:
         """主题切换钩子：空操作（C1-07）。

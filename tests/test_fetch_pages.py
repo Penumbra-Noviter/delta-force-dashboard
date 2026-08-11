@@ -413,6 +413,43 @@ def test_crafting_page_has_no_empty_station() -> None:
     assert not hasattr(cp, "_EMPTY_STATION")
 
 
+def test_reset_card_shared_between_empty_and_error(qapp) -> None:
+    """AA-02：_reset_card(card, product_text) 由空态与错误态共用（仅产物文案不同）。
+
+    空态产物文案「暂无数据」/ 错误态「加载失败，点击重试」可区分不变
+    （spec 4.2.9 / C2-05），其余字段（站名 —、利润/价格/时段空串）清空逻辑共享。
+    """
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    card = page._cards[0]
+
+    page._reset_card(card, "暂无数据")
+    assert card._station_label.text() == "—"
+    assert card._product_label.text() == "暂无数据"
+    assert card._profit_label.text() == ""
+    assert card._price_label.text() == ""
+    assert card._sell_time_label.text() == ""
+
+    page._reset_card(card, "加载失败，点击重试")
+    assert card._product_label.text() == "加载失败，点击重试"
+    assert card._station_label.text() == "—"
+    assert card._profit_label.text() == ""
+    assert card._price_label.text() == ""
+    assert card._sell_time_label.text() == ""
+
+
+def test_render_empty_and_error_both_call_reset_card() -> None:
+    """AA-02 验收：_render_data 空槽位与 _render_error 两处都调用 _reset_card。"""
+    import inspect
+
+    from app.crafting_page import CraftingPage
+
+    for method in ("_render_data", "_render_error"):
+        src = inspect.getsource(getattr(CraftingPage, method))
+        assert "_reset_card(" in src, f"{method} 未走共享 _reset_card"
+
+
 def test_crafting_render_never_constructs_products() -> None:
     """AST 防复发：crafting_page 模块零 CraftingProduct 构造调用（仅类型注解引用）。"""
     import ast
