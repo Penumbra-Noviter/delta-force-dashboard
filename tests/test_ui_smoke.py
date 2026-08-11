@@ -71,12 +71,18 @@ def make_sample_data() -> dict:
 
 @pytest.fixture
 def sample_window(qapp, settings_guard, tmp_path):
-    """带样本数据的 MainWindow（不触碰真实 data.json / settings.json）。"""
+    """带样本数据的 MainWindow（不触碰真实 data.json / settings.json）。
+
+    C2-03：构造注入 stub client——利润页懒加载/预加载零真实网络
+    （不再依赖 offscreen 哨兵）。
+    """
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(make_sample_data()),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -178,9 +184,12 @@ def test_u02_type_scale(sample_window):
     assert win.table._left_table.rowHeight(0) == 26
 
 
-def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monkeypatch):
-    """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。"""
-    import os
+def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path):
+    """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。
+
+    C2-03：构造注入带数据的 stub client——预加载走真实后台线程，
+    线程内立即返回伪造数据，零真实网络。
+    """
     import time
 
     from PySide6.QtTest import QTest
@@ -188,24 +197,18 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
     from data_store import DataStore
-    from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
-
-    # offscreen-t 绕过 preload 的 offscreen 守卫；伪造网络数据避免真实 HTTP
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    monkeypatch.setattr(
-        KkrbClient,
-        "fetch_ov_data",
-        lambda self: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
-    )
-    monkeypatch.setattr(
-        KkrbClient,
-        "fetch_ammo_package_data",
-        lambda self: [AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)],
-    )
+    from kkrb_client import AmmoPackageItem, CraftingProduct
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
         logic=ProfitCalculatorLogic(make_sample_data()),
+        client=make_stub_client(
+            ov_impl=lambda: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
+            ammo_impl=lambda: [
+                AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)
+            ],
+        ),
     )
     win.show()
 
@@ -224,18 +227,13 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path, monk
     win.close()
 
 
-def test_page_switch_loop_no_crash(sample_window, monkeypatch):
+def test_page_switch_loop_no_crash(sample_window):
     """U-11 回归：点利润 → 切回记账 → 再点利润 反复 20 次不崩溃。
 
     用户报告此操作序列闪退（根因：切页淡入的 QGraphicsOpacityEffect 挂
     QStackedWidget 页面，快速 hide/show 触发 Qt 崩溃路径——已移除切页动画）。
     """
     from PySide6.QtTest import QTest
-
-    from kkrb_client import KkrbClient
-
-    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
-    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
 
     win = sample_window
     win.show()
@@ -354,7 +352,7 @@ def test_u05_emoji_single_source(sample_window):
         assert not literal.search(text), f"{py.name} 含散落 emoji 字面量"
 
 
-def test_u06_motion_feedback(sample_window, monkeypatch):
+def test_u06_motion_feedback(sample_window):
     """U-06：曲线绘制动画触发 + fade_in_widget 契约（effect 移除、竞态安全）。
 
     注：页面切换淡入已移除（QStackedWidget + QGraphicsOpacityEffect 快速切页
@@ -364,11 +362,6 @@ def test_u06_motion_feedback(sample_window, monkeypatch):
     from PySide6.QtWidgets import QFrame
 
     from app.motion import fade_in_widget
-    from kkrb_client import KkrbClient
-
-    # 切页会触发利润页懒加载 → 屏蔽真实网络请求
-    monkeypatch.setattr(KkrbClient, "fetch_ov_data", lambda self: [])
-    monkeypatch.setattr(KkrbClient, "fetch_ammo_package_data", lambda self: [])
 
     win = sample_window
     win.show()
@@ -526,6 +519,7 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
     """保存后触发裁剪：状态提示展示自动删除（O-14，J 系列上限 30 条）。"""
     from app.main_window import MainWindow
     from config import RETENTION_LIMIT
+    from tests.conftest import make_stub_client
 
     today = datetime.now()
     # 31 个日期键（含今天），超出保留上限 RETENTION_LIMIT 1 条 → 触发裁剪
@@ -537,6 +531,7 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     assert len(win.logic.data) == RETENTION_LIMIT + 1
 
@@ -672,7 +667,6 @@ def test_shared_client_concurrent_preload_no_errors(
     from app.main_window import MainWindow
     from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
     calls: list[str] = []
     client = KkrbClient()
     monkeypatch.setattr(
@@ -811,6 +805,7 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
     """旧格式（Tkinter）geometry 恢复无 crash。"""
     import app.main_window as mw
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     test_file = tmp_path / "settings_old.json"
     monkeypatch.setattr(mw, "SETTINGS_FILE", test_file)
@@ -819,7 +814,10 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        client=make_stub_client(),
+    )
     win.close()
 
 
@@ -827,6 +825,7 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
     """新格式（空 geometry / hex）恢复无 crash。"""
     import app.main_window as mw
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     test_file = tmp_path / "settings_new.json"
     monkeypatch.setattr(mw, "SETTINGS_FILE", test_file)
@@ -835,7 +834,10 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    win = MainWindow(store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"))
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        client=make_stub_client(),
+    )
     win.close()
 
 
@@ -970,6 +972,7 @@ def test_export_csv_failure_shows_warning(sample_window, monkeypatch, tmp_path):
 def window_without_today(qapp, settings_guard, tmp_path):
     """数据不含今日记录的 MainWindow（触发「今日未录入」提醒）。"""
     from app.main_window import MainWindow
+    from tests.conftest import make_stub_client
 
     data = make_sample_data()
     today_str = datetime.now().strftime(DATE_FORMAT)
@@ -977,6 +980,7 @@ def window_without_today(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -1092,6 +1096,7 @@ def view_switch_window(qapp, settings_guard, tmp_path):
     """
     from app.main_window import MainWindow
     from data_store import DataStore
+    from tests.conftest import make_stub_client
 
     today = datetime.now()
     data = {}
@@ -1101,6 +1106,7 @@ def view_switch_window(qapp, settings_guard, tmp_path):
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     yield win
     win.close()
@@ -1190,6 +1196,7 @@ def account_window_factory(qapp, settings_guard, tmp_path):
     from account_store import AccountStore
     from app.main_window import MainWindow
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     def _make(settings_data=None, setup=None):
         acc = AccountStore(tmp_path / "accounts")
@@ -1200,7 +1207,11 @@ def account_window_factory(qapp, settings_guard, tmp_path):
             settings_file.write_text(
                 json.dumps(settings_data, ensure_ascii=False), encoding="utf-8"
             )
-        win = MainWindow(account_store=acc, settings_store=SettingsStore(settings_file))
+        win = MainWindow(
+            account_store=acc,
+            settings_store=SettingsStore(settings_file),
+            client=make_stub_client(),
+        )
         return win, acc
 
     return _make
@@ -1302,6 +1313,7 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
     from app.main_window import MainWindow
     from data_store import DataStore
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     calls = {"resolve": 0, "new_store": 0}
 
@@ -1318,6 +1330,7 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         account_store=SpyStore(tmp_path / "accounts"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
 
     assert calls["resolve"] == 0
@@ -1539,10 +1552,12 @@ def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path)
     from app.main_window import MainWindow
     from data_store import DataStore
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
 
     assert win.sidebar.account_combo.isHidden()
@@ -1623,6 +1638,7 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
     """切换后关窗落盘 current_account；重启（同 settings 文件）回到新账号（回读断言）。"""
     from app.main_window import MainWindow
     from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
 
     dates = _two_account_dates()
     win, acc = account_window_factory(setup=lambda a: _two_account_env(a, dates))
@@ -1634,7 +1650,9 @@ def test_switch_persists_and_restarts_into_new_account(account_window_factory, t
 
     # 重启：同一 accounts/settings 路径重新构造 → 回到小号
     win2 = MainWindow(
-        account_store=acc, settings_store=SettingsStore(tmp_path / "settings.json")
+        account_store=acc,
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        client=make_stub_client(),
     )
     try:
         assert win2.current_account == "小号"

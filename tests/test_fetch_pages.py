@@ -4,14 +4,15 @@ FetchWorker 安全关闭 + 数据页懒加载/预加载/重构 回归测试（T-
 覆盖：
 - T-01：FetchWorker.shutdown() 正常等待 / 超时逃生舱托管；请求在途时关闭
   主窗口不崩溃（"QThread: Destroyed while thread is still running" 回归）。
-- T-02：preload() 幂等、offscreen 守卫、失败路径记录日志（不静默吞错）。
+- T-02：preload() 幂等、失败路径记录日志（不静默吞错）。C2-03：preload
+  不再读 QT_QPA_PLATFORM 哨兵——各用例以构造注入 stub client 压制网络
+  （tests.conftest.make_stub_client），零真实 HTTP、零实例级私有 monkeypatch。
 - T-03：基类提炼后两页外部行为不变（懒加载、渲染、主题色收敛、_error 死状态移除）。
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from datetime import datetime
@@ -20,6 +21,7 @@ import pytest
 
 from config import DATE_FORMAT
 from data_store import DataStore
+from tests.conftest import make_stub_client
 
 __all__ = []
 
@@ -102,18 +104,17 @@ def test_fetch_worker_shutdown_timeout_detaches(qapp) -> None:
 
 
 def test_close_window_with_inflight_worker_no_crash(
-    qapp, settings_guard, tmp_path, monkeypatch
+    qapp, settings_guard, tmp_path
 ) -> None:
     """请求在途时关闭主窗口：不抛异常、线程安全回收（T-01 回归）。
 
     旧实现中 FetchWorker 只挂在页面实例上，closeEvent 不等待/停止线程，
     关窗即触发 "QThread: Destroyed while thread is still running" abort。
+    C2-03：MainWindow 构造注入 stub client，再以阻塞 stub 覆盖注入实例的
+    fetch_ov_data（实例属性赋值在注入实例上仍成立），preload 真实启动线程。
     """
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
-
-    # 绕过 preload 的 offscreen 守卫，让预加载真实启动后台线程
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
 
     blocking_fetch, release = _make_blocking_stub()
 
@@ -122,9 +123,10 @@ def test_close_window_with_inflight_worker_no_crash(
     win = MainWindow(
         store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
         logic=ProfitCalculatorLogic(data),
+        client=make_stub_client(),
     )
     page = win.profit_page.crafting_page
-    page._client.fetch_ov_data = blocking_fetch  # 实例级替换为阻塞 stub
+    page._client.fetch_ov_data = blocking_fetch  # 覆盖注入实例的方法为阻塞 stub
     page.preload()
 
     worker = page._worker
@@ -142,22 +144,11 @@ def test_close_window_with_inflight_worker_no_crash(
 # ── T-02. preload() ───────────────────────────────────────
 
 
-def test_preload_skipped_offscreen(qapp) -> None:
-    """offscreen 测试模式下 preload() 不启动 worker（原守卫保留）。"""
-    from app.crafting_page import CraftingPage
-
-    page = CraftingPage()
-    page.preload()
-    assert page._worker is None
-
-
-def test_preload_idempotent(qapp, monkeypatch) -> None:
+def test_preload_idempotent(qapp) -> None:
     """preload() 幂等：加载中/已加载时重复调用不重复启动 worker。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: []
+    page = CraftingPage(client=make_stub_client())
 
     page.preload()
     first = page._worker
@@ -174,13 +165,11 @@ def test_preload_idempotent(qapp, monkeypatch) -> None:
     assert page._worker is first
 
 
-def test_refresh_after_loaded_starts_new_worker(qapp, monkeypatch) -> None:
+def test_refresh_after_loaded_starts_new_worker(qapp) -> None:
     """候选 2 回归：loaded 态点刷新（refresh）重新加载——新 worker，状态回 loading。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: []
+    page = CraftingPage(client=make_stub_client())
 
     page.preload()
     first = page._worker
@@ -197,14 +186,16 @@ def test_refresh_after_loaded_starts_new_worker(qapp, monkeypatch) -> None:
     assert page.is_loaded is True
 
 
-def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None:
+def test_preload_failure_logs_and_shows_retry(qapp, caplog) -> None:
     """preload() 失败路径：记录 warning、状态提示可重试、不静默吞错（T-02 回归）。"""
     from app.crafting_page import CraftingPage
     from kkrb_client import KkrbError
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: (_ for _ in ()).throw(KkrbError("boom"))
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
 
     with caplog.at_level(logging.WARNING, logger="app.fetch_page_base"):
         page.preload()
@@ -219,7 +210,7 @@ def test_preload_failure_logs_and_shows_retry(qapp, monkeypatch, caplog) -> None
     assert page._refresh_btn.isEnabled()
 
 
-def test_error_label_click_retries(qapp, monkeypatch) -> None:
+def test_error_label_click_retries(qapp) -> None:
     """U-07：「点击重试」label 真实可点——点击后重新发起加载（新 worker）。"""
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
@@ -227,9 +218,11 @@ def test_error_label_click_retries(qapp, monkeypatch) -> None:
     from app.crafting_page import CraftingPage
     from kkrb_client import KkrbError
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: (_ for _ in ()).throw(KkrbError("boom"))
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
 
     page.show()  # label 可见性需父链已显示
     qapp.processEvents()
@@ -249,12 +242,11 @@ def test_error_label_click_retries(qapp, monkeypatch) -> None:
     assert page._worker is not None and page._worker is not worker
 
 
-def test_preload_after_shutdown_does_not_start(qapp, monkeypatch) -> None:
+def test_preload_after_shutdown_does_not_start(qapp) -> None:
     """shutdown() 后不再启动新预加载（关窗后迟到的定时器回调不复活线程）。"""
     from app.crafting_page import CraftingPage
 
-    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
-    page = CraftingPage()
+    page = CraftingPage(client=make_stub_client())
     page.shutdown()
     page.preload()
     assert page._worker is None
@@ -268,10 +260,13 @@ def test_crafting_page_lazy_loads_on_show(qapp) -> None:
     from app.crafting_page import CraftingPage
     from kkrb_client import CraftingProduct
 
-    page = CraftingPage()
-    page._client.fetch_ov_data = lambda: [
-        CraftingProduct("技术中心", "复合弓", 24669, 39077, "晚上8点"),
-    ]
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: [
+                CraftingProduct("技术中心", "复合弓", 24669, 39077, "晚上8点"),
+            ]
+        )
+    )
 
     page.show()  # 触发 showEvent → 懒加载
     assert page._load_state.is_loading is True
@@ -296,12 +291,15 @@ def test_exchange_page_renders_best_per_package(qapp) -> None:
     from app.exchange_page import ExchangePage
     from kkrb_client import AmmoPackageItem
 
-    page = ExchangePage()
-    page._client.fetch_ammo_package_data = lambda: [
-        AmmoPackageItem("3级子弹自选包", "低利润弹", 3, 200, 100, 20000, 5000),
-        AmmoPackageItem("3级子弹自选包", "高利润弹", 3, 200, 555, 111000, 98790),
-        AmmoPackageItem("4级子弹自选包", "唯一弹", 4, 150, 1934, 290100, 258189),
-    ]
+    page = ExchangePage(
+        client=make_stub_client(
+            ammo_impl=lambda: [
+                AmmoPackageItem("3级子弹自选包", "低利润弹", 3, 200, 100, 20000, 5000),
+                AmmoPackageItem("3级子弹自选包", "高利润弹", 3, 200, 555, 111000, 98790),
+                AmmoPackageItem("4级子弹自选包", "唯一弹", 4, 150, 1934, 290100, 258189),
+            ]
+        )
+    )
 
     page.show()
     worker = page._worker
