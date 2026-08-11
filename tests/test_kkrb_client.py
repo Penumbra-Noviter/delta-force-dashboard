@@ -8,6 +8,7 @@ KkrbClient 的网络/缓存行为。
 from __future__ import annotations
 
 import json
+import threading
 import time
 from http.cookiejar import Cookie, CookieJar
 from typing import Any
@@ -97,6 +98,7 @@ class TestKkrbClient:
 
 # 端到端用例的真实响应样例（与 kkrb_parsing 契约一致）
 _OV_URL = "https://www.kkrb.net/getOVData"
+_AMMO_URL = "https://www.kkrb.net/getAmmoPackageData"
 _OV_PAYLOAD = {
     "code": 1,
     "data": {
@@ -205,6 +207,32 @@ def _header_value(req: Request, name: str) -> str | None:
         if key.lower() == name.lower():
             return value
     return None
+
+
+class _URLRoutedOpener:
+    """URL 路由 fake opener：按请求 URL 返回固定响应（并发测试专用）。
+
+    并发下哪个线程先抢到锁是不确定的，脚本式按位置消费无法与请求顺序
+    对齐；改为按 URL 路由，任意线程调度下行为确定。每次 open 主动让出
+    GIL，放大竞争窗口（无锁实现下确定性失败）。
+    """
+
+    def __init__(self, cookie_jar: CookieJar, routes: dict[str, Any]) -> None:
+        self._jar = cookie_jar
+        self._routes = dict(routes)
+        self.requests: list[Request] = []
+
+    def open(self, req: Request, timeout: float | None = None) -> _FakeResponse:
+        self.requests.append(req)
+        time.sleep(0.01)
+        step = self._routes.get(req.full_url, b"")
+        if isinstance(step, Exception):
+            raise step
+        if isinstance(step, tuple):
+            body, name, value = step
+            self._jar.set_cookie(_make_cookie(name, value))
+            return _FakeResponse(body)
+        return _FakeResponse(step)
 
 
 @pytest.fixture
@@ -405,3 +433,98 @@ class TestEndToEnd:
         )
         with pytest.raises(KkrbError):
             client.fetch_ammo_package_data()
+
+
+class TestConcurrency:
+    """共享 client 并发安全（spec C2-01）：握手恰一次、缓存无脏读。"""
+
+    @staticmethod
+    def _routed_client(routes: dict[str, Any]) -> tuple[KkrbClient, _URLRoutedOpener]:
+        """构造 client：_opener 替换为 URL 路由 opener（传输 seam，同 transport_client）。"""
+        client = KkrbClient()
+        opener = _URLRoutedOpener(client._cookie_jar, routes)
+        client._opener = opener
+        return client, opener
+
+    def test_concurrent_fetch_handshakes_once(self) -> None:
+        """N 线程同时 fetch_ov_data：握手（首页 + getMenu）总次数 == 1。
+
+        全部线程拿到正确数据、无异常；总请求 = 握手 2 + POST 1。
+        """
+        n = 8
+        client, opener = self._routed_client(
+            {
+                "https://www.kkrb.net": b"home",
+                "https://www.kkrb.net/getMenu": (b"menu", "csrf_token", "tok123"),
+                _OV_URL: json.dumps(_OV_PAYLOAD).encode(),
+            }
+        )
+        barrier = threading.Barrier(n)
+        results: list[Any] = []
+        errors: list[BaseException] = []
+
+        def worker() -> None:
+            try:
+                barrier.wait()
+                results.append(client.fetch_ov_data())
+            except BaseException as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker) for _ in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert errors == []
+        assert all(not t.is_alive() for t in threads)
+        assert len(results) == n
+        assert all(len(products) == 1 for products in results)
+        assert all(products[0].station == "技术中心" for products in results)
+        # 握手恰一次：首页 + getMenu 各 1 个请求，总请求 = 2 + 1 POST
+        assert len(opener.requests) == 3
+        assert len([r for r in opener.requests if "getMenu" in r.full_url]) == 1
+        assert len([r for r in opener.requests if "getOVData" in r.full_url]) == 1
+
+    def test_concurrent_fetch_different_urls_share_handshake(self) -> None:
+        """并发请求两个不同端点：握手仍恰一次，两路数据各自正确（缓存互不污染）。"""
+        n = 6
+        client, opener = self._routed_client(
+            {
+                "https://www.kkrb.net": b"home",
+                "https://www.kkrb.net/getMenu": (b"menu", "csrf_token", "tok123"),
+                _OV_URL: json.dumps(_OV_PAYLOAD).encode(),
+                "https://www.kkrb.net/getAmmoPackageData": json.dumps(_AMMO_PAYLOAD).encode(),
+            }
+        )
+        barrier = threading.Barrier(n)
+        results: list[tuple[str, Any]] = []
+        errors: list[BaseException] = []
+
+        def worker(index: int) -> None:
+            try:
+                barrier.wait()
+                if index % 2 == 0:
+                    results.append(("ov", client.fetch_ov_data()))
+                else:
+                    results.append(("ammo", client.fetch_ammo_package_data()))
+            except BaseException as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert errors == []
+        assert all(not t.is_alive() for t in threads)
+        assert len(results) == n
+        ov = [r for kind, r in results if kind == "ov"]
+        ammo = [r for kind, r in results if kind == "ammo"]
+        assert len(ov) == n // 2 and len(ammo) == n // 2
+        assert all(items[0].station == "技术中心" for items in ov)
+        assert all(items[0].item_name == "5.7x28mm L191" for items in ammo)
+        # 握手恰一次：首页 + getMenu 各 1，加两路 POST
+        assert len(opener.requests) == 4
+        assert len([r for r in opener.requests if "getMenu" in r.full_url]) == 1
