@@ -14,6 +14,8 @@ __all__ = ["FetchWorker"]
 
 import atexit
 import logging
+import os
+import time
 from typing import Any, Callable
 
 from PySide6.QtCore import QThread, Signal
@@ -24,13 +26,34 @@ logger = logging.getLogger(__name__)
 #: 模块级强引用阻止 GC 销毁运行中的线程；线程结束后经 finished 信号自行清理。
 _detached_workers: set[FetchWorker] = set()
 
+#: 解释器退出前等待逃生舱线程的总预算（秒）。逃生舱线程可能阻塞在不可中断
+#: 的网络调用（urllib 的 timeout 不覆盖 Windows DNS 解析 getaddrinfo，可
+#: 无限挂起）——无限等待会让进程在窗口关闭后永久残留：残留进程占着单实例
+#: 锁，后续启动被静默拦截（「窗口未出现但后台有进程」）。预算用尽强杀进程。
+_DRAIN_TIMEOUT_S = 5.0
+
 
 @atexit.register
 def _drain_detached_workers() -> None:
-    """解释器退出前等待逃生舱 worker 结束，杜绝销毁运行中线程的 Qt abort。"""
+    """解释器退出前等待逃生舱 worker 结束；有界等待，超时强杀进程。
+
+    正常场景：逃生舱线程多为已超时的网络请求，socket 超时（_TIMEOUT=10s）
+    内自行结束，wait 返回后进程正常退出。异常场景（DNS 挂起等不可中断
+    阻塞）：预算用尽仍在线程 → os._exit(0) 跳过 Python/Qt 析构直接终止
+    进程——运行中 QThread 随进程终结，不会触发 "QThread: Destroyed while
+    thread is still running" abort，进程绝不残留。
+    """
+    deadline = time.monotonic() + _DRAIN_TIMEOUT_S
     for worker in tuple(_detached_workers):
+        remaining_ms = int((deadline - time.monotonic()) * 1000)
+        if remaining_ms <= 0:
+            break
         logger.warning("等待后台请求线程退出（shutdown 超时转入逃生舱）…")
-        worker.wait()
+        worker.wait(remaining_ms)
+    if _detached_workers:  # 预算用尽仍有线程 → 强杀进程（绝不残留）
+        logger.warning("逃生舱线程仍在运行，强制结束进程（请求结果已丢弃）")
+        logging.shutdown()
+        os._exit(0)
 
 
 class FetchWorker(QThread):

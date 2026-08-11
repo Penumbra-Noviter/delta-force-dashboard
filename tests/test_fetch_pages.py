@@ -698,3 +698,75 @@ def test_crafting_card_inline_style_has_no_color_literal() -> None:
             style = label.styleSheet()
             assert not color_literal.search(style), f"内联样式含颜色字面量：{style!r}"
             assert "color:" not in style, f"内联样式含 color 属性：{style!r}"
+
+
+# ── T-01b. 逃生舱 atexit drain 有界性（残留根因回归）─────────────
+
+
+def test_drain_detached_workers_bounded(monkeypatch, qapp) -> None:
+    """atexit drain：预算用尽仍有逃生舱线程 → 强杀进程，绝不无限等待。
+
+    根因回归：drain 旧实现 `worker.wait()` 无界。逃生舱线程阻塞在不可中断
+    的网络调用（urllib 的 timeout 不覆盖 Windows DNS getaddrinfo，可无限
+    挂起）时，解释器退出被无限 wait 卡住——窗口已关但进程残留，残留进程
+    占着单实例锁，后续启动被静默拦截（用户看到「窗口未出现但后台有进程」）。
+    """
+    from app import fetch_worker as fw
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocking_fetch():
+        entered.set()          # 已进入阻塞（run() 内）
+        release.wait(10)
+
+    worker = fw.FetchWorker(blocking_fetch)
+    worker.start()
+    assert entered.wait(5)
+    assert worker.shutdown(100) is False   # 转入逃生舱，线程仍在运行
+
+    exit_calls: list[int] = []
+    monkeypatch.setattr(fw.os, "_exit", lambda code: exit_calls.append(code))
+    monkeypatch.setattr(fw, "_DRAIN_TIMEOUT_S", 0.1)  # 极小预算 → 必触发强杀
+
+    started = time.monotonic()
+    fw._drain_detached_workers()
+    elapsed = time.monotonic() - started
+
+    assert exit_calls == [0]    # 强杀路径已触发（不再无限等待）
+    assert elapsed < 2.0        # 有界返回
+
+    release.set()
+    worker.wait(5000)
+    qapp.processEvents()
+    assert worker not in fw._detached_workers
+
+
+def test_process_exits_when_fetch_hangs_on_shutdown() -> None:
+    """端到端：挂起 fetch 的窗口关闭后，进程必须在预算内退出（残留根因回归）。
+
+    子进程模拟真实关闭链：worker 阻塞（DNS 挂起等价）→ shutdown 超时 →
+    逃生舱 → 解释器退出触发 atexit drain。修复前 drain 无限等待 → 子进程
+    卡死（本测试 TimeoutExpired）；修复后有界 drain 强杀 → 子进程正常退出。
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parent.parent
+    code = "\n".join([
+        "import sys; sys.path.insert(0, %r)" % str(repo),
+        "import threading",
+        "from app.fetch_worker import FetchWorker",
+        "entered = threading.Event()",
+        "def hang():",
+        "    entered.set()",
+        "    threading.Event().wait()",
+        "w = FetchWorker(hang); w.start(); entered.wait(5); w.shutdown(100)",
+    ])
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", code],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    assert proc.wait(timeout=15) == 0  # 修复前：TimeoutExpired；修复后：有界退出

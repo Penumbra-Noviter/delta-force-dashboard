@@ -148,7 +148,10 @@ def main() -> None:
     # ── 单实例检查 ──
     server = _is_already_running()
     if server is None:
-        # 已有实例在运行，静默退出
+        # 已有实例在运行，静默退出（O-20 单实例语义）。打日志便于诊断
+        # 「双击无窗口」：多为上一实例进程残留（逃生舱线程挂起，见
+        # fetch_worker._drain_detached_workers）或重复双击。
+        logging.getLogger("main").info("已有实例在运行，本次启动退出（单实例）")
         sys.exit(0)
 
     # ── 旧数据一次性迁移（O-22 / 更名）：运行态数据统一到 ~/Delta Force Dashboard ──
