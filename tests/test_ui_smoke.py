@@ -1359,6 +1359,32 @@ def test_close_persists_current_account_with_other_settings(account_window_facto
     assert "pinned" in saved
 
 
+def test_account_mode_persists_current_account_key_forward(account_window_factory):
+    """C3-11 正向断言：账号模式落盘含 current_account 键且值非空。
+
+    与 test_settings_persistence 的注入模式反向断言（"not in saved"）成对
+    ——验收 1「账号模式含 current_account；注入模式不含」双向可证伪。
+    """
+    from settings_store import KNOWN_KEYS
+
+    win, acc = account_window_factory(
+        settings_data={"current_account": "小号"},
+        setup=lambda a: _save_account_record(
+            a, "小号", {"2026-08-01": {"cash": 1.0, "warehouse": 2.0}}
+        ),
+    )
+    win.close()
+
+    saved = json.loads(
+        (acc.accounts_dir.parent / "settings.json").read_text(encoding="utf-8")
+    )
+    assert "current_account" in saved, f"账号模式落盘必须含 current_account 键：{saved}"
+    assert saved["current_account"] == "小号"  # 值非空且为当前账号
+    assert set(KNOWN_KEYS) <= set(saved), (
+        f"账号模式落盘应含全部已知键 {sorted(KNOWN_KEYS)}：{saved}"
+    )
+
+
 def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path):
     """注入 store（既有模式）→ 跳过账号解析：resolve 不被调用、无账号概念、标题不变。"""
     from account_store import AccountStore

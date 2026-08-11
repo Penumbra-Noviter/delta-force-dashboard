@@ -780,7 +780,8 @@ class MainWindow(QMainWindow):
         才有卡顿感——改为启动即预加载制造产物 + 兑换利润（各自后台线程，
         kkrb 60s TTL 缓存复用）。导航到 ProfitPage 时数据已就绪，零闪烁。
         预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
-        offscreen 测试模式跳过预加载的守卫同样在 preload() 内部。
+        C2-03：测试经构造注入 stub client 压制网络，preload 不再读取
+        环境变量哨兵。
         """
         self.profit_page.preload()
 
