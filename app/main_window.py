@@ -72,6 +72,13 @@ from signals import RateSignal
 
 logger = logging.getLogger(__name__)
 
+# ── 设置键模块常量（C3-11：窗口层设置读写收敛，键清单归 SettingsStore）──
+_KEY_GEOMETRY = "geometry"
+_KEY_PINNED = "pinned"
+_KEY_THEME = "theme"
+_KEY_ANIMATIONS = "animations"
+_KEY_CURRENT_ACCOUNT = "current_account"
+
 # DPI scaling on Windows
 if platform.system() == "Windows":
     try:
@@ -141,10 +148,10 @@ class MainWindow(QMainWindow):
 
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self._settings = self.settings_store.load()
-        self._theme = self._settings.get("theme", "light")
+        self._theme = self._settings.get(_KEY_THEME, "light")
         set_theme(self._theme)
         # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
-        set_animations_enabled(self._settings.get("animations", True))
+        set_animations_enabled(self._settings.get(_KEY_ANIMATIONS, True))
 
         # Y-03：账号解析。注入 seam 定案——仅当未注入 store/logic 时才走账号解析
         # （生产默认路径，从 settings.current_account 解析并构造对应账号 DataStore）；
@@ -153,7 +160,7 @@ class MainWindow(QMainWindow):
         if store is None and logic is None:
             self._account_store = account_store or AccountStore()
             self.current_account = self._account_store.resolve_account(
-                self._settings.get("current_account")
+                self._settings.get(_KEY_CURRENT_ACCOUNT)
             )
             self.store = self._account_store.new_store(self.current_account)
             self.logic = ProfitCalculatorLogic(self.store.load())
@@ -203,7 +210,7 @@ class MainWindow(QMainWindow):
         self._preload_timer.start(500)
 
         # 恢复置顶状态
-        if self._settings.get("pinned", False):
+        if self._settings.get(_KEY_PINNED, False):
             self._toggle_pin()
 
         self.input_panel.focus_cash()
@@ -236,7 +243,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(680, 650)
 
         # 恢复上次几何（候选 3：解析收敛到 settings_store 纯函数）
-        saved_geo = self._settings.get("geometry", "")
+        saved_geo = self._settings.get(_KEY_GEOMETRY, "")
         geo_ok = False
         if isinstance(saved_geo, str) and saved_geo:
             raw = decode_geometry_hex(saved_geo)
@@ -266,19 +273,20 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _save_settings(self) -> None:
-        """编码当前窗口状态并委托 SettingsStore 原子落盘（D-02）。
+        """合并更新设置并原子落盘（C3-11：走 settings_store.update，未知键保留）。
 
-        MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
-        self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
-        编码收敛到 settings_store._encode_window_state 纯函数（候选 3，私有）；
-        Y-03：current_account 在纯函数输出上合并（注入模式无账号 → 不写 key）。
+        patch = 窗口状态编码（几何/置顶/主题）+ animations 启动值（运行期
+        内存，启动值即运行值——纳入持久化闭环）+ current_account（账号模式
+        才写，注入模式无账号概念不写 key）；update 返回值回写 self._settings，
+        后续读取走运行期内存。文件中原有未知键（patch 之外）由 update 保留。
         """
-        settings = _encode_window_state(
+        patch = _encode_window_state(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
+        patch[_KEY_ANIMATIONS] = self._settings.get(_KEY_ANIMATIONS, True)
         if self.current_account is not None:
-            settings["current_account"] = self.current_account
-        self.settings_store.save(settings)
+            patch[_KEY_CURRENT_ACCOUNT] = self.current_account
+        self._settings = self.settings_store.update(patch)
 
     def _update_account_title(self) -> None:
         """记账页标题栏显示当前账号名（Y-03，随账号区状态同步）。

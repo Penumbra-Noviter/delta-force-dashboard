@@ -796,6 +796,58 @@ def test_settings_persistence(sample_window, tmp_path):
     assert saved.get("theme") == "dark"  # 默认 light → 点击一次 → dark
     assert saved.get("pinned") is True
     assert "geometry" in saved
+    assert saved.get("animations") is True  # 默认 true 纳入持久化闭环（C3-11）
+    assert "current_account" not in saved  # 注入模式无账号概念，不写该键（C3-11）
+
+
+def test_animations_false_persists_through_close(qapp, tmp_path):
+    """C3-11 往返回归：animations=false 预置 → 构造 → closeEvent → 落盘仍 false。
+
+    旧实现 _save_settings 全量覆盖写不写 animations——启动读取的 false
+    偏好首次落盘即丢；update 流程必须保留（可证伪回归）。
+    """
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(json.dumps({"animations": False}), encoding="utf-8")
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.close()
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("animations") is False, (
+        f"animations=false 偏好必须往返保留，实际落盘 {saved.get('animations')!r}"
+    )
+
+
+def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
+    """C3-11：预置 custom 未知键 → 主题切换 + 关窗 → 落盘仍含 custom（端到端保留）。"""
+    from app.main_window import MainWindow
+    from data_store import DataStore
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(json.dumps({"custom": 1}), encoding="utf-8")
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.sidebar.theme_btn.click()  # _toggle_theme → _save_settings
+    win.close()                    # closeEvent → _save_settings
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("custom") == 1, f"未知键 custom 必须端到端保留：{saved}"
+    assert saved.get("theme") == "dark"
 
 
 # ── 11. 窗口几何恢复 ─────────────────────────────────────

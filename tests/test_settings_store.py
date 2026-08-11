@@ -306,3 +306,39 @@ def test_encode_settings_not_public():
     assert "encode_settings" not in ss.__all__
     assert not hasattr(ss, "encode_settings")
     assert hasattr(ss, "_encode_window_state")  # 私有化后的名称存在
+
+
+# ── C3-11. AST 守卫：main_window 设置键访问收敛到模块常量 ──
+
+
+def test_main_window_has_no_bare_settings_keys():
+    """C3-11 AST：main_window.py 无裸字符串设置键（读取/写入均经 _KEY_* 模块常量）。
+
+    只扫「设置键访问」形态：.get("<键>") 调用与 ["<键>"] 下标（含赋值左值）；
+    docstring/注释文字（非访问形态）不匹配。键清单与 KNOWN_KEYS 对齐。
+    """
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    setting_keys = {"geometry", "pinned", "theme", "animations", "current_account"}
+    tree = ast.parse(inspect.getsource(mw))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value in setting_keys
+        ):
+            violations.append(f"L{node.lineno}: .get({node.args[0].value!r})")
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.slice, ast.Constant)
+            and node.slice.value in setting_keys
+        ):
+            violations.append(f"L{node.lineno}: [{node.slice.value!r}] 下标")
+    assert violations == [], f"main_window 含裸字符串设置键：{violations}"
