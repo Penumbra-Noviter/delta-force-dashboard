@@ -6,6 +6,10 @@
 
 ---
 
+## 滚动摘要（2026-08-12）
+
+- **打包 + 发布（2026-08-12，基线 `7cab13c`）**：残留修复版重新打包（onedir 67M，offscreen 烟测 EXE ALIVE 8s 无崩溃 dump）；GitHub release（tag `default`）资产替换为 `default.zip`（43.5M，旧 asset 删除 204），release body 补基线/修复说明
+
 ## 滚动摘要（2026-08-11）
 
 - **打包产物「窗口未出现但进程后台静默运行」诊断修复（2026-08-11，用户现场证据 + 子进程复现）**：根因链——fetch 线程阻塞在不可中断的网络调用（urllib 的 timeout 不覆盖 Windows DNS getaddrinfo，可无限挂起）→ shutdown 300ms 超时转逃生舱 → atexit `_drain_detached_workers` 旧实现 `worker.wait()` 无界 → 窗口关闭后进程永久残留 → 残留进程占单实例锁 → 后续启动静默 `sys.exit(0)`（用户看到「双击无窗口但任务栏有进程」）。修复：drain 改有界等待（`_DRAIN_TIMEOUT_S = 5.0` 总预算），预算用尽 `os._exit(0)` 跳过 Qt 析构强杀进程（不触发 QThread destroyed abort，进程绝不残留）；`main.py` 单实例静默退出前打 `info` 日志（可诊断）。回归：`test_drain_detached_workers_bounded`（drain 有界单测）+ `test_process_exits_when_fetch_hangs_on_shutdown`（子进程端到端：挂起 fetch 关闭后进程在预算内退出，修复前 15s 超时 RED）。旁证排除：crash.log 5 次 `0x8001010d` 崩溃均属旧产物（15:12 前，当前 exe 23:23 打包零崩溃）；settings.json geometry 坐标正常（排除屏幕外恢复）。**534/534** 全绿
