@@ -2057,6 +2057,35 @@ def test_kpi_styles_follow_theme_toggle(sample_window):
     assert win._summary_label.styleSheet() == light_style
 
 
+def test_kpi_signal_shared_pure_function():
+    """AA-01：KPI 磁贴 signal 走共享纯函数 _kpi_signal（两处调用点单一来源）。
+
+    信号判定语义与 format_window_text 对齐（spec：无数据/仅 1 条 → NONE，
+    正/负/零 → POSITIVE/NEGATIVE/NEUTRAL）；期望值来自 spec 语义而非实现。
+    """
+    import inspect
+
+    from app.main_window import _kpi_signal
+    from signals import RateSignal
+
+    # 无数据（total None）→ NONE；仅 1 条记录 → NONE
+    assert _kpi_signal(0, None, "总盈亏", 7) is RateSignal.NONE
+    assert _kpi_signal(1, 100.0, "总盈亏", 7) is RateSignal.NONE
+    # 多记录：正 / 负 / 零
+    assert _kpi_signal(2, 100.0, "总盈亏", 7) is RateSignal.POSITIVE
+    assert _kpi_signal(2, -100.0, "总盈亏", 7) is RateSignal.NEGATIVE
+    assert _kpi_signal(2, 0.0, "总盈亏", 7) is RateSignal.NEUTRAL
+    # label/days 透传（现金磁贴同源）
+    assert _kpi_signal(2, 50.0, "现金总变化", 30) is RateSignal.POSITIVE
+
+    # 两处 signal 计算必须走同一函数（AA-01 验收：消除 Divergent Change）
+    import app.main_window as mw
+
+    for method in ("_update_summary", "_apply_kpi_styles"):
+        src = inspect.getsource(getattr(mw.MainWindow, method))
+        assert "_kpi_signal(" in src, f"{method} 未走共享 _kpi_signal"
+
+
 def test_sidebar_themed_at_startup(sample_window):
     """C1-08 E2：启动期 sidebar 已应用当前主题（首帧样式 = 当前主题值，不依赖首次切换）。"""
     from app.theme import get_color

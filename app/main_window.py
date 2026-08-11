@@ -89,6 +89,17 @@ if platform.system() == "Windows":
         logger.warning("DPI awareness 设置失败")
 
 
+def _kpi_signal(count: int, total: float | None, label: str, days: int) -> RateSignal:
+    """KPI 磁贴信号的共享纯函数：经 format_window_text 取信号（AA-01）。
+
+    _update_summary 与 _apply_kpi_styles 两处都以「logic.summary(_view_n) →
+    format_window_text」重算 signal，此前各自内联同一段——抽取后信号判定
+    只有本函数一个入口（判定规则仍归 presentation.format_window_text），
+    消除 Divergent Change。纯函数：同输入必同输出，可安全双调用。
+    """
+    return format_window_text(count, total, label, days)[1]
+
+
 class DashboardPage(QWidget):
     """记账仪表盘页面（QStackedWidget Page 0）。
 
@@ -545,15 +556,14 @@ class MainWindow(QMainWindow):
 
         纯内存读（logic.summary / cash_summary，零 I/O）；不动数值文本、
         不触发 count-up 动画（不调用 _set_kpi_value）——主题切换只换色。
+        signal 经共享纯函数 _kpi_signal 计算（AA-01，与 _update_summary 同源）。
         """
         count, total = self.logic.summary(self._view_n)
-        _, signal = format_window_text(count, total, "总盈亏", self._view_n)
+        signal = _kpi_signal(count, total, "总盈亏", self._view_n)
         self._summary_label.setStyleSheet(summary_style(signal))
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
-        _, cash_signal = format_window_text(
-            cash_count, cash_delta, "现金总变化", self._view_n
-        )
+        cash_signal = _kpi_signal(cash_count, cash_delta, "现金总变化", self._view_n)
         self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
 
     # ═══════════════════════════════════════════════════════
@@ -812,13 +822,16 @@ class MainWindow(QMainWindow):
 
         D-07：文本与信号由 format_summary / format_cash_summary 纯函数生成，
         本方法只做信号→颜色映射与样式落地（颜色映射留 UI）。
+        signal 经共享纯函数 _kpi_signal 计算（AA-01，与 _apply_kpi_styles 同源；
+        文本仍直接取 format_window_text——纯函数双调用同输入必同输出）。
         总盈亏（_summary_label）与现金总变化（_cash_summary_label）双磁贴，
         同源 recent_records(_view_n)，随视图 7/30 联动。
         W-01：数值变化时数字从旧值滚动到新值（count-up，300ms），
         数据不足（total 为 None）或数值未变时直接落终态。
         """
         count, total = self.logic.summary(self._view_n)
-        text, signal = format_window_text(count, total, "总盈亏", self._view_n)
+        signal = _kpi_signal(count, total, "总盈亏", self._view_n)
+        text, _ = format_window_text(count, total, "总盈亏", self._view_n)
         caption, value = self._split_kpi_text(text)
         self._summary_caption.setText(caption)
         self._set_kpi_value(self._summary_label, value, self._last_summary_total, total)
@@ -826,7 +839,8 @@ class MainWindow(QMainWindow):
         self._summary_label.setStyleSheet(summary_style(signal))
 
         cash_count, cash_delta = self.logic.cash_summary(self._view_n)
-        cash_text, cash_signal = format_window_text(
+        cash_signal = _kpi_signal(cash_count, cash_delta, "现金总变化", self._view_n)
+        cash_text, _ = format_window_text(
             cash_count, cash_delta, "现金总变化", self._view_n
         )
         caption, value = self._split_kpi_text(cash_text)
