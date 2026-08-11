@@ -172,3 +172,65 @@ def test_table_module_has_no_import_time_get_color(qapp):
     assert findings == [], (
         f"table_widget 存在 import 期 get_color() 调用（颜色冻结风险）：{findings}"
     )
+
+
+# ── C1-07. TableWidget.apply_theme（缓存重渲染，零取数）────
+
+
+def test_draw_caches_records_and_apply_theme_rerenders(qapp, theme_guard):
+    """C1-07：draw 缓存 (records, today)；apply_theme 以同一缓存重绘（零新数据源）。"""
+    from app.table_widget import TableWidget
+
+    records = [
+        ("2026-07-29", DayRecord(cash=50.0, warehouse=100.0, date="2026-07-29")),
+        ("2026-07-30", DayRecord(cash=60.0, warehouse=200.0, date="2026-07-30")),
+    ]
+    table = TableWidget()
+    table.draw(records, "2026-07-30")
+    assert table._last_records is records  # 同一引用，零拷贝
+    assert table._last_today == "2026-07-30"
+
+    # spy：apply_theme 以缓存 records 为入参重绘（不重新取数）
+    seen: dict = {}
+    table.draw = lambda r, t: seen.update(records=r, today=t)  # type: ignore[method-assign]
+    table.apply_theme()
+    assert seen["records"] is records, "apply_theme 必须以缓存 records 重绘（不重新取数）"
+
+    # 恢复真实 draw：空 records 缓存（绘制过空数据）→ apply_theme 重绘空表无异常
+    del table.draw  # 删除实例覆盖，回落到类绑定方法
+    table.draw([], "2026-07-30")
+    assert table._last_records == []
+    table.apply_theme()  # 不崩
+
+
+def test_apply_theme_rerenders_inline_colors_with_current_theme(qapp, theme_guard):
+    """C1-07：draw(light) → set_theme(dark) → apply_theme() 后行内颜色为 dark 主题值。"""
+    from app.table_widget import COL_RATE, TableWidget
+
+    records = [
+        ("2026-07-29", DayRecord(cash=50.0, warehouse=100.0, date="2026-07-29")),
+        ("2026-07-30", DayRecord(cash=60.0, warehouse=200.0, date="2026-07-30")),
+    ]
+    table = TableWidget()
+    theme_mod.set_theme("light")
+    table.draw(records, "2026-07-30")
+    # 右栏第二条：prev=100 → 200，收益率 +100% → POSITIVE 信号
+    light_rate = table._right_table.item(0, COL_RATE).foreground().color().name()
+
+    theme_mod.set_theme("dark")
+    table.apply_theme()
+
+    dark_rate = table._right_table.item(0, COL_RATE).foreground().color().name()
+    assert dark_rate.lower() == theme_mod.get_color("FG_POS").lower(), (
+        f"apply_theme 后应为 dark 主题色 {theme_mod.get_color('FG_POS')}，实际 {dark_rate}"
+    )
+    assert dark_rate != light_rate, "apply_theme 后颜色必须随主题变化（无冻结）"
+
+
+def test_apply_theme_without_draw_is_safe(qapp, theme_guard):
+    """C1-07 Falsify：从未 draw 时 apply_theme 无异常（仅刷按钮样式，表格本为空）。"""
+    from app.table_widget import TableWidget
+
+    table = TableWidget()
+    table.apply_theme()  # 不崩
+    assert table._last_records is None  # 未绘制标记保持

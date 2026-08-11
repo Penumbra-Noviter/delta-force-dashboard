@@ -591,3 +591,45 @@ def test_crafting_generic_error_shows_network_message(qapp) -> None:
     for card in page._cards:
         assert card._product_label.text() == "加载失败，点击重试"
     page.hide()
+
+
+# ── C1-07. apply_theme 钩子（crafting 空操作 + profit 扇出）─
+
+
+def test_crafting_apply_theme_is_noop(qapp) -> None:
+    """C1-07：CraftingPage.apply_theme() 空操作——无异常、不改变标签文本/样式。
+
+    制造卡颜色全部由 QSS 选择器驱动（generate_qss 按当前主题生成），
+    无内联冻结色需要重解析。
+    """
+    from app.crafting_page import CraftingPage
+    from kkrb_client import CraftingProduct
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data(
+        [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")]
+    )
+    before = [
+        (c._station_label.text(), c._product_label.styleSheet())
+        for c in page._cards
+    ]
+
+    page.apply_theme()  # 空操作，无异常
+
+    after = [
+        (c._station_label.text(), c._product_label.styleSheet())
+        for c in page._cards
+    ]
+    assert before == after, "apply_theme 不得改变任何标签文本/样式"
+
+
+def test_profit_apply_theme_fans_out_to_children(qapp) -> None:
+    """C1-07：profit_page.apply_theme() 扇出 crafting + exchange（spy 断言）。"""
+    from app.profit_page import ProfitPage
+
+    page = ProfitPage()
+    calls: list[str] = []
+    page.crafting_page.apply_theme = lambda: calls.append("crafting")  # type: ignore[method-assign]
+    page.exchange_page.apply_theme = lambda: calls.append("exchange")  # type: ignore[method-assign]
+    page.apply_theme()
+    assert calls == ["crafting", "exchange"]

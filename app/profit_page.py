@@ -105,12 +105,13 @@ class ProfitPage(QWidget):
         self.exchange_page.preload()
 
     def apply_theme(self) -> None:
-        """主题切换时刷新子页面主题样式。
+        """主题切换时刷新子页面主题样式（C1-07：扇出 crafting + exchange）。
 
-        过渡态（C1 前）：仅扇出 exchange——兑换页包标签为构建期冻结的
-        内联样式，必须重解析（行为与 refresh_theme 直插等价）；
-        C1 落地 CraftingPage.apply_theme 后在此扩展扇出 crafting。
+        兑换页包标签与分隔线为构建期冻结的内联样式，必须重解析
+        （U-03/Z-01）；制造卡由 QSS 选择器驱动，空钩子调用无副作用
+        ——统一出口契约，子页各自实现 apply_theme。
         """
+        self.crafting_page.apply_theme()
         self.exchange_page.apply_theme()
 
     def shutdown(self) -> None:

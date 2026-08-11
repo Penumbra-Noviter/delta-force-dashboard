@@ -131,3 +131,12 @@ class CraftingPage(FetchPageBase):
             card._profit_label.setText("")
             card._price_label.setText("")
             card._sell_time_label.setText("")
+
+    def apply_theme(self) -> None:
+        """主题切换钩子：空操作（C1-07）。
+
+        制造卡颜色全部由 QSS 选择器驱动（QFrame#craftingCard /
+        QLabel#craftStation 等在 generate_qss 中按当前主题生成），
+        卡片内联样式仅字号/字重（无颜色），无需重解析。
+        """
+
