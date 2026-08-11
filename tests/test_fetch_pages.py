@@ -279,10 +279,9 @@ def test_crafting_page_lazy_loads_on_show(qapp) -> None:
     assert page._load_state.is_loading is False
     assert page._refresh_btn.isEnabled()
     assert page._status_label.isHidden()
-    # 第一张卡片已渲染
+    # 第一张卡片已渲染（C2-04：直接引用，不再 layout.itemAt 回读）
     card = page._cards[0]
-    product_label = card.layout().itemAt(1).widget()
-    assert product_label.text() == "复合弓"
+    assert card._product_label.text() == "复合弓"
     page.hide()
 
 
@@ -369,6 +368,68 @@ def test_pages_have_no_dead_error_state(qapp) -> None:
 
     assert not hasattr(CraftingPage(), "_error")
     assert not hasattr(ExchangePage(), "_error")
+
+
+# ── C2-04. CraftingPage 渲染对齐（直接引用 + 显式占位）──
+
+
+def test_crafting_empty_data_renders_placeholder(qapp) -> None:
+    """空数据渲染：4 卡显式占位文案（站名 —、产物 暂无数据、其余空串，spec 4.2.9）。"""
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data([])
+
+    for card in page._cards:
+        assert card._station_label.text() == "—"
+        assert card._product_label.text() == "暂无数据"
+        assert card._profit_label.text() == ""
+        assert card._price_label.text() == ""
+        assert card._sell_time_label.text() == ""
+
+
+def test_crafting_partial_data_fills_remaining_slots(qapp) -> None:
+    """部分数据（<4）：前 N 卡渲染数据，其余空槽位回占位文案（显式重置）。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import CraftingProduct
+
+    page = CraftingPage(client=make_stub_client())
+    page._render_data([CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")])
+
+    assert page._cards[0]._station_label.text() == "技术中心"
+    assert page._cards[0]._product_label.text() == "复合弓"
+    assert page._cards[0]._profit_label.text() == "总利润：¥100.00"
+    assert page._cards[0]._price_label.text() == "当前售价：¥200.00"
+    assert page._cards[0]._sell_time_label.text() == "建议出售时段：晚上8点"
+    for card in page._cards[1:]:
+        assert card._station_label.text() == "—"
+        assert card._product_label.text() == "暂无数据"
+
+
+def test_crafting_page_has_no_empty_station() -> None:
+    """_EMPTY_STATION 假领域对象已删除（空渲染零 CraftingProduct 构造）。"""
+    import app.crafting_page as cp
+
+    assert not hasattr(cp, "_EMPTY_STATION")
+
+
+def test_crafting_render_never_constructs_products() -> None:
+    """AST 防复发：crafting_page 模块零 CraftingProduct 构造调用（仅类型注解引用）。"""
+    import ast
+    import inspect
+
+    import app.crafting_page as cp
+
+    tree = ast.parse(inspect.getsource(cp))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CraftingProduct"
+        ):
+            violations.append(f"L{node.lineno}: CraftingProduct(...) 构造调用")
+    assert violations == [], f"渲染路径不应构造 CraftingProduct：{violations}"
 
 
 # ── T-04. 构造注入 client seam（C2-02）────────────────────

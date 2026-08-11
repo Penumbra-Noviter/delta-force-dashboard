@@ -20,8 +20,6 @@ from app.fetch_page_base import FetchPageBase
 from kkrb_client import CraftingProduct
 from formatting import format_money
 
-_EMPTY_STATION = CraftingProduct("—", "暂无数据", 0, 0, "")
-
 
 class CraftingPage(FetchPageBase):
     """制造产物推荐页面（QStackedWidget Page 1 的子页面）。"""
@@ -49,6 +47,13 @@ class CraftingPage(FetchPageBase):
         layout.addLayout(self._card_grid)
 
     def _build_card(self) -> QFrame:
+        """构建一张台位卡：持有全部标签的直接引用（C2-04）。
+
+        直接引用（_station_label / _product_label / _profit_label /
+        _price_label / _sell_time_label）供 _render_data 按槽位更新文案，
+        取代布局索引回读；空槽位由 _render_data 显式重置为占位文案
+        （站名 —、产物 暂无数据、其余空串，spec 4.2.9）。
+        """
         card = QFrame()
         card.setObjectName("craftingCard")
         card.setFrameShape(QFrame.Shape.StyledPanel)
@@ -57,67 +62,59 @@ class CraftingPage(FetchPageBase):
         cl.setContentsMargins(16, 14, 16, 14)
         cl.setSpacing(6)
 
-        station = QLabel("—")
-        station.setObjectName("craftStation")
-        cl.addWidget(station)
+        card._station_label = QLabel("—")
+        card._station_label.setObjectName("craftStation")
+        cl.addWidget(card._station_label)
 
-        product = QLabel("暂无数据")
-        product.setObjectName("craftProduct")
+        card._product_label = QLabel("暂无数据")
+        card._product_label.setObjectName("craftProduct")
         # U-02：卡片主角名归 section 档（原 18px 越过页面标题 16px 层级）
-        product.setStyleSheet("font-size: 16px; font-weight: bold;")
-        cl.addWidget(product)
+        card._product_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        cl.addWidget(card._product_label)
 
-        profit = QLabel("")
-        profit.setObjectName("craftProfit")
-        cl.addWidget(profit)
+        card._profit_label = QLabel("")
+        card._profit_label.setObjectName("craftProfit")
+        cl.addWidget(card._profit_label)
 
-        price = QLabel("")
-        price.setObjectName("craftPrice")
-        cl.addWidget(price)
+        card._price_label = QLabel("")
+        card._price_label.setObjectName("craftPrice")
+        cl.addWidget(card._price_label)
 
-        sell_time = QLabel("")
-        sell_time.setObjectName("craftSellTime")
-        cl.addWidget(sell_time)
+        card._sell_time_label = QLabel("")
+        card._sell_time_label.setObjectName("craftSellTime")
+        cl.addWidget(card._sell_time_label)
 
         return card
 
     # ── 渲染 ────────────────────────────────────────────
 
     def _render_data(self, data: list[CraftingProduct]) -> None:
-        """将产物数据渲染到 4 个卡片。"""
+        """将产物数据渲染到 4 个卡片。
+
+        前 ``len(data)`` 张卡按数据更新；空槽位显式重置为占位文案
+        （站名 —、产物 暂无数据、利润/价格/时段空串）——空数据渲染
+        不构造 CraftingProduct 实例（模块级假领域对象已删除）。
+        """
         products = data or []
-        # 确保 4 个卡片都有数据
-        display = products[:4]
-        while len(display) < 4:
-            display.append(_EMPTY_STATION)
-
         for i, card in enumerate(self._cards):
-            product = display[i]
-            layout = card.layout()
-            if layout is None:
-                continue
-
-            # station name
-            station = layout.itemAt(0).widget()
-            if isinstance(station, QLabel):
-                station.setText(product.station)
-
-            # product name
-            prod = layout.itemAt(1).widget()
-            if isinstance(prod, QLabel):
-                prod.setText(product.product if product.product else "暂无数据")
-
-            # profit
-            profit = layout.itemAt(2).widget()
-            if isinstance(profit, QLabel):
-                profit.setText(f"总利润：{format_money(product.profit)}")
-
-            # current price
-            price = layout.itemAt(3).widget()
-            if isinstance(price, QLabel):
-                price.setText(f"当前售价：{format_money(product.ideal_price)}")
-
-            # sell time
-            sell = layout.itemAt(4).widget()
-            if isinstance(sell, QLabel):
-                sell.setText(f"建议出售时段：{product.sell_time}")
+            if i < len(products):
+                product = products[i]
+                card._station_label.setText(product.station or "—")
+                card._product_label.setText(
+                    product.product if product.product else "暂无数据"
+                )
+                card._profit_label.setText(
+                    f"总利润：{format_money(product.profit)}"
+                )
+                card._price_label.setText(
+                    f"当前售价：{format_money(product.ideal_price)}"
+                )
+                card._sell_time_label.setText(
+                    f"建议出售时段：{product.sell_time}"
+                )
+            else:
+                card._station_label.setText("—")
+                card._product_label.setText("暂无数据")
+                card._profit_label.setText("")
+                card._price_label.setText("")
+                card._sell_time_label.setText("")
