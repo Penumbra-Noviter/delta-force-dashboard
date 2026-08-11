@@ -6,6 +6,14 @@
 
 ---
 
+## 滚动摘要（2026-08-11）
+
+- **架构加深批次完成 — C1/C2/C3（2026-08-11，来源：improve-codebase-architecture 报告候选，kickoff 基线 `77f6ae7`）**：单串行链 11 工单（每 commit 全量测试全绿）——C2 Fetch 家族：01 `dbd6488` KkrbClient 并发加锁（`threading.Lock` 整体持锁，握手恰一次/缓存无脏读，共享 client 前置）、02 `45ae7f6` 构造注入 seam + 利润页共享 client + ProfitPage 单出口扇出、03 `df59a60` 删 offscreen 哨兵（preload 不再读 `QT_QPA_PLATFORM`），16 处直构点测试迁移构造注入、04 `fa73589` CraftingPage 渲染对齐（直接标签引用 + 显式占位 + 删 `_EMPTY_STATION` 假领域对象）、05 `2a5340d` 错误/空态分离（`_render_error` 钩子，基类默认=空态渲染语义不漂移）；C1 主题契约：06 `d8fd496` `get_color` 未知键 warning 化（漏改键 → 日志可见）、07 `2d21325` TableWidget（缓存重渲染不取数）/CraftingPage（显式空实现）`apply_theme` 钩子、08 `644e7fb` 树遍历契约（启动期收集 `_theme_refreshers`，`refresh_theme` 重写与数据刷新解耦，KPI 磁贴 `_apply_kpi_styles` 保持）、09 `45ddffc` AST 全键守卫 + 主题全链路 light→dark→light 抽查；C3 Settings schema：10 `9678349` SettingsStore 成为 schema 所有者（`DEFAULTS`/`KNOWN_KEYS`/`update(patch)` 合并语义未知键保留）、11 `a96775d` `animations` 纳入持久化闭环 + 窗口层 `_KEY_*` 常量收敛；快修 `9b987e3`（offscreen 残留注释清理 + 账号模式正向断言，code-review），merge `633f549`（526/526）+ `c78acc4`（**527/527**）；**覆盖率 94%**（口径 `--cov=app --cov=kkrb_client --cov=settings_store --cov=data_store --cov=account_store --cov=calculator --cov=json_file --cov=signals --cov=formatting --cov=presentation --cov=config`）
+- **AA-01~04 录入 TO-TICKETS 活跃表（2026-08-11）**：code-review 非阻断建议 4 条——AA-01 KPI signal 计算抽取 / AA-02 craft 卡重置抽取 `_reset_card` / AA-03 `kkrb_client.reset()` 无锁注记 / AA-04 `_encode_window_state` 私有名跨模块导入矛盾
+- **知识库预检召回轨迹（kickoff）**：persona（2026-08-09 版）+ 精读 3 条：`主题色 import 期冻结`（绝不在模块顶层调 get_color——C1-06/07 直接相关）/ `双主题渲染路径回归`（主题切换后旧色残留路径逐条跑）/ `多页面懒加载守卫`（页面懒加载与 preload 的交互边界）；守卫反查通过
+- **既有 teardown 崩溃注记**：`pytest test_ui_smoke.py test_input_panel.py` 组合序 exit 127/139（Qt teardown），基线同样复现、全量字母序不受影响——非本批次引入，留待后续处理
+
+---
 ## 滚动摘要（2026-08-10）
 
 - **Z-01 主题联动收尾（08-10）**：U-03 遗留闭环——兑换页 SEPARATOR 分隔线构建期冻结（双主题值不同，亮→暗切换暗面残留浅线）→ `apply_theme()` 补齐运行期刷新 + 双主题单元用例 + 集成断言，Falsify 红验证通过；**484/484 绿**、覆盖率 96%；crafting_page 遗留注记核实不成立（全 QSS 选择器自动联动）；`.scratch/multi-account/`（Y 系列工作文件）经确认 git rm 清理；活跃表清零

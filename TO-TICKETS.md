@@ -12,10 +12,14 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-10）：Y/U/V/W/Z 系列已归档，当前无活跃工单。
+> 活跃表（2026-08-11）：架构加深批次（C1/C2/C3）code-review 非阻断建议 4 条。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
+| AA-01 | KPI signal 计算抽取——`_apply_kpi_styles` 与 `_update_summary` 重复段共享纯函数 | 重构（消除重复） | 📝 已录入 | 🟡 Worth exploring |
+| AA-02 | craft 卡重置抽取——`_render_data` 空槽位循环与 `_render_error` 近乎重复，抽 `_reset_card(card, product_text)` | 重构（消除重复） | 📝 已录入 | 🟡 Worth exploring |
+| AA-03 | `kkrb_client.reset()` 无锁且清 `_cache`/cookie jar——当前无生产调用点，纳入锁或注释声明仅空闲调用 | 健壮性（并发边界） | 📝 已录入 | ⚪ Speculative |
+| AA-04 | `_encode_window_state` 私有名跨模块导入（main_window）——`__all__` 私有与真实依赖矛盾，公开命名或收敛 | 重构（协议表面） | 📝 已录入 | ⚪ Speculative |
 
 ---
 
@@ -290,6 +294,22 @@
 ---
 
 ## 已完成归档
+
+### 架构加深 C1/C2/C3（2026-08-11，来源：improve-codebase-architecture 报告候选；功能 merge `633f549` + 评审快修 merge `c78acc4`，527/527）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| 01 | KkrbClient 并发加锁 — `threading.Lock` 整体持锁（缓存检查→握手→请求→缓存写入临界区，`_ensure_csrf` 无锁内重入），并发下握手恰一次、缓存无脏读——C2 共享 client 必要前提 | 架构（并发安全） | 2026-08-11 | `dbd6488` |
+| 02 | 注入 seam + 共享 client + ProfitPage 单出口 — `FetchPageBase`/`ProfitPage`/`MainWindow` 构造注入 client（None → 自建，生产唯一创建点仍在 MainWindow）；利润页两子页共享单一 client；`profit_page.preload()/apply_theme()` 单出口扇出（C1 前过渡态仅扇出 exchange，行为与现状等价）；测试由此获得「注入 fake 即断网」能力 | 架构（seam） | 2026-08-11 | `45ae7f6` |
+| 03 | 删除 offscreen 哨兵 + 测试迁移构造注入 — `preload()` 不再读取 `QT_QPA_PLATFORM` 环境变量；16 处直构点全部迁移构造注入 stub client，零真实网络、零实例级私有属性 monkeypatch | 架构（测试 seam） | 2026-08-11 | `df59a60` |
+| 04 | CraftingPage 渲染对齐 — 每卡构建期持有全部标签直接引用（删 `layout.itemAt` 回读）；空数据显示显式占位文案；删除模块级 `_EMPTY_STATION` 假领域对象——空数据渲染不构造任何 CraftingProduct 实例 | 架构（深模块） | 2026-08-11 | `fa73589` |
+| 05 | 错误/空态分离（`_render_error` 钩子） — 基类新增钩子，默认实现 = 空态渲染（与既有 `_on_fetch_error` 行为逐字节等价）；`_on_fetch_error` = status label 逻辑 + `_render_error()`；制造页覆盖为「加载失败，点击重试」卡片，与空态「暂无数据」可区分 | 功能（UX 修复） | 2026-08-11 | `2a5340d` |
+| 06 | get_color 未知键 warning — 未知键 `logger.warning`（含键名）后返回 `""` 不 raise；`generate_qss` 直接索引语义不变——「漏改键 → 静默失效」变「日志可见」 | 架构（契约） | 2026-08-11 | `d8fd496` |
+| 07 | TableWidget/CraftingPage `apply_theme` 钩子 — 表格基于 `draw()` 缓存（`_last_records/_last_today`）重渲染行内颜色、**不重新取数**；制造页显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange | 架构（契约） | 2026-08-11 | `2d21325` |
+| 08 | 树遍历契约 + refresh_theme 重写 — 启动期递归收集 `_theme_refreshers`（自顶向下、父拥有子树）；`refresh_theme` = QSS + 按钮/置顶样式 + refreshers 统一调用，与数据刷新彻底解耦；KPI 磁贴 `_apply_kpi_styles()` 另法保持；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整） | 架构（深模块） | 2026-08-11 | `644e7fb` |
+| 09 | AST 全键守卫 + 全链路抽查 — app/ 下 `get_color` 字面量调用点 + `_PACKAGE_CONFIG`/图表 series color_key → 双主题均存在且非空；light→dark→light 全链路抽查（exchange 标签/分隔线、table 行按钮、sidebar、chart、input）；craft 卡内联 styleSheet 无颜色字面量断言 | 测试（防复发） | 2026-08-11 | `45ddffc` |
+| 10 | SettingsStore schema 所有者 — 公开 `DEFAULTS`（geometry/pinned/theme/animations）与 `KNOWN_KEYS`；`update(patch)` 读当前原始 dict → 合并（未知键保留）→ 原子写 → 返回新 dict，取代全量覆盖写；`encode_settings` 降级模块私有 `_encode_window_state` | 架构（深模块） | 2026-08-11 | `9678349` |
+| 11 | MainWindow 设置接线 + 常量收敛 + AST 守卫 — `__init__` 设置读取改走 `_KEY_*` 模块常量（消灭裸字符串键）；`_save_settings` = `_encode_window_state` + animations 启动值 + current_account 合并 + `update()` 返回值回写——animations 纳入持久化闭环、未知键端到端保留 | 架构（收敛） | 2026-08-11 | `a96775d` |
 
 ### Z 系列（2026-08-10，主题联动收尾，来源：U-03 遗留）
 

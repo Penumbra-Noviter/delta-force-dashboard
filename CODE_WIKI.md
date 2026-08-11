@@ -355,10 +355,12 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 |------|------|
 | <!--AUTO:sig:app/theme.py:generate_qss-->`generate_qss(theme_name)`<!--/AUTO--> | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
 | <!--AUTO:sig:app/theme.py:get_theme-->`get_theme()`<!--/AUTO--> / <!--AUTO:sig:app/theme.py:set_theme-->`set_theme(name)`<!--/AUTO--> | 读取 / 切换当前主题（"light" \| "dark"） |
-| <!--AUTO:sig:app/theme.py:get_color-->`get_color(key)`<!--/AUTO--> | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**） |
+| <!--AUTO:sig:app/theme.py:get_color-->`get_color(key)`<!--/AUTO--> | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**）；未知键 `logger.warning`（含键名）后返回 `""`，不 raise（C1-06，`generate_qss` 的 `t[...]` 直接索引语义不变） |
 | <!--AUTO:sig:app/theme.py:signal_color-->`signal_color(signal)`<!--/AUTO--> | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
+
+**主题刷新契约（C1-07/C1-08）**：具 `apply_theme()` 的组件构成统一刷新契约——MainWindow 启动期（`_build_ui` 后）递归遍历子树收集（自顶向下、父拥有子树；节点有 `apply_theme` 即收集且不再下钻）为 `self._theme_refreshers`；`refresh_theme` 重写为「`_apply_qss`（移除 sidebar.apply_theme）+ 按钮文字 + 置顶样式 + refreshers 统一调用」，不再触发数据刷新（`table.draw/_update_summary/_update_today_status` 调用移除，主题与数据刷新彻底解耦）；KPI 磁贴颜色以 `_apply_kpi_styles()` 另法保持（纯内存重算 signal，零 I/O）；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整）。组件侧契约：TableWidget `apply_theme()` 基于 `draw()` 缓存（`_last_records/_last_today`）重渲染行内颜色、**不重新取数**；CraftingPage 为显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange 两子页。
 
 ---
 
@@ -505,9 +507,10 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 |------|------|
 | <!--AUTO:sig:settings_store.py:SettingsStore.__init__-->`__init__(settings_file=SETTINGS_FILE)`<!--/AUTO--> | 设置文件路径 |
 | <!--AUTO:sig:settings_store.py:SettingsStore.load-->`load()`<!--/AUTO--> | 容错读：文件缺失 → `{}`（首次运行静默）；解析失败 → warning（含异常详情，D-02 前逐字文案）+ `{}`；顶层非 dict → warning + `{}` |
-| <!--AUTO:sig:settings_store.py:SettingsStore.save-->`save(settings)`<!--/AUTO--> | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题） |
+| <!--AUTO:sig:settings_store.py:SettingsStore.save-->`save(settings)`<!--/AUTO--> | 经 `atomic_write_json` 原子落盘；失败仅记 warning，不抛异常（不阻断关窗/切换主题）；保留为原语，`update` 内部复用 |
+| <!--AUTO:sig:settings_store.py:SettingsStore.update-->`update(patch)`<!--/AUTO--> | **C3-10** schema 合并写入：读当前文件原始 dict → 合并 patch（未知键保留）→ 原子写 → 返回新 dict；写失败 warning 不抛（容错语义与 save 一致） |
 
-**职责边界**：MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
+**职责边界（C3-10/C3-11）**：SettingsStore 是设置 schema 的唯一所有者——公开 `DEFAULTS`（`geometry`/`pinned`/`theme`/`animations`）与 `KNOWN_KEYS = frozenset(DEFAULTS) | {"current_account"}`；`update(patch)` 取代全量覆盖写（未知键端到端保留）。C3-11：`animations` 键纳入持久化闭环（启动值即运行值写回，关窗后动画开关不丢）；窗口层设置键收敛为 `_KEY_*` 模块常量（消灭裸字符串键，AST 守卫）；`encode_settings` 降级为模块私有 `_encode_window_state`。MainWindow 只保留「编码/解码」（窗口状态 ↔ dict），文件 I/O 全部收敛到此处。
 
 ---
 
@@ -552,6 +555,26 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:account_store.py:AccountStore.migrate_legacy_to_default-->`migrate_legacy_to_default(data_dir=None)`<!--/AUTO--> | v2 旧数据迁移（Y-02）：accounts/ 不存在 **且** 旧 data.json 存在 → 复制 data.json + 全部 `data.json.bak*` 到 accounts/主账号/ 并写 `.migrated_v2`；accounts/ 已存在（含空）/marker 存在 → 跳过；复制非移动、永不删源（O-22 铁律）；OSError → warning 不中断不写 marker；data_dir 缺省 = accounts_dir 父目录（生产 DATA_DIR），测试显式注入 |
 
 **main.py 接线（Y-02）**：v2 迁移在 O-22 `migrate_legacy_data` 之后、MainWindow 构造之前（AST 顺序断言防复发）。
+
+---
+
+### 4.16 `kkrb_client.py` — kkrb.net API 客户端（L-02/V-01，<!--AUTO:lines:kkrb_client.py-->~149 行<!--/AUTO-->）
+
+kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie 提取）/ HTTP 传输 / TTL 缓存三合一，纯 stdlib 零外部依赖；数据入口 `fetch_ov_data()` / `fetch_ammo_package_data()`；解析收敛于 `kkrb_models` / `kkrb_parsing`（V-01），本模块只留会话 / 传输 / 缓存。
+
+**C2-01 并发契约**：`__init__` 持有 `threading.Lock`；`_post_json` 对「缓存检查 → 握手 → 请求 → 缓存写入」**整体持锁**（`_ensure_csrf` 仅在本方法内被调用，无锁内重入），保证共享 client 被多后台线程并发调用时握手恰一次、缓存无脏读（C2-02 共享 client 的必要前提）。`reset()` 清会话与缓存（无锁，当前无生产调用点——AA-03 注记）。
+
+---
+
+### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~171 行<!--/AUTO-->）
+
+CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：showEvent 懒加载、LoadState 四态状态机（V-02）、FetchWorker 后台取数（T-01）、refresh / preload / shutdown 生命周期。
+
+**C2 契约**：
+- **C2-02 注入 seam**：`__init__(parent=None, client=None)`——`client` 为 None → 自建 `KkrbClient()`（生产唯一创建点在 MainWindow），测试经构造注入 stub client 即「断网」；
+- **C2-03 删哨兵**：`preload()` 不再读取 `QT_QPA_PLATFORM` 环境变量——测试模式靠构造注入压制网络（`tests/conftest.make_stub_client`），offscreen 哨兵已删除；
+- **C2-05 错误/空态分离**：`_render_error()` 钩子（默认实现 = 空态渲染，与既有 `_on_fetch_error` 行为逐字节等价）；`_on_fetch_error` = status label 逻辑（KkrbError/非 KkrbError 文案 + 点击重试）+ `self._render_error()`；CraftingPage 覆盖为「加载失败，点击重试」卡片，与空态「暂无数据」可区分；
+- **单出口**：`ProfitPage` 在父层扇出 `preload()` / `apply_theme()`（C2-02 / C1-07），页面外部不再直插子页方法。
 
 ---
 
@@ -675,7 +698,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->95<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->28<!--/AUTO--> | 数据模型 + OV 响应解析 |
-| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->30<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/offscreen 守卫/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除 |
+| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->30<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 

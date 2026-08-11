@@ -46,6 +46,10 @@ data.json
 .serena/
 .claude/
 
+# ── Kickoff/批次工作区（spec/issues/orchestration 交付后归档进 commit 历史）──
+.scratch/
+.worktrees/
+
 # ── OS ──────────────────────────────────────────────
 Thumbs.db
 Desktop.ini
