@@ -1877,3 +1877,113 @@ def test_startup_combo_excludes_illegal_accounts(account_window_factory):
         assert win.current_account == "主账号"  # 解析兜底不受非法目录干扰
     finally:
         win.close()
+
+
+# ── C1-08. 主题刷新契约（树遍历收集 + refresh_theme 解耦）──
+
+
+def test_theme_refreshers_collected_at_startup(sample_window):
+    """C1-08：_theme_refreshers 非空且含 sidebar/input_panel/chart/table/profit_page。"""
+    win = sample_window
+    refreshers = win._theme_refreshers
+    assert refreshers, "启动期必须收集到主题刷新器"
+    members = {id(w) for w in refreshers}
+    for expected in (win.sidebar, win.input_panel, win.chart, win.table, win.profit_page):
+        assert id(expected) in members, f"{type(expected).__name__} 未入列"
+    # 防双扇出：profit_page 入列时 crafting/exchange 不得重复入列
+    assert id(win.profit_page.crafting_page) not in members, "crafting 不应重复入列"
+    assert id(win.profit_page.exchange_page) not in members, "exchange 不应重复入列"
+
+
+def test_theme_refreshers_cover_all_apply_theme_widgets(sample_window):
+    """C1-08：树上任何具 apply_theme 的组件要么在集合中、要么其祖先在集合中（可证伪）。"""
+    from PySide6.QtWidgets import QWidget
+
+    win = sample_window
+    collected = {id(w) for w in win._theme_refreshers}
+
+    def covered(widget) -> bool:
+        node = widget
+        while node is not None:
+            if id(node) in collected:
+                return True
+            node = node.parent()
+        return False
+
+    for widget in win.findChildren(QWidget):
+        if hasattr(widget, "apply_theme"):
+            assert covered(widget), (
+                f"{type(widget).__name__} 具 apply_theme 但不在收集集合且无收集祖先"
+            )
+
+
+def test_refresh_theme_does_not_redraw_data(sample_window, monkeypatch):
+    """C1-08：refresh_theme 不触发数据渲染路径（取数与摘要零调用）。
+
+    MainWindow 层不得再直插数据渲染：_get_records 即取数入口、零调用即
+    零新数据源；_update_summary / _update_today_status 同为数据路径。
+    table.apply_theme 内部以缓存重绘（07 契约）不经过这三个入口。
+    """
+    win = sample_window
+    calls: list[str] = []
+    monkeypatch.setattr(
+        win, "_get_records", lambda: (calls.append("_get_records"), [])[1]
+    )
+    monkeypatch.setattr(
+        win, "_update_summary", lambda: calls.append("_update_summary")
+    )
+    monkeypatch.setattr(
+        win, "_update_today_status", lambda: calls.append("_update_today_status")
+    )
+    win.refresh_theme()
+    assert calls == [], f"refresh_theme 不应触碰数据渲染路径：{calls}"
+
+
+def test_refresh_theme_source_has_no_data_redraw_calls():
+    """C1-08 AST 防复发：refresh_theme 方法体不得访问 table.draw/_update_summary/_update_today_status。"""
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    tree = ast.parse(inspect.getsource(mw))
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "refresh_theme":
+            for sub in ast.walk(node):
+                if (
+                    isinstance(sub, ast.Attribute)
+                    and sub.attr in {"draw", "_update_summary", "_update_today_status"}
+                ):
+                    violations.append(f"L{sub.lineno}: refresh_theme 访问 {sub.attr}")
+    assert violations == [], f"refresh_theme 不得触碰数据渲染路径：{violations}"
+
+
+def test_kpi_styles_follow_theme_toggle(sample_window):
+    """C1-08：主题切换后 KPI 磁贴数字颜色随主题变化（数值文本不受影响）。"""
+    from app.theme import get_color
+
+    win = sample_window
+    text_before = win._summary_label.text()
+    light_style = win._summary_label.styleSheet()
+
+    win.sidebar.theme_btn.click()  # light → dark
+
+    dark_style = win._summary_label.styleSheet()
+    assert dark_style != light_style, "KPI 磁贴样式必须随主题变化"
+    assert win._summary_label.text() == text_before, "数值文本不受主题切换影响"
+    # dark 下样式含当前主题信号色（样本数据总盈亏为正 → FG_POS）
+    assert get_color("FG_POS") in dark_style
+
+    win.sidebar.theme_btn.click()  # dark → light 往返
+    assert win._summary_label.styleSheet() == light_style
+
+
+def test_sidebar_themed_at_startup(sample_window):
+    """C1-08 E2：启动期 sidebar 已应用当前主题（首帧样式 = 当前主题值，不依赖首次切换）。"""
+    from app.theme import get_color
+
+    win = sample_window
+    assert get_color("MUTED_BG") in win.sidebar.styleSheet(), (
+        "sidebar 首帧样式应为当前主题值（refreshers 启动期已应用）"
+    )

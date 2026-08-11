@@ -181,6 +181,10 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
+        # C1-08：registry 组件已全部入树后收集主题刷新器并首次应用
+        # （E2：sidebar 首帧主题完整，不依赖首次切换）
+        self._collect_theme_refreshers()
+        self._apply_theme_refreshers()
         # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
         self._update_account_title()
         # Y-04：账号区初始化——解析模式注入账号列表；注入模式隐藏账号区
@@ -481,7 +485,32 @@ class MainWindow(QMainWindow):
     def _apply_qss(self) -> None:
         qss = generate_qss(self._theme)
         self.setStyleSheet(qss)
-        self.sidebar.apply_theme()
+        # C1-08：sidebar 由 _theme_refreshers 统一调用（启动期已应用，
+        # E2）；此处不再直插，避免双路径
+
+    def _collect_theme_refreshers(self) -> None:
+        """启动期遍历子树收集具 apply_theme 的组件（自顶向下、父拥有子树）。
+
+        节点有 apply_theme 即收集且不再下钻——profit_page 入列时
+        crafting/exchange 不得重复入列（防双扇出）；新组件只要实现
+        apply_theme 即自动纳入刷新（C1-08 契约）。
+        """
+        self._theme_refreshers: list[QWidget] = []
+
+        def walk(widget: QWidget) -> None:
+            if hasattr(widget, "apply_theme"):
+                self._theme_refreshers.append(widget)
+                return
+            for obj in widget.children():
+                if isinstance(obj, QWidget):
+                    walk(obj)
+
+        walk(self)
+
+    def _apply_theme_refreshers(self) -> None:
+        """统一调用全部主题刷新器（启动期与 refresh_theme 共用）。"""
+        for widget in self._theme_refreshers:
+            widget.apply_theme()
 
     def _toggle_theme(self) -> None:
         self._theme = "dark" if self._theme == "light" else "light"
@@ -490,24 +519,34 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
     def refresh_theme(self) -> None:
-        """仅刷新主题视觉样式，不重新加载数据。
+        """仅刷新主题视觉样式，不重新加载数据（C1-08）。
 
-        主题切换时，get_color() 已返回新主题色值，全部 UI 组件
-        通过调用自身的 apply_theme 方法增量更新颜色，无需重新获取数据。
+        主题切换与数据刷新彻底解耦：QSS 重生成 + 按钮文字 + 置顶样式 +
+        树遍历收集的 refreshers 统一调用；不再调用 table.draw /
+        _update_summary / _update_today_status（数据渲染路径零触碰）。
+        KPI 磁贴颜色由 _apply_kpi_styles 承担（signal 重算，不动文本/动画）。
         """
         self._apply_qss()
         self._update_theme_btn_text()
         self._update_pin_btn_style()
-        self.input_panel.apply_theme()
-        self.chart.apply_theme()
-        # 兑换页包标签为内联样式，构建期冻结——主题切换后需重解析（U-03 评审修复）；
-        # C1 前过渡态：ProfitPage.apply_theme() 仅扇出 exchange（行为与直插等价）
-        self.profit_page.apply_theme()
-        # 表格用当前数据重绘（get_color 自动取新主题色）
-        records = self._get_records()
-        self._update_summary()
-        self._update_today_status()
-        self.table.draw(records, self.today)
+        self._apply_theme_refreshers()
+        self._apply_kpi_styles()
+
+    def _apply_kpi_styles(self) -> None:
+        """重算两 KPI 磁贴的 signal 并重应用 summary_style（C1-08 E1）。
+
+        纯内存读（logic.summary / cash_summary，零 I/O）；不动数值文本、
+        不触发 count-up 动画（不调用 _set_kpi_value）——主题切换只换色。
+        """
+        count, total = self.logic.summary(self._view_n)
+        _, signal = format_window_text(count, total, "总盈亏", self._view_n)
+        self._summary_label.setStyleSheet(summary_style(signal))
+
+        cash_count, cash_delta = self.logic.cash_summary(self._view_n)
+        _, cash_signal = format_window_text(
+            cash_count, cash_delta, "现金总变化", self._view_n
+        )
+        self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
 
     # ═══════════════════════════════════════════════════════
     # 置顶
