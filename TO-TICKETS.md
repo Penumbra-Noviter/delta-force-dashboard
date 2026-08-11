@@ -12,14 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-11）：架构加深批次（C1/C2/C3）code-review 非阻断建议 4 条。
+> 活跃表（2026-08-11）：AA-01~04 已完成归档，当前无活跃工单。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| AA-01 | KPI signal 计算抽取——`_apply_kpi_styles` 与 `_update_summary` 重复段共享纯函数 | 重构（消除重复） | 📝 已录入 | 🟡 Worth exploring |
-| AA-02 | craft 卡重置抽取——`_render_data` 空槽位循环与 `_render_error` 近乎重复，抽 `_reset_card(card, product_text)` | 重构（消除重复） | 📝 已录入 | 🟡 Worth exploring |
-| AA-03 | `kkrb_client.reset()` 无锁且清 `_cache`/cookie jar——当前无生产调用点，纳入锁或注释声明仅空闲调用 | 健壮性（并发边界） | 📝 已录入 | ⚪ Speculative |
-| AA-04 | `_encode_window_state` 私有名跨模块导入（main_window）——`__all__` 私有与真实依赖矛盾，公开命名或收敛 | 重构（协议表面） | 📝 已录入 | ⚪ Speculative |
 
 ---
 
@@ -310,6 +306,15 @@
 | 09 | AST 全键守卫 + 全链路抽查 — app/ 下 `get_color` 字面量调用点 + `_PACKAGE_CONFIG`/图表 series color_key → 双主题均存在且非空；light→dark→light 全链路抽查（exchange 标签/分隔线、table 行按钮、sidebar、chart、input）；craft 卡内联 styleSheet 无颜色字面量断言 | 测试（防复发） | 2026-08-11 | `45ddffc` |
 | 10 | SettingsStore schema 所有者 — 公开 `DEFAULTS`（geometry/pinned/theme/animations）与 `KNOWN_KEYS`；`update(patch)` 读当前原始 dict → 合并（未知键保留）→ 原子写 → 返回新 dict，取代全量覆盖写；`encode_settings` 降级模块私有 `_encode_window_state` | 架构（深模块） | 2026-08-11 | `9678349` |
 | 11 | MainWindow 设置接线 + 常量收敛 + AST 守卫 — `__init__` 设置读取改走 `_KEY_*` 模块常量（消灭裸字符串键）；`_save_settings` = `_encode_window_state` + animations 启动值 + current_account 合并 + `update()` 返回值回写——animations 纳入持久化闭环、未知键端到端保留 | 架构（收敛） | 2026-08-11 | `a96775d` |
+
+### AA 系列（2026-08-11，架构加深批次 code-review 非阻断建议；merge `25082df`，532/532）
+
+| Ticket | 标题 | 类型 | 完成日期 | 提交 |
+|--------|------|------|----------|------|
+| AA-01 | KPI signal 计算抽取 — `_apply_kpi_styles` 与 `_update_summary` 重复段抽模块级纯函数 `_kpi_signal`（委托 presentation.format_window_text，信号判定单一来源）；两调用点 + AST 锁定 | 重构（消除重复） | 2026-08-11 | `70cb749` |
+| AA-02 | craft 卡重置抽取 — `_render_data` 空槽位循环与 `_render_error` 抽 `_reset_card(card, product_text)`；「暂无数据」/「加载失败，点击重试」文案保持可区分 | 重构（消除重复） | 2026-08-11 | `31773c9` |
+| AA-03 | `kkrb_client.reset()` 纳入锁边界 — `with self._lock:` 与 `_post_json` 同边界（无锁内重入）；确定性锁边界测试 + 并发 fetch×6+reset 压力测试 | 健壮性（并发边界） | 2026-08-11 | `379fa6a` |
+| AA-04 | 编码函数公开命名 — `_encode_window_state` → `encode_window_state`（纳入 `__all__`），main_window import 与调用点同步——`__all__` 私有与真实跨模块依赖矛盾消除 | 重构（协议表面） | 2026-08-11 | `10423c6` |
 
 ### Z 系列（2026-08-10，主题联动收尾，来源：U-03 遗留）
 
