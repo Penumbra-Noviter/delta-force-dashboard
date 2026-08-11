@@ -633,3 +633,31 @@ def test_profit_apply_theme_fans_out_to_children(qapp) -> None:
     page.exchange_page.apply_theme = lambda: calls.append("exchange")  # type: ignore[method-assign]
     page.apply_theme()
     assert calls == ["crafting", "exchange"]
+
+
+# ── C1-09. craft 卡内联样式无颜色字面量 ──────────────────
+
+
+def test_crafting_card_inline_style_has_no_color_literal() -> None:
+    """C1-09：制造卡内联 styleSheet 不得含颜色字面量（颜色全部 QSS 选择器驱动）。
+
+    内联样式仅允许字号/字重等字体样式；出现 #hex / rgba( 即红——
+    颜色冻结在构建期会随主题失效（C1 契约）。
+    """
+    import re
+
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    color_literal = re.compile(r"#[0-9A-Fa-f]{3,8}\b|rgba?\(")
+    for card in page._cards:
+        for label in (
+            card._station_label,
+            card._product_label,
+            card._profit_label,
+            card._price_label,
+            card._sell_time_label,
+        ):
+            style = label.styleSheet()
+            assert not color_literal.search(style), f"内联样式含颜色字面量：{style!r}"
+            assert "color:" not in style, f"内联样式含 color 属性：{style!r}"

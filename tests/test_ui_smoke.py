@@ -1987,3 +1987,48 @@ def test_sidebar_themed_at_startup(sample_window):
     assert get_color("MUTED_BG") in win.sidebar.styleSheet(), (
         "sidebar 首帧样式应为当前主题值（refreshers 启动期已应用）"
     )
+
+
+# ── C1-09. 主题全链路抽查（light→dark→light 机械回归）────
+
+
+def test_full_chain_theme_toggle_roundtrip(sample_window):
+    """C1-09：light→dark→light 循环后各抽查组件样式含当前主题色值（与 get_color 比对）。
+
+    覆盖全部渲染路径：exchange 包标签/分隔线、table 行按钮、sidebar、
+    input 面板标签、chart 曲线——主题改动必须双主题×全路径回归。
+    """
+    from app.exchange_page import _PACKAGE_CONFIG
+    from app.table_widget import COL_ACTIONS
+    from app.theme import get_color
+
+    win = sample_window
+    exchange = win.profit_page.exchange_page
+    actions = win.table._left_table.cellWidget(0, COL_ACTIONS)
+    assert actions is not None, "表格行按钮未渲染（draw 未创建操作列）"
+
+    def assert_chain_themed():
+        for i, cfg in enumerate(_PACKAGE_CONFIG):
+            assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
+                f"{cfg.color} 包标签未随主题（当前 {get_color(cfg.color)}）"
+            )
+            assert get_color("SEPARATOR") in exchange._cards[i]._sep.styleSheet(), (
+                "分隔线未随主题"
+            )
+        assert get_color("BTN_BG") in actions._edit_btn.styleSheet(), "表格行按钮未随主题"
+        assert get_color("MUTED_BG") in win.sidebar.styleSheet(), "sidebar 未随主题"
+        assert get_color("FG_LABEL") in win.input_panel._cash_label.styleSheet(), (
+            "输入面板标签未随主题"
+        )
+        curve = win.chart._warehouse_curve
+        assert curve is not None, "仓库曲线未绘制"
+        pen_color = curve.opts["pen"].color().name().lower()
+        assert pen_color == get_color("CHART_WAREHOUSE").lower(), (
+            f"图表曲线未随主题：{pen_color} != {get_color('CHART_WAREHOUSE')}"
+        )
+
+    assert_chain_themed()          # 初始 light
+    win.sidebar.theme_btn.click()  # → dark
+    assert_chain_themed()
+    win.sidebar.theme_btn.click()  # → light（往返）
+    assert_chain_themed()
