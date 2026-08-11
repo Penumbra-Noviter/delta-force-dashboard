@@ -405,6 +405,26 @@ class TestReset:
         client.fetch_ov_data()
         assert len(opener.requests) == 6  # 重新握手 2 + 重新 POST 1
 
+    def test_reset_serializes_with_in_flight_request(self, transport_client) -> None:
+        """AA-03：reset 纳入 _lock——锁被在途请求持有时 reset 阻塞，不并发清缓存。
+
+        确定性锁边界断言：主线程持有 _lock（模拟在途 fetch 持锁），
+        reset 线程应阻塞等待；锁释放后 reset 才执行完毕。
+        无锁实现下 reset 立即执行（事件立刻置位），本断言失败。
+        """
+        client, _ = transport_client([b"home"])
+        done = threading.Event()
+
+        client._lock.acquire()
+        try:
+            t = threading.Thread(target=lambda: (client.reset(), done.set()))
+            t.start()
+            assert not done.wait(timeout=0.3), "reset 不应在锁被持有时执行"
+        finally:
+            client._lock.release()
+        assert done.wait(timeout=2.0), "锁释放后 reset 应完成"
+        t.join(timeout=2.0)
+
 
 class TestEndToEnd:
     """真实传输链路：FakeOpener 网络层 + 真实握手/缓存/解析全走。"""
@@ -528,3 +548,52 @@ class TestConcurrency:
         # 握手恰一次：首页 + getMenu 各 1，加两路 POST
         assert len(opener.requests) == 4
         assert len([r for r in opener.requests if "getMenu" in r.full_url]) == 1
+
+    def test_concurrent_fetch_with_reset_no_race(self) -> None:
+        """AA-03：并发 fetch + reset 无竞争异常；reset 后重新 fetch 数据正确。
+
+        reset 与 fetch 同一把锁串行化——「检查缓存命中 → 读取缓存项」之间
+        不会被 reset 清缓存打断（无锁实现可抛 KeyError/半状态），
+        reset 后任何线程重新 fetch 均返回完整数据。
+        """
+        n = 6
+        client, opener = self._routed_client(
+            {
+                "https://www.kkrb.net": b"home",
+                "https://www.kkrb.net/getMenu": (b"menu", "csrf_token", "tok123"),
+                _OV_URL: json.dumps(_OV_PAYLOAD).encode(),
+            }
+        )
+        barrier = threading.Barrier(n + 1)
+        results: list[Any] = []
+        errors: list[BaseException] = []
+
+        def fetch_worker() -> None:
+            try:
+                barrier.wait()
+                for _ in range(4):
+                    results.append(client.fetch_ov_data())
+            except BaseException as e:  # noqa: BLE001
+                errors.append(e)
+
+        def reset_worker() -> None:
+            try:
+                barrier.wait()
+                for _ in range(4):
+                    client.reset()
+                    results.append(client.fetch_ov_data())
+            except BaseException as e:  # noqa: BLE001
+                errors.append(e)
+
+        threads = [threading.Thread(target=fetch_worker) for _ in range(n)]
+        threads.append(threading.Thread(target=reset_worker))
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=20)
+
+        assert errors == [], f"并发 reset+fetch 出现异常：{errors}"
+        assert all(not t.is_alive() for t in threads)
+        assert len(results) == (n + 1) * 4
+        assert all(len(products) == 1 for products in results)
+        assert all(products[0].station == "技术中心" for products in results)

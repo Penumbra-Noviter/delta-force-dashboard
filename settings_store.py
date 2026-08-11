@@ -6,7 +6,7 @@
 - Schema：DEFAULTS / KNOWN_KEYS 公开常量；update(patch) 以
   「读当前文件原始 dict → 合并 patch（未知键保留）→ 原子写 → 返回新 dict」
   取代全量覆盖写；
-- 纯函数：decode_geometry_hex / decode_legacy_geometry / _encode_window_state
+- 纯函数：decode_geometry_hex / decode_legacy_geometry / encode_window_state
   为 MainWindow 提供「几何 ↔ hex 字符串 / 旧 Tkinter 格式 ↔ 四元组」编解码，
   不依赖 Qt，任何异常在函数内部消化，不向上抛出。
 """
@@ -17,6 +17,7 @@ __all__ = [
     "SettingsStore",
     "decode_geometry_hex",
     "decode_legacy_geometry",
+    "encode_window_state",
 ]
 
 import logging
@@ -129,11 +130,12 @@ def decode_legacy_geometry(saved: str) -> tuple[int, int, int, int] | None:
     return (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
 
 
-def _encode_window_state(geo_bytes: bytes, pinned: bool, theme: str) -> dict[str, Any]:
+def encode_window_state(geo_bytes: bytes, pinned: bool, theme: str) -> dict[str, Any]:
     """编码窗口状态 dict：geometry 以 hex 字符串落盘（与 decode_geometry_hex 对称）。
 
-    C3-10 私有化（原 encode_settings）：MainWindow 只提供窗口状态字节
-    （saveGeometry），本函数负责「状态 → dict」的全部编码；
-    pinned / theme 原样透传。
+    AA-04 公开命名（原 _encode_window_state）：MainWindow 跨模块依赖本
+    函数，真实依赖面已超出模块私有边界——公开命名并纳入 __all__ 与声明一致。
+    MainWindow 只提供窗口状态字节（saveGeometry），本函数负责「状态 → dict」
+    的全部编码；pinned / theme 原样透传。
     """
     return {"geometry": geo_bytes.hex(), "pinned": pinned, "theme": theme}
