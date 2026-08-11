@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from signals import PnLSignal, RateSignal
 
 __all__ = [
@@ -17,6 +19,8 @@ __all__ = [
     "signal_color",
     "summary_style",
 ]
+
+logger = logging.getLogger(__name__)
 
 # ── 主题色板 ──────────────────────────────────────────
 # 护眼配色：暖纸白底 + 温润青色（teal）主色调，降低蓝光刺激
@@ -223,8 +227,16 @@ def set_theme(name: str) -> None:
 
 
 def get_color(key: str) -> str:
-    """获取当前主题下指定颜色值。"""
-    return THEMES[_current_theme].get(key, "")
+    """获取当前主题下指定颜色值。
+
+    未知键：记录 warning（含键名）后返回 ""（不 raise，防御语义保持）
+    ——让「漏改键 → 静默失效」变成「漏改键 → 日志可见」（C1-06）。
+    """
+    palette = THEMES[_current_theme]
+    value = palette.get(key, "")
+    if value == "" and key not in palette:
+        logger.warning("get_color 未知主题键: %r", key)
+    return value
 
 
 

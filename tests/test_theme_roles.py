@@ -281,3 +281,31 @@ def test_exchange_apply_theme_updates_separator(qapp, theme_guard) -> None:
             assert theme_mod.get_color("SEPARATOR") in card._sep.styleSheet(), (
                 f"{theme} 下 apply_theme 后第 {i} 卡分隔线未用当前主题色"
             )
+
+
+# ── C1-06. get_color 未知键 warning ───────────────────────
+
+
+def test_get_color_unknown_key_warns(caplog) -> None:
+    """C1-06：未知键返回 "" 且记录 warning（含键名），不 raise（防御语义保持）。"""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.theme"):
+        assert theme_mod.get_color("不存在的键") == ""
+        assert theme_mod.get_color("NON_EXISTENT_KEY") == ""
+
+    messages = [r.message for r in caplog.records]
+    assert any("不存在的键" in m for m in messages), f"warning 应含键名：{messages}"
+    assert any("NON_EXISTENT_KEY" in m for m in messages), f"warning 应含键名：{messages}"
+
+
+def test_get_color_known_keys_no_warning(caplog) -> None:
+    """C1-06：双主题全部已知键调用零 warning（既有消费者 caplog 干净）。"""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.theme"):
+        for name, palette in theme_mod.THEMES.items():
+            theme_mod.set_theme(name)
+            for key in palette:
+                assert theme_mod.get_color(key) != ""
+    assert [r for r in caplog.records] == [], f"已知键不应产生 warning：{caplog.records}"
