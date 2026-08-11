@@ -178,7 +178,15 @@ class KkrbClient:
         return "DeltaForceDashboard/1.0"
 
     def reset(self) -> None:
-        """重置 CSRF token、cookie jar 和缓存（强制下次请求重新认证）。"""
-        self._csrf_token = None
-        self._cookie_jar.clear()
-        self._cache.clear()
+        """重置 CSRF token、cookie jar 和缓存（强制下次请求重新认证）。
+
+        AA-03：纳入 _lock 与 _post_json 同一锁边界——并发下 reset 与其他
+        请求串行化，杜绝「清缓存的同时另一线程在检查/读取/写入缓存」的
+        竞争（无锁实现下 reset 可在 fetch 的「缓存命中检查 → 读取缓存项」
+        之间清空 _cache，抛 KeyError 或半状态；_csrf_token/_cache 均为
+        非线程安全容器）。reset 不调用任何持锁方法，无锁内重入。
+        """
+        with self._lock:
+            self._csrf_token = None
+            self._cookie_jar.clear()
+            self._cache.clear()
