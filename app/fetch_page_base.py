@@ -173,6 +173,14 @@ class FetchPageBase(QWidget):
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self._data = []
         self._refresh_btn.setEnabled(True)
+        self._render_error()
+
+    def _render_error(self) -> None:
+        """错误态渲染钩子（C2-05）。
+
+        默认实现 = 空态渲染（等价 ``_render_data([])``，错误路径行为与
+        现状逐字节等价）；子类可覆盖为与空态可区分的错误文案。
+        """
         self._render_data([])
 
     # ── 公开接口 ────────────────────────────────────────

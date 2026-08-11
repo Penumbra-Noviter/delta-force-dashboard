@@ -482,3 +482,112 @@ def test_profit_page_preload_fans_out_to_children(qapp) -> None:
     page.exchange_page.preload = lambda: calls.append("exchange")  # type: ignore[method-assign]
     page.preload()
     assert calls == ["crafting", "exchange"]
+
+
+# ── C2-05. 错误/空态渲染分离（_render_error 钩子）─────────
+
+
+def test_default_render_error_delegates_to_empty_render(qapp, monkeypatch) -> None:
+    """C2-05：基类默认钩子仅委托 _render_data([])（错误路径行为逐字节等价）。"""
+    from app.exchange_page import ExchangePage
+
+    page = ExchangePage(client=make_stub_client())
+    calls: list[list] = []
+    monkeypatch.setattr(page, "_render_data", lambda data: calls.append(data))
+    page._render_error()
+    assert calls == [[]]  # 默认实现 = 空态渲染，无额外行为
+
+
+def test_crafting_error_invokes_render_error_hook(qapp, monkeypatch) -> None:
+    """C2-05：制造页真实错误链路走 _render_error 钩子（spy），不再直调 _render_data。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import KkrbError
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(page, "_render_error", lambda: calls.append("error"))
+    monkeypatch.setattr(page, "_render_data", lambda data: calls.append("data"))
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    assert calls == ["error"], f"_on_fetch_error 应走 _render_error 钩子：{calls}"
+    page.hide()
+
+
+def test_crafting_error_renders_distinct_from_empty(qapp) -> None:
+    """C2-05：制造页错误卡片产物文案 ≠ 空态「暂无数据」（可证伪断言）。"""
+    from app.crafting_page import CraftingPage
+    from kkrb_client import KkrbError
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    for card in page._cards:
+        assert card._product_label.text() == "加载失败，点击重试"
+        assert card._product_label.text() != "暂无数据"  # 与空态可区分
+        assert card._station_label.text() == "—"
+        assert card._profit_label.text() == ""
+        assert card._price_label.text() == ""
+        assert card._sell_time_label.text() == ""
+    page.hide()
+
+
+def test_exchange_error_path_renders_empty_state(qapp) -> None:
+    """C2-05：兑换页未覆盖钩子——错误路径渲染 == 空态（现状等价）。"""
+    from app.exchange_page import ExchangePage
+    from kkrb_client import KkrbError
+
+    page = ExchangePage(
+        client=make_stub_client(
+            ammo_impl=lambda: (_ for _ in ()).throw(KkrbError("boom"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    for card in page._cards:
+        assert card._item_name.text() == "暂无数据"
+    page.hide()
+
+
+def test_crafting_generic_error_shows_network_message(qapp) -> None:
+    """C2-05 Falsify：非 KkrbError 异常走 generic 分支——网络文案 + 错误渲染钩子。"""
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(
+        client=make_stub_client(
+            ov_impl=lambda: (_ for _ in ()).throw(RuntimeError("timeout"))
+        )
+    )
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+
+    assert page._status_label.text() == "⚠️ 网络异常，请检查连接后重试"
+    for card in page._cards:
+        assert card._product_label.text() == "加载失败，点击重试"
+    page.hide()

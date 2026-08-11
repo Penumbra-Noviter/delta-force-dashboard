@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-08  
-> 测试状态：<!--AUTO:tests_total:total-->497<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->502<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->497<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->502<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -125,7 +125,7 @@ Delta Force Dashboard/
 │   ├── test_load_state.py   ← <!--AUTO:tests:tests/test_load_state.py-->8<!--/AUTO--> 个测试（LoadState 四态转移矩阵：防重入/失败重试/loaded 手动刷新）
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->11<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
-│   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->22<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
+│   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->27<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
@@ -564,7 +564,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->497<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->502<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -675,7 +675,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->85<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->28<!--/AUTO--> | 数据模型 + OV 响应解析 |
-| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->22<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/offscreen 守卫/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除 |
+| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->27<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/offscreen 守卫/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->5<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 

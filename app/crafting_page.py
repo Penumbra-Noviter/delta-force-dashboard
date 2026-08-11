@@ -118,3 +118,16 @@ class CraftingPage(FetchPageBase):
                 card._profit_label.setText("")
                 card._price_label.setText("")
                 card._sell_time_label.setText("")
+
+    def _render_error(self) -> None:
+        """错误态渲染：与空态可区分的错误文案（C2-05，spec 4.2.10）。
+
+        站名 —、产物「加载失败，点击重试」（空态为「暂无数据」）、
+        利润/价格/时段清空——用户可分辨「没数据」与「出错了」。
+        """
+        for card in self._cards:
+            card._station_label.setText("—")
+            card._product_label.setText("加载失败，点击重试")
+            card._profit_label.setText("")
+            card._price_label.setText("")
+            card._sell_time_label.setText("")
