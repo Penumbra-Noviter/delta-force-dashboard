@@ -58,9 +58,17 @@ class FetchPageBase(QWidget):
     #: 日志文案前缀（子类覆盖，如「制造产物」「弹药包」）
     _page_name = "数据页面"
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 client: KkrbClient | None = None) -> None:
+        """构造数据页。
+
+        Args:
+            parent: 父控件。
+            client: 共享 KkrbClient 实例（C2-02 注入 seam）；None → 自建
+                （现状兼容，既有直构用例零改动）。
+        """
         super().__init__(parent)
-        self._client = KkrbClient()
+        self._client = client or KkrbClient()
         self._load_state = LoadState()
         self._shut_down = False
         self._worker: FetchWorker | None = None

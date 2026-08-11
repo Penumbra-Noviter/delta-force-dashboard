@@ -371,3 +371,55 @@ def test_pages_have_no_dead_error_state(qapp) -> None:
 
     assert not hasattr(CraftingPage(), "_error")
     assert not hasattr(ExchangePage(), "_error")
+
+
+# ── T-04. 构造注入 client seam（C2-02）────────────────────
+
+
+def test_crafting_page_injected_client_used_by_fetch(qapp) -> None:
+    """构造注入：CraftingPage(client=fake) 后 _fetch 落在 fake 实例（断网能力）。"""
+    from types import SimpleNamespace
+
+    from app.crafting_page import CraftingPage
+
+    calls: list[str] = []
+    fake = SimpleNamespace(fetch_ov_data=lambda: (calls.append("ov"), [])[1])
+    page = CraftingPage(client=fake)
+    assert page._fetch() == []
+    assert calls == ["ov"]
+
+
+def test_exchange_page_injected_client_used_by_fetch(qapp) -> None:
+    """构造注入：ExchangePage(client=fake) 后 _fetch 落在 fake 实例。"""
+    from types import SimpleNamespace
+
+    from app.exchange_page import ExchangePage
+
+    calls: list[str] = []
+    fake = SimpleNamespace(fetch_ammo_package_data=lambda: (calls.append("ammo"), [])[1])
+    page = ExchangePage(client=fake)
+    assert page._fetch() == []
+    assert calls == ["ammo"]
+
+
+def test_pages_without_client_build_own_kkrb_client(qapp) -> None:
+    """client=None 现状兼容：自建 KkrbClient（既有直构用例语义不变）。"""
+    from kkrb_client import KkrbClient
+
+    from app.crafting_page import CraftingPage
+    from app.exchange_page import ExchangePage
+
+    assert isinstance(CraftingPage()._client, KkrbClient)
+    assert isinstance(ExchangePage()._client, KkrbClient)
+
+
+def test_profit_page_preload_fans_out_to_children(qapp) -> None:
+    """C2-02：profit_page.preload() 扇出两子页 preload（单出口，不再各页直插）。"""
+    from app.profit_page import ProfitPage
+
+    page = ProfitPage()
+    calls: list[str] = []
+    page.crafting_page.preload = lambda: calls.append("crafting")  # type: ignore[method-assign]
+    page.exchange_page.preload = lambda: calls.append("exchange")  # type: ignore[method-assign]
+    page.preload()
+    assert calls == ["crafting", "exchange"]

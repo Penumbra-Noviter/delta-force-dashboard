@@ -56,6 +56,7 @@ from app.ui_text import EMOJI
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
+from kkrb_client import KkrbClient
 from presentation import (
     format_saved_indicator,
     format_signed_money,
@@ -134,7 +135,8 @@ class MainWindow(QMainWindow):
                  logic: ProfitCalculatorLogic | None = None,
                  settings_store: SettingsStore | None = None,
                  registry: WidgetRegistry | None = None,
-                 account_store: AccountStore | None = None) -> None:
+                 account_store: AccountStore | None = None,
+                 client: KkrbClient | None = None) -> None:
         super().__init__()
 
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
@@ -169,6 +171,10 @@ class MainWindow(QMainWindow):
         # W-01：KPI count-up 的上一帧数值（None = 尚未渲染过/数据不足）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
+
+        # C2-02：kkrb API 客户端注入 seam——None → 自建（生产唯一创建点）；
+        # 注入 fake 后利润页两子模块共享同一实例（01 加锁保证并发安全）。
+        self._client = client or KkrbClient()
 
         self._setup_window()
         self.sidebar = Sidebar()
@@ -401,8 +407,8 @@ class MainWindow(QMainWindow):
         self._date_label = dashboard._date_label
         self._stack.addWidget(dashboard)
 
-        # ── Page 1：利润（制造产物 + 兑换利润）──
-        self.profit_page = ProfitPage()
+        # ── Page 1：利润（制造产物 + 兑换利润，共享同一 client）──
+        self.profit_page = ProfitPage(client=self._client)
         self._stack.addWidget(self.profit_page)
 
         # ── 侧边栏导航切换 ──
@@ -494,8 +500,9 @@ class MainWindow(QMainWindow):
         self._update_pin_btn_style()
         self.input_panel.apply_theme()
         self.chart.apply_theme()
-        # 兑换页包标签为内联样式，构建期冻结——主题切换后需重解析（U-03 评审修复）
-        self.profit_page.exchange_page.apply_theme()
+        # 兑换页包标签为内联样式，构建期冻结——主题切换后需重解析（U-03 评审修复）；
+        # C1 前过渡态：ProfitPage.apply_theme() 仅扇出 exchange（行为与直插等价）
+        self.profit_page.apply_theme()
         # 表格用当前数据重绘（get_color 自动取新主题色）
         records = self._get_records()
         self._update_summary()
@@ -728,8 +735,7 @@ class MainWindow(QMainWindow):
         预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
         offscreen 测试模式跳过预加载的守卫同样在 preload() 内部。
         """
-        self.profit_page.crafting_page.preload()
-        self.profit_page.exchange_page.preload()
+        self.profit_page.preload()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。

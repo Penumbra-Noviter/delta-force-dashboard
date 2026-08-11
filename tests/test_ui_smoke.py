@@ -637,6 +637,133 @@ def test_theme_toggle_updates_exchange_labels(sample_window):
         )
 
 
+# ── 8.5 注入 seam + 共享 client + 单出口扇出（C2-02）──────
+
+
+def test_main_window_shares_single_injected_client(qapp, settings_guard, tmp_path):
+    """C2-02：MainWindow(client=fake) → 利润页两子页 _client 同一实例（共享 client）。"""
+    from types import SimpleNamespace
+
+    from app.main_window import MainWindow
+
+    fake = SimpleNamespace()
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=fake,
+    )
+    assert win.profit_page.crafting_page._client is fake
+    assert win.profit_page.exchange_page._client is fake
+    win.close()
+
+
+def test_shared_client_concurrent_preload_no_errors(
+    qapp, settings_guard, tmp_path, monkeypatch
+):
+    """C2-02 ⑦：共享 client 两页并发 preload 无异常。
+
+    两子页各自后台线程同时向同一 client 取数（线程重叠由 fetch 内 sleep 保证）；
+    依赖 01 的锁保证线程安全（握手恰一次已在 01 覆盖），此处断言无异常 + 双页 loaded。
+    """
+    import time
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+    from kkrb_client import AmmoPackageItem, CraftingProduct, KkrbClient
+
+    monkeypatch.setitem(os.environ, "QT_QPA_PLATFORM", "offscreen-t")
+    calls: list[str] = []
+    client = KkrbClient()
+    monkeypatch.setattr(
+        client,
+        "fetch_ov_data",
+        lambda: (
+            time.sleep(0.02), calls.append("ov"),
+            [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
+        )[2],
+    )
+    monkeypatch.setattr(
+        client,
+        "fetch_ammo_package_data",
+        lambda: (
+            time.sleep(0.02), calls.append("ammo"),
+            [AmmoPackageItem("3级子弹自选包", "5.7mm", 3, 40, 100, 4000, 500)],
+        )[2],
+    )
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=client,
+    )
+    assert win.profit_page.crafting_page._client is client
+    assert win.profit_page.exchange_page._client is client
+
+    win.profit_page.preload()  # 扇出两子页，各自后台线程并发取数
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        QTest.qWait(50)
+        qapp.processEvents()
+        if (
+            win.profit_page.crafting_page.is_loaded
+            and win.profit_page.exchange_page.is_loaded
+        ):
+            break
+    assert win.profit_page.crafting_page.is_loaded
+    assert win.profit_page.exchange_page.is_loaded
+    assert sorted(calls) == ["ammo", "ov"]
+    win.close()
+
+
+def test_startup_preload_fans_out_via_profit_page(qapp, settings_guard, tmp_path):
+    """C2-02：启动 500ms 定时器回调走 profit_page.preload() 单出口（不再直插两子页）。"""
+    import time
+
+    from types import SimpleNamespace
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=SimpleNamespace(),
+    )
+    calls: list[str] = []
+    win.profit_page.preload = lambda: calls.append("preload")  # type: ignore[method-assign]
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and not calls:
+        QTest.qWait(50)
+        qapp.processEvents()
+    assert calls == ["preload"]
+    win.close()
+
+
+def test_profit_page_access_whitelist_in_main_window() -> None:
+    """C2-02 ⑥：main_window.py 中 `profit_page.` 后只允许 refresh/preload/apply_theme/shutdown。
+
+    单出口契约（spec 4.2.7 + E5）：此后若在 main_window 直插
+    profit_page.crafting_page 等子页访问即被 AST 证伪；扫描限 app/ 源码，
+    测试文件对子页的直接访问不受限。
+    """
+    import ast
+    import inspect
+
+    import app.main_window as mw
+
+    allowed = {"refresh", "preload", "apply_theme", "shutdown"}
+    tree = ast.parse(inspect.getsource(mw))
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        # 形如 `X.profit_page.Y` 的属性链：外层 attr 必须落在白名单
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute):
+            if node.value.attr == "profit_page" and node.attr not in allowed:
+                offenders.append(f"L{node.lineno}: profit_page.{node.attr}")
+    assert offenders == [], f"main_window 直插 profit_page 子页访问：{offenders}"
+
+
 # ── 9. 窗口置顶 ──────────────────────────────────────────
 
 
