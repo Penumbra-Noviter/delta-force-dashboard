@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-08  
-> 测试状态：<!--AUTO:tests_total:total-->518<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->523<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->518<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->523<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -117,7 +117,7 @@ Delta Force Dashboard/
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
-│   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->28<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
+│   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->33<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->92<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->28<!--/AUTO--> 个测试（数据模型 + 客户端会话/传输/缓存 + 解析收敛验证）
@@ -497,7 +497,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~86 行<!--/AUTO-->）
+### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~108 行<!--/AUTO-->）
 
 #### 类：`SettingsStore`
 
@@ -564,7 +564,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->518<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->523<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -658,7 +658,7 @@ main.py
 | `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_account_store.py` | <!--AUTO:tests:tests/test_account_store.py-->52<!--/AUTO--> | 多账号存储层（Y-01）：list_accounts 目录扫描、create_account 校验拒绝（空/重名/禁用字符/首尾空格或点/非文本）、resolve_account 兜底回退主账号 + 空库自建、DataStore 路径注入继承（账号隔离/损坏恢复/滚动备份）、全新环境首次运行 |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
-| `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->28<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
+| `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->33<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
 | `tests/test_json_file.py` | <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> | json_file seam（D-02）：原子写（失败清理临时文件）/ 容错读（缺失/解析失败返回 None）/ on_error 回调异常详情 |
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |

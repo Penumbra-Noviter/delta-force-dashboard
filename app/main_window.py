@@ -64,9 +64,9 @@ from presentation import (
 )
 from settings_store import (
     SettingsStore,
+    _encode_window_state,
     decode_geometry_hex,
     decode_legacy_geometry,
-    encode_settings,
 )
 from signals import RateSignal
 
@@ -270,10 +270,10 @@ class MainWindow(QMainWindow):
 
         MainWindow 只保留「编码」（窗口状态 → dict）；文件 I/O 收敛到
         self.settings_store（容错读 + 原子写）。几何/置顶/主题的 dict
-        编码收敛到 settings_store.encode_settings 纯函数（候选 3）；
+        编码收敛到 settings_store._encode_window_state 纯函数（候选 3，私有）；
         Y-03：current_account 在纯函数输出上合并（注入模式无账号 → 不写 key）。
         """
-        settings = encode_settings(
+        settings = _encode_window_state(
             bytes(self.saveGeometry()), self._pinned, self._theme
         )
         if self.current_account is not None:
