@@ -135,19 +135,25 @@ def test_ui_initialization(sample_window):
     assert pnl_widget is not None
 
 
-def test_kpi_tile_splits_caption_and_value(sample_window):
-    """U-01：汇总文本拆为「说明行 + 数值行」，磁贴数字为大字号信号色。"""
+def test_kpi_tile_splits_caption_and_value(qapp):
+    """U-01：汇总文本拆为「说明行 + 数值行」，磁贴数字为大字号信号色。
+
+    C4 块 2：文本拆分语义随 _split_kpi_text 收敛到 KpiPresenter，直测 presenter。
+    """
     from signals import RateSignal
 
+    from PySide6.QtWidgets import QLabel
+
+    from app.kpi_presenter import KpiPresenter
     from app.theme import get_color, summary_style
 
-    win = sample_window
+    presenter = KpiPresenter(QLabel(), QLabel(), QLabel(), QLabel())
 
-    caption, value = win._split_kpi_text("最近7条总盈亏：+¥41.0M")
+    caption, value = presenter._split_kpi_text("最近7条总盈亏：+¥41.0M")
     assert caption == "最近7条总盈亏"
     assert value == "+¥41.0M"
     # 无分隔符（兜底）→ 整体作说明，数值留空
-    assert win._split_kpi_text("数据不足") == ("数据不足", "")
+    assert presenter._split_kpi_text("数据不足") == ("数据不足", "")
 
     # 磁贴数字样式：正常态 22px 信号色；数据不足态 16px 灰字
     style = summary_style(RateSignal.POSITIVE)
@@ -251,26 +257,47 @@ def test_page_switch_loop_no_crash(sample_window):
     assert win._stack.currentIndex() == 1
 
 
-def test_w01_kpi_countup(sample_window):
-    """W-01：KPI 数值变化时 count-up 动画触发，结束后落新值；数值未变直接设置。"""
+def test_w01_kpi_countup(qapp):
+    """W-01：KPI 数值变化时 count-up 动画触发，结束后落新值；数值未变直接设置。
+
+    C4 块 2：count-up 逻辑随 _set_kpi_value 收敛到 KpiPresenter，直测 presenter。
+    """
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QFrame, QLabel
 
     from app import motion
+    from app.kpi_presenter import KpiPresenter
     from presentation import format_signed_money
 
-    win = sample_window
-    label = QLabel()
+    class _Logic:
+        """单磁贴可编程 logic（总盈亏侧驱动动画，现金侧不干扰）。"""
+
+        def __init__(self, total: float) -> None:
+            self._total = total
+
+        def summary(self, view_n: int) -> tuple[int, float]:
+            return 2, self._total
+
+        def cash_summary(self, view_n: int) -> tuple[int, float]:
+            return 2, self._total
+
+    presenter = KpiPresenter(QLabel(), QLabel(), QLabel(), QLabel())
+    label = presenter._summary_label
+
+    logic = _Logic(100.0)
+    presenter.update(logic, 7)  # 首帧（last=None）直落终态
+    assert label.text() == format_signed_money(100.0)[0]
 
     # 数值变化（100 → 200）→ 动画触发，结束后文本 == 新值格式化
-    win._set_kpi_value(label, "+¥100", 100.0, 200.0)
-    assert win._kpi_countup_anim is not None
+    logic._total = 200.0
+    presenter.update(logic, 7)
+    assert presenter._countup_anim is not None
     QTest.qWait(400)
     assert label.text() == format_signed_money(200.0)[0]
 
-    # 数值未变 → 直接设置，无动画
-    win._set_kpi_value(label, "+¥200", 200.0, 200.0)
-    assert label.text() == "+¥200"
+    # 数值未变 → 直接设置，文本保持终态
+    presenter.update(logic, 7)
+    assert label.text() == format_signed_money(200.0)[0]
 
     # 动效关闭 → animate_value 直接落终态
     motion.set_animations_enabled(False)
@@ -2078,11 +2105,12 @@ def test_kpi_signal_shared_pure_function():
     # label/days 透传（现金磁贴同源）
     assert _kpi_signal(2, 50.0, "现金总变化", 30) is RateSignal.POSITIVE
 
-    # 两处 signal 计算必须走同一函数（AA-01 验收：消除 Divergent Change）
-    import app.main_window as mw
+    # 两处 signal 计算必须走同一函数（AA-01 验收：消除 Divergent Change；
+    # C4 块 2 后计算点收敛到 KpiPresenter 的 update 渲染路径与主题换色路径）
+    from app.kpi_presenter import KpiPresenter
 
-    for method in ("_update_summary", "_apply_kpi_styles"):
-        src = inspect.getsource(getattr(mw.MainWindow, method))
+    for method in ("_update_tile", "apply_theme_styles"):
+        src = inspect.getsource(getattr(KpiPresenter, method))
         assert "_kpi_signal(" in src, f"{method} 未走共享 _kpi_signal"
 
 
