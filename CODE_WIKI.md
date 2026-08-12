@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-08  
-> 测试状态：<!--AUTO:tests_total:total-->557<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->559<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->557<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->559<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -87,7 +87,6 @@ Delta Force Dashboard/
 │   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮 + 顶部账号区 Y-04，L-01，~98 行）
 │   ├── dashboard_page.py    ← [C4] 仪表盘装配直构（DashboardBundle + build_dashboard，~170 行）
 │   ├── kpi_presenter.py     ← [C4] KPI 双磁贴渲染（update/apply_theme_styles/reset 三出口）
-│   ├── registry.py          ← 插件式 Widget 注册系统（AppWidget + WidgetRegistry，~54 行）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
 │   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
@@ -129,6 +128,7 @@ Delta Force Dashboard/
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
 │   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->34<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
 │   ├── test_dashboard_page.py ← <!--AUTO:tests:tests/test_dashboard_page.py-->8<!--/AUTO--> 个测试（C4 build_dashboard 直构：bundle 契约/布局层级/信号接线）
+│   ├── test_no_registry.py    ← <!--AUTO:tests:tests/test_no_registry.py-->2<!--/AUTO--> 个测试（C6 守卫：全库零 WidgetRegistry/AppWidget 引用 + registry.py 已删）
 │   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->15<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
@@ -368,7 +368,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~500 行<!--/AUTO-->）
+### 4.7 `calculator.py` — 业务逻辑（<!--AUTO:lines:calculator.py-->~341 行<!--/AUTO-->）
 
 #### 类：`DayRecord` (frozen dataclass)
 
@@ -571,7 +571,7 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 ---
 
 ### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~171 行<!--/AUTO-->）
-### 4.18 `app/dashboard_page.py` — 仪表盘装配（C4-01，<!--AUTO:lines:app/dashboard_page.py-->~179 行<!--/AUTO-->）
+### 4.18 `app/dashboard_page.py` — 仪表盘装配（C4-01，<!--AUTO:lines:app/dashboard_page.py-->~178 行<!--/AUTO-->）
 
 **核心**：`build_dashboard(mw) -> DashboardBundle` 模块函数直构仪表盘页——组件创建、布局、信号显式连接一次完成（替代旧 registry 回调间接层）；`DashboardBundle` dataclass 持 8 成员（input_panel/table/chart/summary_label/summary_caption/cash_summary_label/cash_summary_caption/hint_label），MainWindow 解包保留同名属性。信号连接（save/cancel/reuse/edit/delete/view_changed）在 bundle 内显式接线，零 registry。
 
@@ -598,7 +598,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->557<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->559<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 

@@ -16,7 +16,6 @@
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| C6 | 删除 Registry 插件系统 | 重构（删除） | 📝 已录入 | ⚪ Speculative |
 | C7 | 存储 seam 容错收敛（容错读统一 + InvalidToken） | 重构（存储） | 📝 已录入 | ⚪ Speculative |
 
 ---
@@ -296,11 +295,16 @@
 | Ticket | 标题 | 类型 | 强度 |
 |--------|------|------|------|
 | C4-债1 | KPI 动画竞态：`_set_kpi_value` 替换动画不停旧动画、`reset()` 只停最后引用磁贴 → 数据不足/账号切换/动效开关时陈旧动画覆盖终态（Y-05 语义失效）。修复：赋值前 `stop()` 旧动画（复用 `app/motion.py:67-71` fade_in_widget 反竞态模式），一行可消 F-1/F-2/F-3 | 重构（竞态） | ⚪ Speculative |
-| C4-债2 | `app/registry.py` docstring 第 9 行示例 `MainWindow(registry=registry)` 陈旧（registry 参数已删，执行即 TypeError）——并入 C6 工单处理 | 文档（死引用） | ⚪ Speculative |
 
 ---
 
 ## 已完成归档
+
+### C6（2026-08-12，kickoff 全自动档）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| C6 | 删除 Registry 插件系统（registry.py 删除 + AST 守卫 2 测试） | ✅ 2026-08-12 | `c9b7f3e` |
 
 ### C5（2026-08-12，kickoff 全自动档）
 

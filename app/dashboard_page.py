@@ -1,10 +1,9 @@
-"""记账仪表盘页装配（C4 块 1）：从 WidgetRegistry 间接层改为直构。
+"""记账仪表盘页装配（C4 块 1）：直构替代 WidgetRegistry 间接层（C6 已删）。
 
 `build_dashboard(mw)` 一次性完成仪表盘页（QStackedWidget Page 0）的组件创建、
 布局与信号显式连接，返回 `DashboardBundle` 装配产物；页面本体经
 `build_dashboard_page` 布局函数构建并挂到 `mw._dashboard_page`，由
-MainWindow 入栈并解包标签引用。registry 仅剩引用被移除（registry.py 本体
-由后续工单删除）。
+MainWindow 入栈并解包标签引用。
 """
 
 from __future__ import annotations
