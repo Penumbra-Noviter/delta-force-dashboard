@@ -5,16 +5,26 @@
 >
 > **维护节奏**（绑定到已有流程节点，不新增习惯）：
 > 1. 开始实现某工单前，把状态从 📝 已录入 → 🔄 进行中（认领）
-> 2. 每会话结束、commit 之前：完成 → ✅/❌ → 移入归档；新评审候选（含未拍板的 `Worth exploring` / `Speculative`）一律先录入活跃表
+> 2. 每会话结束、commit 之前：完成 → ✅/❌ → 移入归档；新评审候选（含未拍板的 `Worth exploring` / `Speculative`）一律先录入技术债区（= 活跃表的未立项子集，带 编号/来源/强度/状态）
 > 3. 待办**不得写在 memory / 个人笔记里**——不落 TO-TICKETS 就不算数
 
 ---
 
 ## 活跃工单
 
-> 活跃表（2026-08-12）：当前为空——C4→C5→C6→C7 批次已全部归档；非阻断技术债见下文「技术债」小节。
+> 活跃表（2026-08-12）：当前为空——C4→C5→C6→C7 批次已全部归档；非阻断技术债见下方「技术债区」。
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
+
+---
+
+## 技术债区
+
+> 期末/波次审核的非阻断发现落盘于此（带来源 + 强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
+
+| 编号 | 遗留项 | 来源 | 强度 | 状态 |
+|------|--------|------|------|------|
+| C4-债3 | KPI 动画对象生命周期收敛（重构·资源生命周期）：presenter 的 QObject 子对象随动画触发次数无界累积——Stopped 动画无 finished 清理（预存在自 C4-债1；`_countup_anims` dict entry 有界 ≤2 但 Qt children 无界），修复方向：`animate_value` 创建时 `DeleteWhenStopped` 或 finished→deleteLater + 回归断言「N 次触发后 presenter 子对象数有界」；顺带：① `__init__` docstring 明示「4 个 label 必须互异」前置条件（重复注入时 per-tile 隔离退化为共享槽行为）；② `update`/`apply_theme_styles` 的 `logic` 参数补类型标注（预存在，随触碰顺带） | C4-债2 批次期末四轴（Falsify/Architecture/Standards） | 🟡 Worth exploring | 📝 |
 
 ---
 
@@ -288,14 +298,6 @@
 
 ---
 
-### 技术债（2026-08-12，C4-债1 批次 code-review 非阻断建议，来源：code-review 子智能体）
-
-| Ticket | 标题 | 类型 | 强度 |
-|--------|------|------|------|
-| C4-债2 | KPI 动画结构性根治（per-tile 独立动画槽）：共享单槽 + 出槽落终（`setCurrentTime`）是收敛而非根治——每磁贴独立动画槽使出槽动画可寻址，消除「新动画启动即截断旧动画至终值」的视觉语义（A1）；顺带 `_countup_anim`/`_countup_anim_label` 成对读写 Data Clump 并入结构（A2）、`==` 改 `is` 引用比较（S1，app/kpi_presenter.py:189） | 重构（状态模型） | 🟡 Worth exploring |
-
----
-
 ## 已完成归档
 
 ### 技术债批次（2026-08-12，kickoff 轻量档，基线 8bc4e68）
@@ -303,6 +305,7 @@
 | Ticket | 标题 | 完成 | 提交 |
 |--------|------|------|------|
 | C4-债1 | KPI 动画竞态修复（per-label 分槽 + 出槽动画优雅落终，回归 5 用例覆盖 100%） | ✅ 2026-08-12 | `e26f1a6` + `cc937c9`（merge `2a66972`/`8ba15eb`） |
+| C4-债2 | KPI 动画结构性根治（per-tile 独立动画槽 `_countup_anims: dict[QLabel, ...]`，A1 顶出截断消除 + A2 Data Clump 消解 + S1 引用比较随 dict 身份寻址消失；测试 20→24，kpi_presenter 覆盖 100%） | ✅ 2026-08-12 | `2448053`（merge `0edcaa7`） |
 
 ### C7（2026-08-12，kickoff 全自动档）
 

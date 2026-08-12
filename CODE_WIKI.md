@@ -577,7 +577,7 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 
 ### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~173 行<!--/AUTO-->）
 
-**核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换动画帧归零 + 终止在途动画，Y-05）。signal 计算经 `app.main_window._kpi_signal`（AA-01 单一来源，调用期延迟解析规避循环 import）。
+**核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换动画帧归零 + 终止在途动画，Y-05）。signal 计算经 `app.main_window._kpi_signal`（AA-01 单一来源，调用期延迟解析规避循环 import）。count-up 动画按磁贴独立槽（C4-债2）：`_countup_anims: dict[QLabel, QAbstractAnimation]` 每磁贴一个在途动画、始终可寻址——落值入口 pop + `setCurrentTime(duration)` 优雅落终；直落三态/同值直落移除 entry；0≤len≤2 不变式，Stopped 残留不清理。
 
 CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：showEvent 懒加载、LoadState 四态状态机（V-02）、FetchWorker 后台取数（T-01）、refresh / preload / shutdown 生命周期。
 
