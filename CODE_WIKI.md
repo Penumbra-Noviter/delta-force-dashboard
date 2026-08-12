@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-08  
-> 测试状态：<!--AUTO:tests_total:total-->559<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->561<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->559<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->561<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -113,7 +113,7 @@ Delta Force Dashboard/
 │   ├── test_calculator.py
 │   ├── test_presentation.py ← <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> 个测试（展示文本生成：format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label）
 │   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
-│   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
+│   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->20<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_account_store.py ← <!--AUTO:tests:tests/test_account_store.py-->52<!--/AUTO--> 个测试（Y-01 多账号存储层：扫描/新建校验/resolve 兜底/DataStore 路径注入继承）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
 │   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
@@ -448,7 +448,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:data_store.py:DataStore.__init__-->`__init__(data_file=DATA_FILE, backup_file=BACKUP_FILE, max_backups=3)`<!--/AUTO--> | 初始化存储路径和备份数量 |
 | <!--AUTO:sig:data_store.py:DataStore.load-->`load()`<!--/AUTO--> | 加载数据：主文件 → 损坏则依次尝试 bak.1 → bak.2 → bak.3 → bak → 空字典 |
 | <!--AUTO:sig:data_store.py:DataStore.save-->`save(data)`<!--/AUTO--> | 保存数据：滚动备份 → 原子写入 |
-| <!--AUTO:sig:data_store.py:DataStore._try_load-->`_try_load(path)`<!--/AUTO--> | 安全读取 JSON 文件，损坏返回 None |
+| <!--AUTO:sig:data_store.py:DataStore._try_load-->`_try_load(path)`<!--/AUTO--> | 委托 `try_load_json` 安全读取（读写对称，加密下读密文）+ 顶层 dict 形状检查（非 dict 视为损坏返回 None，O-09）；C7 起静默降级不变 |
 | <!--AUTO:sig:data_store.py:DataStore._atomic_write-->`_atomic_write(data, target)`<!--/AUTO--> | 原子写入：先写 `.tmp`，再 `os.replace` 覆盖 |
 | <!--AUTO:sig:data_store.py:DataStore._rotate_backups-->`_rotate_backups()`<!--/AUTO--> | 滚动备份：bak.2→bak.3, bak.1→bak.2, 当前→bak.1 + bak；复制失败记日志不中断（O-01） |
 
@@ -492,12 +492,12 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.12 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~71 行<!--/AUTO-->）
+### 4.12 `json_file.py` — JSON 原子写 seam（D-02，<!--AUTO:lines:json_file.py-->~87 行<!--/AUTO-->）
 
 | 函数 | 说明 |
 |------|------|
 | <!--AUTO:sig:json_file.py:atomic_write_json-->`atomic_write_json(path, data)`<!--/AUTO--> | 原子写入：先写 `.tmp` 再 `os.replace`；失败清理临时文件并抛出 OSError，由调用方决定告警/降级 |
-| <!--AUTO:sig:json_file.py:try_load_json-->`try_load_json(path, on_error=None)`<!--/AUTO--> | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败返回 None；解析/IO 失败时若提供 `on_error`，以实际异常为参数调用（供调用方恢复带异常详情的告警） |
+| <!--AUTO:sig:json_file.py:try_load_json-->`try_load_json(path, on_error=None)`<!--/AUTO--> | 容错读取：返回解析值（形状校验交由调用方）；文件缺失/解析失败/**解密失败（InvalidToken，C7）**返回 None；失败时若提供 `on_error`，以实际异常为参数调用 |
 
 **范围**：通用 JSON 持久化 seam（当前消费方为 `SettingsStore`）。`DataStore` 保留其更丰富的写路径（滚动备份 + 损坏恢复），未改用本 seam；**CSV 不走本 seam**（CSV 是导出格式而非持久化状态，D-02 拍板）。
 
@@ -529,7 +529,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.15 `account_store.py` — 多账号存储层（Y 系列，<!--AUTO:lines:account_store.py-->~196 行<!--/AUTO-->）
+### 4.15 `account_store.py` — 多账号存储层（Y 系列，<!--AUTO:lines:account_store.py-->~201 行<!--/AUTO-->）
 
 **布局约定（ADR-0005）**：`accounts/<账号名>/data.json`，目录名即账号名，无 `accounts.json` 元数据文件；每账号复用 `DataStore(data_file, backup_file)` 路径注入，原子写 / 损坏恢复 / 滚动备份全部继承。UI 层不得直接拼装账号路径——所有账号文件系统操作收敛到本模块。
 
@@ -598,7 +598,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->559<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->561<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -689,7 +689,7 @@ main.py
 |----------|--------|----------|
 | `tests/test_calculator.py` | <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> | DayRecord 字段/冻结、CRUD、日期回溯、记录滚动（recent_records/rotate_weekly）、收益率计算、格式化、盈亏标签、删除、滚动旋转（含删除日志 O-14）、汇总、CSV 导出（含金额统一格式化 O-11）、现金>仓库保存告警（O-08）、带符号金额 format_signed_money（D-01）、现金⊆仓库谓词 is_cash_under_warehouse（D-05）、汇总/保存指示器纯函数 format_summary/format_saved_indicator（D-07）、加载跳过记录 warning |
 | `tests/test_presentation.py` | <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> | 展示文本生成纯函数（format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label，D-01/D-07 架构评审候选 1） |
-| `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->18<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
+| `tests/test_data_store.py` | <!--AUTO:tests:tests/test_data_store.py-->20<!--/AUTO--> | 空加载、保存/加载回环、备份创建、备份编号、滚动旋转、主文件损坏恢复、滚动备份恢复、全部损坏恢复、原子写入无残留、Unicode 支持、备份失败日志、顶层 list 视为损坏（O-09） |
 | `tests/test_account_store.py` | <!--AUTO:tests:tests/test_account_store.py-->52<!--/AUTO--> | 多账号存储层（Y-01）：list_accounts 目录扫描、create_account 校验拒绝（空/重名/禁用字符/首尾空格或点/非文本）、resolve_account 兜底回退主账号 + 空库自建、DataStore 路径注入继承（账号隔离/损坏恢复/滚动备份）、全新环境首次运行 |
 | `tests/test_formatting.py` | <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> | 格式化（各种量级/零/负/None）、输入解析（纯数字/逗号/¥/￥/$/后缀/空格/非法格式）、校验边界、焦点格式化/反格式化 |
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->34<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
