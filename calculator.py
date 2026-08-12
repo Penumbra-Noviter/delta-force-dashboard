@@ -13,6 +13,7 @@ from typing import Optional
 
 from config import DATE_FORMAT, RETENTION_LIMIT, _WEEK_DAYS as WEEK_DAYS
 from formatting import format_money
+from presentation import format_rate
 
 __all__ = [
     "BaseRecord",
@@ -288,7 +289,7 @@ class ProfitCalculatorLogic:
                 continue
             date_str = row[0].strip()
             try:
-                # 兼容 export_csv 可能含 ¥ 前缀与千分位逗号的可视化格式
+                # 兼容历史导出的可视化格式：剥离 ¥ 前缀与千分位逗号
                 cash = float(row[1].replace("¥", "").replace(",", ""))
                 warehouse = float(row[2].replace("¥", "").replace(",", ""))
             except (ValueError, IndexError):
@@ -322,14 +323,9 @@ class ProfitCalculatorLogic:
                 else format_money(record.warehouse - prev_warehouse)
             )
             rate = self.calculate_rate(prev_warehouse, record.warehouse)
-            if rate is None:
-                rate_text = "—"
-            elif rate > 0:
-                rate_text = f"+{rate:.1f}%"
-            elif rate < 0:
-                rate_text = f"{rate:.1f}%"
-            else:
-                rate_text = "0.0%"
+            # 收益率文案唯一来源 presentation.format_rate（C5 单源收敛）：
+            # None → "—"、正 → "+x.x%"、负 → "-x.x%"、零 → "0.0%"。
+            rate_text = format_rate(rate)[0]
             writer.writerow(
                 [
                     date_str,
@@ -409,170 +405,3 @@ class ProfitCalculatorLogic:
 
         return result
 
-    def generate_report(self, days: int = 7) -> str:
-        """生成 HTML 格式报告，包含日期范围、汇总统计、数据表格。
-
-        Args:
-            days: 包含最近多少条记录（默认 7）。
-
-        Returns:
-            完整 HTML 字符串（自包含内联 CSS，无需外部文件）。
-        """
-        records = self.recent_records(days)
-        if not records:
-            return _build_empty_report()
-
-        count, total_profit = self.summary(days)
-        _, cash_change = self.cash_summary(days)
-
-        # 日期范围
-        start_date = records[0][0]
-        end_date = records[-1][0]
-
-        # 计算收益率
-        first_warehouse = records[0][1].warehouse
-        last_warehouse = records[-1][1].warehouse
-        if first_warehouse != 0:
-            overall_rate = (last_warehouse - first_warehouse) / first_warehouse * 100
-        else:
-            overall_rate = None
-
-        # 生成表格行
-        table_rows = ""
-        prev_warehouse: float | None = None
-        for date_str, record in records:
-            diff = (
-                "—"
-                if prev_warehouse is None
-                else format_money(record.warehouse - prev_warehouse)
-            )
-            rate = self.calculate_rate(prev_warehouse, record.warehouse)
-            if rate is None:
-                rate_text = "—"
-            elif rate > 0:
-                rate_text = f"+{rate:.1f}%"
-            elif rate < 0:
-                rate_text = f"{rate:.1f}%"
-            else:
-                rate_text = "0.0%"
-            table_rows += (
-                f"<tr>"
-                f"<td>{date_str}</td>"
-                f"<td>{format_money(record.cash)}</td>"
-                f"<td>{format_money(record.warehouse)}</td>"
-                f"<td>{diff}</td>"
-                f"<td>{rate_text}</td>"
-                f"</tr>\n"
-            )
-            prev_warehouse = record.warehouse
-
-        total_profit_str = format_money(total_profit)
-        cash_change_str = format_money(cash_change)
-        rate_str = (
-            "—"
-            if overall_rate is None
-            else f"{overall_rate:+.1f}%"
-        )
-
-        html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>收益报告</title>
-<style>
-* {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #333; background: #f5f7fa; padding: 20px; }}
-.container {{ max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 24px; }}
-h1 {{ font-size: 22px; color: #1a1a2e; margin-bottom: 4px; }}
-.date-range {{ font-size: 14px; color: #888; margin-bottom: 20px; }}
-.summary {{ display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }}
-.summary-card {{ flex: 1; min-width: 140px; background: #f0f4f8; border-radius: 6px; padding: 14px 16px; }}
-.summary-card .label {{ font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }}
-.summary-card .value {{ font-size: 20px; font-weight: 600; color: #1a1a2e; margin-top: 4px; }}
-.summary-card .value.positive {{ color: #16a34a; }}
-.summary-card .value.negative {{ color: #dc2626; }}
-table {{ width: 100%; border-collapse: collapse; }}
-th {{ background: #f0f4f8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; padding: 10px 12px; text-align: right; }}
-th:first-child {{ text-align: left; }}
-td {{ padding: 10px 12px; border-bottom: 1px solid #eee; text-align: right; font-size: 14px; }}
-td:first-child {{ text-align: left; font-family: "SF Mono", "Cascadia Code", "Consolas", monospace; font-size: 13px; color: #666; }}
-tr:last-child td {{ border-bottom: none; }}
-.positive {{ color: #16a34a; }}
-.negative {{ color: #dc2626; }}
-.footer {{ text-align: center; font-size: 11px; color: #bbb; margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee; }}
-@media (max-width: 600px) {{
-.container {{ padding: 16px; }}
-.summary {{ flex-direction: column; }}
-.summary-card {{ min-width: auto; }}
-}}
-</style>
-</head>
-<body>
-<div class="container">
-<h1>收益报告</h1>
-<p class="date-range">{start_date} ~ {end_date}（共 {count} 条记录）</p>
-<div class="summary">
-<div class="summary-card">
-<div class="label">总盈亏</div>
-<div class="value {('positive' if total_profit is not None and total_profit >= 0 else 'negative') if total_profit is not None else ''}">{total_profit_str}</div>
-</div>
-<div class="summary-card">
-<div class="label">现金总变化</div>
-<div class="value {('positive' if cash_change is not None and cash_change >= 0 else 'negative') if cash_change is not None else ''}">{cash_change_str}</div>
-</div>
-<div class="summary-card">
-<div class="label">收益率</div>
-<div class="value {('positive' if overall_rate is not None and overall_rate >= 0 else 'negative') if overall_rate is not None else ''}">{rate_str}</div>
-</div>
-</div>
-<table>
-<thead>
-<tr><th>日期</th><th>现金</th><th>仓库</th><th>较前日</th><th>收益率</th></tr>
-</thead>
-<tbody>
-{table_rows}</tbody>
-</table>
-<div class="footer">Delta Force Dashboard &mdash; 自动生成报告</div>
-</div>
-</body>
-</html>"""
-        return html
-
-    def export_html(self, path: str, days: int = 7) -> None:
-        """将 HTML 报告写入文件。
-
-        Args:
-            path: 输出文件路径。
-            days: 包含最近多少条记录（默认 7）。
-        """
-        html = self.generate_report(days)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(html)
-
-
-def _build_empty_report() -> str:
-    """生成空数据报告的 HTML。"""
-    return """<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>收益报告</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #333; background: #f5f7fa; padding: 20px; }
-.container { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); padding: 24px; text-align: center; }
-h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 8px; }
-p { font-size: 14px; color: #888; }
-.footer { text-align: center; font-size: 11px; color: #bbb; margin-top: 20px; padding-top: 16px; border-top: 1px solid #eee; }
-</style>
-</head>
-<body>
-<div class="container">
-<h1>收益报告</h1>
-<p>暂无数据，请先录入记录。</p>
-<div class="footer">Delta Force Dashboard &mdash; 自动生成报告</div>
-</div>
-</body>
-</html>"""
