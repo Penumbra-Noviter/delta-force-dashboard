@@ -328,6 +328,8 @@ MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均�
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.export_png-->`export_png()`<!--/AUTO--> | 导出当前图表为 PNG 文件 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_all-->`_clear_all()`<!--/AUTO--> | 销毁图表及占位组件 |
 
+**绘制揭示动画生命周期（C4-债4）**：`_play_draw_anim` 每次数据更新以 0→1 opacity 揭示曲线（200ms，U-06 feedback-only）——启动新动画前 `stop()` 旧动画（防同目标 opacity 残帧竞态：旧实现 0.88→0.20 抖动可见 bug）+ `deleteLater()`（防 KeepWhenStopped 对象无界累积）；新动画挂 `finished` 回调（identity 检查 `self._draw_anim is a` 清句柄 + `deleteLater`）；`_draw_anim` 为寻址句柄（防 GC 由 C++ parent 承担）；`anim is None` 判空覆盖动效关闭路径；`getattr` 兜底 `__init__` 未初始化。
+
 **图表结构**：
 
 ```
@@ -798,7 +800,7 @@ python scripts/install-hooks.bat         # 安装 pre-commit 钩子到 .git/hook
 2. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用，D-05）；总收益 = 仓库价值（已含现金），非 `warehouse + cash`
 3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，按「录入条数」超过保留上限 `RETENTION_LIMIT=30` 时从最旧开始删除（满 30 不删、第 31 条才删）；表格/图表/汇总（`recent_records`/`summary`）同以当前视图 7/30 条实际录入记录为基准（随按钮组切换，Q5 存储与视图解耦），而非日历天
 4. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入
-5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem`（双序列各一），仅 `setData()` 更新，避免重建；无填充区域（H-01 删填充）
+5. **图表更新**：`ChartWidget._update_data` 使用持久化的 `PlotCurveItem`（双序列各一），仅 `setData()` 更新，避免重建；无填充区域（H-01 删填充）
 6. **输入框去抖**：`MoneyLineEdit` 使用 150ms 去抖的 QTimer，快速输入时避免每次按键都触发校验
 7. **DPI 感知**：Windows 下通过 `SetProcessDpiAwareness(1)` 配合 `Qt.HighDpiScaleFactorRoundingPolicy.PassThrough`
 8. **几何格式兼容**：`_setup_window()` 同时兼容新格式（hex QByteArray）和旧格式（Tkinter `WxH+X+Y` 字符串）

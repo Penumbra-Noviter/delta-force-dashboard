@@ -479,7 +479,7 @@ class ChartWidget(QWidget):
         self._warehouse_vals = warehouse_vals
         self._cash_vals = cash_vals
 
-        # 更新曲线数据（FillBetweenItem 通过 sigPlotChanged 自动跟随）
+        # 更新曲线数据（PlotCurveItem 持久化，仅 setData 不重建；原生无填充区域）
         if self._warehouse_curve is not None:
             self._warehouse_curve.setData(x, warehouse_vals)
         if self._cash_curve is not None:

@@ -66,7 +66,7 @@ rate = (today.warehouse - prev_day.warehouse) / prev_day.warehouse * 100
 | **金额模型** | cash 和 warehouse 均为 float，warehouse 已含 cash |
 | **输入解析** | 兼容 ¥/￥/$、千分位、K/M/B 后缀、负号、首尾空格 |
 | **主题系统** | 两套完整色板（light/dark），约 30 个语义化 token，运行时 `get_color()` 解析 |
-| **图表** | pyqtgraph 原生渲染，双图（仓库价值 + 现金），持久化 PlotCurveItem/FillBetweenItem 增量更新 |
+| **图表** | pyqtgraph 原生渲染，双图（仓库价值 + 现金），持久化 PlotCurveItem 增量更新（仅 setData 不重建） |
 | **打包** | PyInstaller onedir（`dist/Delta Force Dashboard/`，exe + `_internal/`），`app_icon.ico` 设 exe 图标 + 运行窗口图标 |
 
 ---
@@ -78,7 +78,7 @@ rate = (today.warehouse - prev_day.warehouse) / prev_day.warehouse * 100
 3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 每次 `save_today()` 后执行，按「录入条数」超过保留上限 `RETENTION_LIMIT=30` 时从最旧开始删（满 30 不删、第 31 条才删）；表格/图表/汇总同以当前视图 7/30 条实际录入记录为基准（`recent_records`/`summary`，随按钮组切换），而非日历天。
 4. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用）；总收益 = 仓库价值（已含现金），非 warehouse + cash。
 5. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入。
-6. **增量 vs 全量图更新**：`_ChartPanel` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，更新时仅 `setData()` 不重建组件；填充边界曲线也持久化，避免重建开销。
+6. **增量 vs 全量图更新**：`ChartWidget` 使用持久化的 `PlotCurveItem`（双序列），更新时仅 `setData()` 不重建组件（原生无填充区域，H-01 删填充）。
 
 ---
 
