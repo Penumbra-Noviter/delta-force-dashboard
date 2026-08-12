@@ -292,6 +292,15 @@
 
 ---
 
+### 技术债（C4 波增量审核遗留，2026-08-12，非阻断）
+
+| Ticket | 标题 | 类型 | 强度 |
+|--------|------|------|------|
+| C4-债1 | KPI 动画竞态：`_set_kpi_value` 替换动画不停旧动画、`reset()` 只停最后引用磁贴 → 数据不足/账号切换/动效开关时陈旧动画覆盖终态（Y-05 语义失效）。修复：赋值前 `stop()` 旧动画（复用 `app/motion.py:67-71` fade_in_widget 反竞态模式），一行可消 F-1/F-2/F-3 | 重构（竞态） | ⚪ Speculative |
+| C4-债2 | `app/registry.py` docstring 第 9 行示例 `MainWindow(registry=registry)` 陈旧（registry 参数已删，执行即 TypeError）——并入 C6 工单处理 | 文档（死引用） | ⚪ Speculative |
+
+---
+
 ## 已完成归档
 
 ### C4 系列（2026-08-12，kickoff 全自动档，基线 98b2ee1）
