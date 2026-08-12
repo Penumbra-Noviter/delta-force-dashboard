@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
 > 生成日期：2026-08-08  
-> 测试状态：<!--AUTO:tests_total:total-->534<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->557<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->534<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->557<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
 
 ---
@@ -85,6 +85,8 @@ Delta Force Dashboard/
 │   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流（含账号区 Y-03/Y-04/Y-05）
 │   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮 + 顶部账号区 Y-04，L-01，~98 行）
+│   ├── dashboard_page.py    ← [C4] 仪表盘装配直构（DashboardBundle + build_dashboard，~170 行）
+│   ├── kpi_presenter.py     ← [C4] KPI 双磁贴渲染（update/apply_theme_styles/reset 三出口）
 │   ├── registry.py          ← 插件式 Widget 注册系统（AppWidget + WidgetRegistry，~54 行）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
@@ -126,6 +128,8 @@ Delta Force Dashboard/
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
 │   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->34<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
+│   ├── test_dashboard_page.py ← <!--AUTO:tests:tests/test_dashboard_page.py-->8<!--/AUTO--> 个测试（C4 build_dashboard 直构：bundle 契约/布局层级/信号接线）
+│   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->15<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
@@ -158,7 +162,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~843 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~644 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -168,9 +172,9 @@ Delta Force Dashboard/
 
 | 方法 | 说明 |
 |------|------|
-| <!--AUTO:sig:app/main_window.py:MainWindow.__init__-->`__init__(store=None, logic=None, settings_store=None, registry=None, account_store=None, client=None)`<!--/AUTO--> | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
+| <!--AUTO:sig:app/main_window.py:MainWindow.__init__-->`__init__(store=None, logic=None, settings_store=None, account_store=None, client=None)`<!--/AUTO--> | 加载 DataStore → 加载数据 → 初始化逻辑 → 恢复设置 → 构建 UI → 连接信号 → 应用 QSS |
 | <!--AUTO:sig:app/main_window.py:MainWindow._setup_window-->`_setup_window()`<!--/AUTO--> | 窗口标题、最小尺寸（680×700）、几何恢复（兼容 Tkinter 旧格式）、DPI 感知 |
-| <!--AUTO:sig:app/main_window.py:MainWindow._build_ui-->`_build_ui()`<!--/AUTO--> | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期、输入面板卡片、表格卡片、图表卡片、底部提示栏 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._build_ui-->`_build_ui()`<!--/AUTO--> | 构建标题栏（含今日未录入提醒、主题/置顶/导出 CSV 按钮）、日期；仪表盘装配委托 `dashboard_page.build_dashboard`（C4-01 直构，bundle 解包 8 属性） |
 | <!--AUTO:sig:app/main_window.py:MainWindow._connect_signals-->`_connect_signals()`<!--/AUTO--> | 连接信号槽（Enter→保存, Esc→清空, 编辑/删除请求, 导出按钮→_export_csv） |
 | <!--AUTO:sig:app/main_window.py:MainWindow.save_today-->`save_today()`<!--/AUTO--> | 解析输入 → 验证 → 保存到 logic → 轮转保留最近 30 条（RETENTION_LIMIT）→ 持久化 → 刷新显示 |
 | <!--AUTO:sig:app/main_window.py:MainWindow.refresh_display-->`refresh_display()`<!--/AUTO--> | 获取 records → 刷新汇总/今日未录入/表格/图表 |
@@ -360,7 +364,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
 
-**主题刷新契约（C1-07/C1-08）**：具 `apply_theme()` 的组件构成统一刷新契约——MainWindow 启动期（`_build_ui` 后）递归遍历子树收集（自顶向下、父拥有子树；节点有 `apply_theme` 即收集且不再下钻）为 `self._theme_refreshers`；`refresh_theme` 重写为「`_apply_qss`（移除 sidebar.apply_theme）+ 按钮文字 + 置顶样式 + refreshers 统一调用」，不再触发数据刷新（`table.draw/_update_summary/_update_today_status` 调用移除，主题与数据刷新彻底解耦）；KPI 磁贴颜色以 `_apply_kpi_styles()` 另法保持（纯内存重算 signal，零 I/O）；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整）。组件侧契约：TableWidget `apply_theme()` 基于 `draw()` 缓存（`_last_records/_last_today`）重渲染行内颜色、**不重新取数**；CraftingPage 为显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange 两子页。
+**主题刷新契约（C1-07/C1-08）**：具 `apply_theme()` 的组件构成统一刷新契约——MainWindow 启动期（`_build_ui` 后）递归遍历子树收集（自顶向下、父拥有子树；节点有 `apply_theme` 即收集且不再下钻）为 `self._theme_refreshers`；`refresh_theme` 重写为「`_apply_qss`（移除 sidebar.apply_theme）+ 按钮文字 + 置顶样式 + refreshers 统一调用」，不再触发数据刷新（`table.draw/_update_summary/_update_today_status` 调用移除，主题与数据刷新彻底解耦）；KPI 磁贴颜色由 `KpiPresenter.apply_theme_styles()` 另法保持（纯内存重算 signal，零 I/O；C4-02 收敛，MainWindow 仅薄调用）；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整）。组件侧契约：TableWidget `apply_theme()` 基于 `draw()` 缓存（`_last_records/_last_today`）重渲染行内颜色、**不重新取数**；CraftingPage 为显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange 两子页。
 
 ---
 
@@ -567,6 +571,13 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 ---
 
 ### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~171 行<!--/AUTO-->）
+### 4.18 `app/dashboard_page.py` — 仪表盘装配（C4-01，<!--AUTO:lines:app/dashboard_page.py-->~179 行<!--/AUTO-->）
+
+**核心**：`build_dashboard(mw) -> DashboardBundle` 模块函数直构仪表盘页——组件创建、布局、信号显式连接一次完成（替代旧 registry 回调间接层）；`DashboardBundle` dataclass 持 8 成员（input_panel/table/chart/summary_label/summary_caption/cash_summary_label/cash_summary_caption/hint_label），MainWindow 解包保留同名属性。信号连接（save/cancel/reuse/edit/delete/view_changed）在 bundle 内显式接线，零 registry。
+
+### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~160 行<!--/AUTO-->）
+
+**核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换动画帧归零 + 终止在途动画，Y-05）。signal 计算经 `app.main_window._kpi_signal`（AA-01 单一来源，调用期延迟解析规避循环 import）。
 
 CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：showEvent 懒加载、LoadState 四态状态机（V-02）、FetchWorker 后台取数（T-01）、refresh / preload / shutdown 生命周期。
 
@@ -587,7 +598,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->534<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->557<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
