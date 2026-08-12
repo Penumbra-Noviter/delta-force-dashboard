@@ -7,8 +7,10 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 from data_store import DataStore
+from json_file import set_encryption_key
 
 
 # ── Fixtures ─────────────────────────────────────────
@@ -17,6 +19,13 @@ from data_store import DataStore
 def tmp_dir():
     with tempfile.TemporaryDirectory() as d:
         yield Path(d)
+
+
+@pytest.fixture(autouse=True)
+def cleanup_encryption():
+    """每个测试后清理 json_file 全局加密密钥，避免污染其他测试。"""
+    yield
+    set_encryption_key(None)
 
 
 def make_store(tmp_dir: Path, max_backups: int = 3) -> DataStore:
@@ -210,6 +219,27 @@ def test_save_empty_dict(tmp_dir):
     store = make_store(tmp_dir)
     store.save({})
     assert store.load() == {}
+
+
+# ── C7：加密启用下的读写对称 ─────────────────────────
+
+def test_encryption_roundtrip_via_datastore(tmp_dir):
+    """加密启用时 DataStore.save/load 往返成功（C7：读路径与写路径对称）。"""
+    set_encryption_key(Fernet.generate_key())
+    store = make_store(tmp_dir)
+    record = {"2026-07-20": {"cash": 100.0, "warehouse": 200.0}}
+    store.save(record)
+    assert store.load() == record
+
+
+def test_recovery_chain_intact_after_delegation(tmp_dir):
+    """_try_load 委托 try_load_json 后，主文件损坏的备份链恢复不变（C7 回归）。"""
+    store = make_store(tmp_dir, max_backups=2)
+    store.save({"v": 1})
+    store.save({"v": 2})
+    # 主文件损坏 → 从滚动备份 .bak.1（save 前状态 {"v": 1}）恢复
+    tmp_dir.joinpath("data.json").write_text("corrupt", encoding="utf-8")
+    assert store.load() == {"v": 1}
 
 
 # ── Special characters ───────────────────────────────

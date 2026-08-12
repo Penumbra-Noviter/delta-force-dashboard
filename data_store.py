@@ -4,14 +4,13 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 from config import DATA_FILE, _BACKUP_FILE as BACKUP_FILE
-from json_file import atomic_write_json
+from json_file import atomic_write_json, try_load_json
 
 T = TypeVar("T", bound=dict)
 
@@ -38,6 +37,12 @@ def migrate_legacy_data(legacy_dir: Path, target_dir: Path) -> None:
     - 采用复制而非移动：源文件保留、迁移可逆；失败仅记 warning，不中断启动。
     - 完成标记（F-02）：任何「目标目录已是权威数据源」的分支都写标记，用于配合
       :func:`log_legacy_cleanup_hint` 提示源清理；脚本绝不自动删源，删除是用户确认后的手动动作。
+
+    注：与 :meth:`account_store.AccountStore.migrate_legacy_to_default` 是两套刻意
+    独立的迁移——触发条件（本函数以目标 data.json 存在为已迁移，后者以 accounts/
+    目录存在即不迁移）、完成标记（.migrated vs .migrated_v2）、失败语义（本函数仅
+    warning 不清理，后者清理半成品以恢复重试触发条件）三处不同，不合并且；
+    改动任一侧时需同步审视另一侧。
     """
     target_data = target_dir / "data.json"
     if target_data.exists():
@@ -147,13 +152,9 @@ class DataStore(Generic[T]):
         return Path(f"{self.backup_file}.{index}")
 
     def _try_load(self, path: Path) -> dict[str, Any] | None:
-        if not path.exists():
-            return None
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return None
+        # 委托 json_file.try_load_json：与原子写对称，加密启用时同样能读回（C7）。
+        # 不传 on_error——DataStore 保持既有静默降级语义（O-09 / 共识范围内不加告警）。
+        data = try_load_json(path)
         # 顶层必须为 dict（形如 {"2026-08-01": {...}}）；合法 JSON 但结构
         # 错误视为损坏，走备份恢复链，避免上层收下错误类型（O-09）
         if not isinstance(data, dict):

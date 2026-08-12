@@ -40,17 +40,20 @@ def test_encryption_roundtrip(tmp_path):
 
 
 def test_encryption_wrong_key_fails(tmp_path):
-    """错误密钥读取失败（InvalidToken）。"""
+    """错误密钥下 try_load_json 容错返回 None，并以实际异常触发 on_error（C7 容错契约）。"""
     key1 = Fernet.generate_key()
     key2 = Fernet.generate_key()
     set_encryption_key(key1)
     path = tmp_path / "secret.json"
     atomic_write_json(path, {"msg": "secret"})
 
-    # 切换密钥后读取应失败
+    # 切换密钥后读取：不抛 InvalidToken，按容错契约降级为 None + on_error
     set_encryption_key(key2)
-    with pytest.raises(InvalidToken):
-        try_load_json(path)
+    seen: list[Exception] = []
+    result = try_load_json(path, on_error=seen.append)
+    assert result is None
+    assert len(seen) == 1
+    assert isinstance(seen[0], InvalidToken)
 
 
 def test_no_encryption_by_default(tmp_path):

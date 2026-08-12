@@ -160,6 +160,12 @@ class AccountStore:
         - 迁移失败（OSError）→ warning 日志、不中断启动；不写 marker。
         - ``data_dir`` 缺省为 ``accounts_dir`` 的父目录（生产 = DATA_DIR），
           测试显式注入 tmp_path，零真实用户目录触碰。
+
+        注：与 :func:`data_store.migrate_legacy_data` 是两套刻意独立的迁移——
+        触发条件（本函数以 accounts/ 目录存在即不迁移，后者以目标 data.json
+        存在为已迁移）、完成标记（.migrated_v2 vs .migrated）、失败语义（本函数
+        清理半成品以恢复重试触发条件，后者仅 warning 不清理）三处不同，不合并且；
+        改动任一侧时需同步审视另一侧。
         """
         accounts_dir = self.accounts_dir
         if (accounts_dir / MIGRATED_V2_MARKER_NAME).exists():
