@@ -8,7 +8,6 @@ from app.exchange_page import ExchangePage
 from app.input_panel import InputPanel, MoneyLineEdit
 from app.main_window import MainWindow
 from app.profit_page import ProfitPage
-from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
 from app.table_widget import PnLBadge, TableWidget
 from app.theme import (
@@ -23,7 +22,6 @@ from app.theme import (
 
 __all__ = [
     "adaptive_range",
-    "AppWidget",
     "ChartSeries",
     "ChartState",
     "ChartWidget",
@@ -43,5 +41,4 @@ __all__ = [
     "summary_style",
     "TableWidget",
     "THEMES",
-    "WidgetRegistry",
 ]
