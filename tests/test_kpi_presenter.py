@@ -274,6 +274,109 @@ def test_animations_disabled_lands_terminal(presenter):
         motion.set_animations_enabled(True)
 
 
+# ── C4-债1：在途 count-up 动画 vs 直落路径的竞态（per-label 分槽）──
+
+
+def test_inflight_anim_does_not_overwrite_data_insufficient(presenter):
+    """在途 count-up → 数据不足直落 → 等待后「数据不足」终态不被残留帧覆盖。
+
+    基线代码下旧动画未被 stop，其残留帧把「数据不足」改写为 +¥200.00。
+    """
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    p.update(logic, 7)  # count-up 动画触发，未等待（在途）
+    assert p._countup_anim is not None
+
+    logic._summary[7] = (0, None)
+    p.update(logic, 7)  # 数据不足直落
+    assert t["summary_label"].text() == "数据不足"
+    QTest.qWait(400)  # 若旧动画未停，其残留帧会改写直落文本
+    assert t["summary_label"].text() == "数据不足"
+
+
+def test_inflight_anim_stopped_after_direct_landing(presenter):
+    """数据不足直落后，原动画对象已 Stopped 且槽引用仍指向该对象。
+
+    基线代码下直落不改写槽引用但也不停动画——state() 仍为 Running。
+    """
+    from PySide6.QtCore import QAbstractAnimation
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    p.update(logic, 7)
+    anim_before = p._countup_anim
+    assert anim_before is not None
+
+    logic._summary[7] = (0, None)
+    p.update(logic, 7)  # 数据不足直落
+    assert p._countup_anim is anim_before  # 旧引用保留（未置 None）
+    assert anim_before.state() == QAbstractAnimation.State.Stopped  # 旧动画已停
+
+
+def test_disable_animations_inflight_lands_terminal(presenter):
+    """在途动画 → 动效开关关闭 → 数值变化直落终态并保持（残留帧不覆盖）。"""
+    from PySide6.QtTest import QTest
+
+    from app import motion
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    p.update(logic, 7)  # count-up 在途
+    assert p._countup_anim is not None
+
+    motion.set_animations_enabled(False)
+    try:
+        logic._summary[7] = (2, 300.0)
+        p.update(logic, 7)  # 动效关闭：animate_value 直落终态（返回 None）
+        assert t["summary_label"].text() == format_signed_money(300.0)[0]
+        QTest.qWait(400)
+        assert t["summary_label"].text() == format_signed_money(300.0)[0]
+    finally:
+        motion.set_animations_enabled(True)
+
+
+def test_direct_landing_one_tile_keeps_other_tile_animation(presenter):
+    """per-label：单磁贴直落只停自己的在途动画，不冻结另一磁贴动画。
+
+    双磁贴同帧先后触发动画后，cash 磁贴数据不足直落——summary 磁贴的
+    在途动画（已被 cash 动画替换出槽）须继续跑完自身终态；全局 stop 或
+    基线残留帧均会使本断言失败。
+    """
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    logic._cash_summary[7] = (2, 150.0)
+    p.update(logic, 7)  # 双磁贴同帧先后触发动画（槽内为 cash 动画）
+
+    logic._cash_summary[7] = (0, None)
+    p.update(logic, 7)  # cash 磁贴数据不足直落
+    assert t["cash_summary_label"].text() == "数据不足"
+    QTest.qWait(400)
+    # summary 动画未被跨磁贴 stop——仍达自身动画终态
+    assert t["summary_label"].text() == format_signed_money(200.0)[0]
+    # cash 直落终态不被自己（同目标）在途动画残留帧覆盖
+    assert t["cash_summary_label"].text() == "数据不足"
+
+
 # ── Falsify：使 presenter 崩溃的输入，错误信息须指明缺失成员 ──
 
 

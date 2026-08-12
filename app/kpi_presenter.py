@@ -69,6 +69,10 @@ class KpiPresenter(QObject):
         self._last_cash_delta: float | None = None
         # 动画对象挂 presenter 防 GC；动画中重复触发会替换旧动画
         self._countup_anim = None
+        # C4-债1 per-label 分槽：当前在途动画的目标磁贴（None = 无在途动画）。
+        # 落值入口仅终止「目标 == 本次磁贴」的在途动画——双磁贴共享单一
+        # 动画槽、同帧先后渲染，跨磁贴终止会冻结另一磁贴动画于中间值。
+        self._countup_anim_label = None
 
     def update(self, logic, view_n: int) -> None:
         """双磁贴全量渲染（说明 + 大数字 + count-up + 信号色样式）。
@@ -171,19 +175,33 @@ class KpiPresenter(QObject):
 
         动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致；
         动画对象挂 presenter 防 GC，动画中重复触发会替换旧动画。
+
+        C4-债1 反竞态（移植 fade_in_widget「同目标连续触发先停旧动画」）：
+        每次落值前仅终止「目标 == 本次磁贴」的在途动画——直落路径（数据
+        不足 / 数值未变 / 动效关闭）不被旧动画残留帧覆盖终态；双磁贴共享
+        单一动画槽、同帧先后渲染，跨磁贴终止会把另一磁贴动画停于中间值
+        （per-label 条件避免）。
         """
+        if (
+            self._countup_anim is not None
+            and self._countup_anim_label == label
+        ):
+            self._countup_anim.stop()
         if (
             old is not None
             and new is not None
             and old != new
             and value != "数据不足"
         ):
-            self._countup_anim = animate_value(
+            anim = animate_value(
                 self,
                 old,
                 new,
                 lambda v: label.setText(format_signed_money(v)[0]),
                 duration_ms=300,
             )
+            if anim is not None:
+                self._countup_anim = anim
+                self._countup_anim_label = label
         else:
             label.setText(value)
