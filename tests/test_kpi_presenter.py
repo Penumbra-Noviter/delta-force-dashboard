@@ -9,6 +9,7 @@ reset（账号切换归零后直落终态，Y-05）；count-up 触发条件
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 
 # offscreen 平台必须在 QApplication 创建前设置
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -43,11 +44,23 @@ class FakeLogic:
 
 
 @pytest.fixture
-def presenter(qapp) -> tuple[KpiPresenter, list[QLabel]]:
+def presenter(qapp) -> Iterator[tuple[KpiPresenter, list[QLabel]]]:
     """全新 presenter + 4 个假 labels（summary_label / summary_caption /
-    cash_summary_label / cash_summary_caption）。"""
+    cash_summary_label / cash_summary_caption）。
+
+    teardown 卫生（C4-债3）：先 p.reset() 显式回收在途动画（stop + 
+    deleteLater——stop 不发 finished，不显式回收则动画对象跨用例滞留，
+    且 pending deleteLater 可能在下个用例的事件循环中处理），再冲刷
+    DeferredDelete 事件（父对象存活时冲刷安全）。缺任一 → 用例间
+    children 断言相互污染 / 顺序依赖。
+    """
+    from PySide6.QtCore import QCoreApplication, QEvent
+
     labels = [QLabel(""), QLabel(""), QLabel(""), QLabel("")]
-    return KpiPresenter(*labels), labels
+    p = KpiPresenter(*labels)
+    yield p, labels
+    p.reset()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
 def _tiles(labels: list[QLabel]) -> dict[str, QLabel]:
@@ -526,8 +539,14 @@ def test_n2_retrigger_one_tile_keeps_other_inflight(presenter):
     assert t["cash_summary_label"].text() == format_signed_money(250.0)[0]
 
 
-def test_n3_natural_end_keeps_stopped_entry(presenter):
-    """N3：动画自然结束后 entry 残留且 Stopped（Q2 定案：有界不清理）。"""
+def test_n3_natural_end_recycles_anim(presenter):
+    """N3：动画自然结束后 entry 移除 + Qt 子对象回收（C4-债3 新语义）。
+
+    自然结束 → finished → _pop_countup_anim（entry 移除 + deleteLater）：
+    qWait 后断言 dict 缺席 + children 归零 + 文本终值。qWait 后对旧
+    wrapper 调 state() 会 RuntimeError（已删对象）——断言写 dict 缺席 +
+    children 数，不写 state。
+    """
     from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
 
@@ -538,12 +557,14 @@ def test_n3_natural_end_keeps_stopped_entry(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)
-    anim = p._countup_anims[t["summary_label"]]
-    assert anim.state() == QAbstractAnimation.State.Running
+    assert (
+        p._countup_anims[t["summary_label"]].state()
+        == QAbstractAnimation.State.Running
+    )
 
-    QTest.qWait(400)  # 自然结束：最后一帧同步写终值，动画自动 Stopped
-    assert p._countup_anims[t["summary_label"]] is anim  # entry 残留
-    assert anim.state() == QAbstractAnimation.State.Stopped
+    QTest.qWait(400)  # 自然结束：finished → entry 移除 + deleteLater 回收
+    assert t["summary_label"] not in p._countup_anims
+    assert len(p.children()) == 0
     assert t["summary_label"].text() == format_signed_money(200.0)[0]
 
 
@@ -552,7 +573,8 @@ def test_n4_mixed_sequence_bounded_entries(presenter):
 
     US-7 不变式：任意序列后 0 ≤ len(_countup_anims) ≤ 2——映射结构无
     无界增长路径；update 是全量双磁贴渲染，未变化磁贴走同值直落移除
-    entry，残留 Stopped entry 在下次同磁贴落值 / reset 时回收。
+    entry；C4-债3 自然结束即回收——动画结束即从 dict 移除并 deleteLater，
+    Qt children 同步收敛归零。
     """
     from PySide6.QtTest import QTest
 
@@ -581,6 +603,7 @@ def test_n4_mixed_sequence_bounded_entries(presenter):
     assert t["cash_summary_label"].text() == "数据不足"
     QTest.qWait(400)  # 直落路径无在途动画残留
     assert len(p._countup_anims) == 0
+    assert len(p.children()) == 0  # C4-债3：pop 落终与自然结束路径均回收子对象
 
     motion.set_animations_enabled(False)
     try:
@@ -597,3 +620,57 @@ def test_n4_mixed_sequence_bounded_entries(presenter):
     p.update(logic, 7)  # 归零后首帧直落
     assert len(p._countup_anims) == 0
     assert len(p._countup_anims) <= 2  # 不变式上界
+
+
+# ── C4-债3：动画对象生命周期收敛（finished → entry 移除 + deleteLater）──
+
+
+def test_c4debt3_children_bounded_after_n_triggers(presenter):
+    """C4-债3 回归：N 次快速交替触发后 children 与在途映射双双归零。
+
+    基线：动画对象以 presenter 为 parent 挂载、从不回收——N 次触发后
+    children 线性增长（实测 19 次触发 → 38）。C4-债3 后：触发中 dict
+    有界（≤ 2，双磁贴同变），qWait 后自然结束路径全部回收——children
+    == 0 且 dict == 0（缺一不可：dict 有界仅锁映射，children 归零锁
+    子对象回收）。
+    """
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)  # 首帧直落（last=None）
+    n = 20
+    for i in range(1, n + 1):
+        logic._summary[7] = (2, 100.0 + i)
+        logic._cash_summary[7] = (2, 50.0 + i)
+        p.update(logic, 7)  # 双磁贴同变：每次触发替换各自在途动画
+        assert len(p._countup_anims) <= 2  # 触发中不变式（双磁贴）
+
+    QTest.qWait(400)  # 全部自然结束 → finished 回收链
+    assert len(p.children()) == 0  # Qt 子对象归零（无界累积回归）
+    assert len(p._countup_anims) == 0  # 在途映射归零
+
+
+def test_c4debt3_reset_recycles_inflight_anims(presenter):
+    """C4-债3 回归：reset 显式 stop + deleteLater，在途动画对象不滞留。
+
+    基线：reset 只 stop + 清空映射——动画对象仍挂 presenter（children
+    残留）。C4-债3：stop 不发 finished → deleteLater 必须显式——reset
+    后 qWait 冲刷 pending deleteLater，children 归零。
+    """
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    p.update(logic, 7)  # 在途动画（未等待）
+    assert p._countup_anims
+
+    p.reset()  # stop + deleteLater 全部在途动画
+    QTest.qWait(100)  # 冲刷 pending deleteLater
+    assert len(p.children()) == 0
