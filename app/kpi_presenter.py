@@ -180,7 +180,9 @@ class KpiPresenter(QObject):
         每次落值前仅终止「目标 == 本次磁贴」的在途动画——直落路径（数据
         不足 / 数值未变 / 动效关闭）不被旧动画残留帧覆盖终态；双磁贴共享
         单一动画槽、同帧先后渲染，跨磁贴终止会把另一磁贴动画停于中间值
-        （per-label 条件避免）。
+        （per-label 条件避免）。F1：动画分支启动新动画前，对被顶出槽的
+        旧动画优雅落终——setCurrentTime 到终点同步触发 valueChanged 终帧
+        写终值（E2：不冻结中间值），动画到达终点自动 Stopped 不再跑帧。
         """
         if (
             self._countup_anim is not None
@@ -193,6 +195,9 @@ class KpiPresenter(QObject):
             and old != new
             and value != "数据不足"
         ):
+            old_anim = self._countup_anim
+            if old_anim is not None:
+                old_anim.setCurrentTime(old_anim.duration())
             anim = animate_value(
                 self,
                 old,
