@@ -377,6 +377,46 @@ def test_direct_landing_one_tile_keeps_other_tile_animation(presenter):
     assert t["cash_summary_label"].text() == "数据不足"
 
 
+def test_evicted_anim_lands_terminal_and_does_not_overwrite(presenter):
+    """F1：被顶出槽的动画优雅落终（Stopped），其磁贴直落终态不被残留帧覆盖。
+
+    同帧双磁贴先后触发动画时，cash 动画分支把在途 summary 动画顶出槽——
+    基线代码下出槽动画未停继续跑帧，其后 summary 直落「数据不足」被残留帧
+    覆盖为 +¥500.00；修复后出槽动画落终（同步写终值、自动 Stopped），
+    直落终态保持。
+    """
+    from PySide6.QtCore import QAbstractAnimation, QVariantAnimation
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 100.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 500.0)
+    logic._cash_summary[7] = (2, 200.0)
+    p.update(logic, 7)  # 双磁贴同帧先后触发动画：cash 分支顶出 summary 动画
+    # 出槽动画已优雅落终：同步写终值（E2 不冻结中间值）
+    assert t["summary_label"].text() == format_signed_money(500.0)[0]
+    # 机制：出槽动画对象已 Stopped（presenter 防 GC 持有，可枚举）；
+    # 槽内 cash 动画仍在 Running
+    assert p._countup_anim.state() == QAbstractAnimation.State.Running
+    evicted = [
+        c
+        for c in p.children()
+        if isinstance(c, QVariantAnimation)
+        and c.state() == QAbstractAnimation.State.Stopped
+    ]
+    assert len(evicted) == 1
+
+    logic._summary[7] = (0, None)
+    p.update(logic, 7)  # summary 直落「数据不足」
+    assert t["summary_label"].text() == "数据不足"
+    QTest.qWait(400)
+    assert t["summary_label"].text() == "数据不足"  # 基线：被 anim_s 残留帧覆盖
+    assert t["cash_summary_label"].text() == format_signed_money(200.0)[0]
+
+
 # ── Falsify：使 presenter 崩溃的输入，错误信息须指明缺失成员 ──
 
 
