@@ -51,7 +51,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（527 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
+| 测试框架 | pytest（561 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -105,6 +105,8 @@ delta-force-dashboard/
 ├── app/
 │   ├── __init__.py          # app 包标记
 │   ├── main_window.py       # 主窗口（组件协调与数据流）
+│   ├── dashboard_page.py    # 记账仪表盘装配（build_dashboard 直构，C4）
+│   ├── kpi_presenter.py     # KPI 双磁贴渲染（count-up + 主题只换色，C4）
 │   ├── sidebar.py           # 左侧导航栏（记账/利润 + 底部操作按钮）
 │   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
 │   ├── exchange_page.py     # 兑换利润页面（7 种子弹自选包）
@@ -123,7 +125,7 @@ delta-force-dashboard/
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（527 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（561 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）

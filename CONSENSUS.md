@@ -14,7 +14,9 @@
 
 ---
 
-## 一、项目当前状态
+## 一、立项时项目状态（2026-07-28 快照，历史）
+
+> 注：本节为立项时快照（Tkinter 时代），当前状态以 PROJECT_REFERENCE.md / CODE_WIKI.md 为准。
 
 - **框架**：Python Tkinter + matplotlib
 - **技术栈**：纯 Python，无外部依赖（除 matplotlib）
