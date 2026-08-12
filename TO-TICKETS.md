@@ -12,10 +12,16 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-11）：AA-01~04 已完成归档，当前无活跃工单。
+> 活跃表（2026-08-12）：C4→C5→C6→C7 架构批次（kickoff 全自动档，基线 98b2ee1）。
 
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
+| C4-01 | widget 装配抽离（build_dashboard + DashboardBundle） | 重构（编排） | 🔄 进行中 | 🟡 Worth exploring |
+| C4-02 | KPI 渲染收敛（KpiPresenter） | 重构（编排） | 📝 已录入 | 🟡 Worth exploring |
+| C4-03 | C4 文档同步收尾 | 文档 | 📝 已录入 | 🟡 Worth exploring |
+| C5 | calculator 展示边界（比率单源 + 删孤儿报告） | 重构（边界） | 📝 已录入 | 🟡 Worth exploring |
+| C6 | 删除 Registry 插件系统 | 重构（删除） | 📝 已录入 | ⚪ Speculative |
+| C7 | 存储 seam 容错收敛（容错读统一 + InvalidToken） | 重构（存储） | 📝 已录入 | ⚪ Speculative |
 
 ---
 
