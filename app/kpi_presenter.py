@@ -15,7 +15,7 @@ from __future__ import annotations
 
 __all__ = ["KpiPresenter"]
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QAbstractAnimation, QObject
 from PySide6.QtWidgets import QLabel
 
 from app.motion import animate_value
@@ -67,12 +67,10 @@ class KpiPresenter(QObject):
         # W-01：count-up 上一帧数值（None = 尚未渲染过/数据不足）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
-        # 动画对象挂 presenter 防 GC；动画中重复触发会替换旧动画
-        self._countup_anim = None
-        # C4-债1 per-label 分槽：当前在途动画的目标磁贴（None = 无在途动画）。
-        # 落值入口仅终止「目标 == 本次磁贴」的在途动画——双磁贴共享单一
-        # 动画槽、同帧先后渲染，跨磁贴终止会冻结另一磁贴动画于中间值。
-        self._countup_anim_label = None
+        # C4-债2 per-tile 独立动画槽：label → 在途动画，键恒为动画目标磁贴。
+        # 动画对象挂 presenter 防 GC；自然结束的 Stopped entry 残留不清理
+        # （有界 0 ≤ len ≤ 2，Q2 定案——下次同磁贴落值 / reset 时回收）。
+        self._countup_anims: dict[QLabel, QAbstractAnimation] = {}
 
     def update(self, logic, view_n: int) -> None:
         """双磁贴全量渲染（说明 + 大数字 + count-up + 信号色样式）。
@@ -119,9 +117,9 @@ class KpiPresenter(QObject):
         切换是数据源更换，随后的 update 数字直接落终态——不做
         「旧账号数值滚动到新账号数值」的误导动画。
         """
-        if self._countup_anim is not None:
-            self._countup_anim.stop()
-            self._countup_anim = None
+        for anim in self._countup_anims.values():
+            anim.stop()
+        self._countup_anims.clear()
         self._last_summary_total = None
         self._last_cash_delta = None
 
@@ -174,30 +172,24 @@ class KpiPresenter(QObject):
         """KPI 磁贴数字落值：数值变化时 count-up 滚动（W-01），否则直接设置。
 
         动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致；
-        动画对象挂 presenter 防 GC，动画中重复触发会替换旧动画。
+        动画对象挂 presenter 防 GC。
 
-        C4-债1 反竞态（移植 fade_in_widget「同目标连续触发先停旧动画」）：
-        每次落值前仅终止「目标 == 本次磁贴」的在途动画——直落路径（数据
-        不足 / 数值未变 / 动效关闭）不被旧动画残留帧覆盖终态；双磁贴共享
-        单一动画槽、同帧先后渲染，跨磁贴终止会把另一磁贴动画停于中间值
-        （per-label 条件避免）。F1：动画分支启动新动画前，对被顶出槽的
-        旧动画优雅落终——setCurrentTime 到终点同步触发 valueChanged 终帧
-        写终值（E2：不冻结中间值），动画到达终点自动 Stopped 不再跑帧。
+        C4-债2 per-tile 独立动画槽（A1 根治）：任何落值入口（动画分支或
+        直落分支）先按本次磁贴 label 弹出旧动画并统一 setCurrentTime(duration())
+        优雅落终——同磁贴重触发与直落共用同一落终路径，跨磁贴零触碰
+        （双磁贴同帧动画互不截断）。动画触发三条件（old != new 且均非
+        None 且 value != "数据不足"）满足时新动画写入本磁贴键位，否则
+        直落 setText（同调用内覆盖落终终帧，F1 终态不被残留帧改写）。
         """
-        if (
-            self._countup_anim is not None
-            and self._countup_anim_label == label
-        ):
-            self._countup_anim.stop()
+        prev = self._countup_anims.pop(label, None)
+        if prev is not None:
+            prev.setCurrentTime(prev.duration())
         if (
             old is not None
             and new is not None
             and old != new
             and value != "数据不足"
         ):
-            old_anim = self._countup_anim
-            if old_anim is not None:
-                old_anim.setCurrentTime(old_anim.duration())
             anim = animate_value(
                 self,
                 old,
@@ -206,7 +198,6 @@ class KpiPresenter(QObject):
                 duration_ms=300,
             )
             if anim is not None:
-                self._countup_anim = anim
-                self._countup_anim_label = label
+                self._countup_anims[label] = anim
         else:
             label.setText(value)
