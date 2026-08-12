@@ -2,8 +2,12 @@
 Tests for calculator.py — 业务逻辑：DayRecord、日期查询、差值计算。
 """
 
+import ast
+from pathlib import Path
+
 import pytest
 
+import calculator
 from calculator import BaseRecord, DayRecord, ProfitCalculatorLogic
 
 
@@ -809,43 +813,76 @@ def test_summary_by_period_empty():
     assert logic.summary_by_period("quarter") == {}
     assert logic.summary_by_period("year") == {}
 
-def test_generate_report_contains_title():
-    """报告包含标题文本。"""
-    logic = ProfitCalculatorLogic(
-        {
-            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
-            "2026-07-21": {"cash": 150.0, "warehouse": 550.0},
-        }
+
+# ── 守卫：收益率格式化单源（C5）────────────────────────
+
+_RATE_FORMAT_SPECS = (".1f", "+.1f")
+
+
+def _find_inline_rate_literals(source: str) -> list[str]:
+    """收集源码中内联收益率格式化 f-string 的源码文本（AST 解析）。
+
+    判定标准：f-string 中某 FormattedValue 的格式说明符内容以 `.1f` 结尾
+    （Python 3.12 AST 中说明符的冒号前缀由格式语义隐含，不进入 Constant；
+    `endswith` 亦覆盖 `+` 符号与宽度填充等变体），且紧随其后的字面量是 `%`——
+    即 `f"+{rate:.1f}%"` / `f"{rate:.1f}%"` / `f"{rate:+.1f}%"` 三种被禁形态
+    及其填充变体。format_money 等其他合法调用不含此形态。
+    """
+    tree = ast.parse(source)
+    hits: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.JoinedStr):
+            continue
+        values = node.values
+        for i, value in enumerate(values):
+            if not isinstance(value, ast.FormattedValue):
+                continue
+            spec = value.format_spec
+            if not isinstance(spec, ast.JoinedStr):
+                continue
+            spec_text = "".join(
+                part.value for part in spec.values if isinstance(part, ast.Constant)
+            )
+            if not spec_text.endswith(_RATE_FORMAT_SPECS):
+                continue
+            nxt = values[i + 1] if i + 1 < len(values) else None
+            if isinstance(nxt, ast.Constant) and nxt.value == "%":
+                hits.append(ast.unparse(node))
+                break
+    return hits
+
+
+def test_guard_detects_all_inline_rate_shapes():
+    """正例（防误报自检）：守卫能检出全部被禁的收益率字面量形态（含填充变体）。"""
+    bad_source = (
+        'a = f"+{rate:.1f}%"\n'
+        'b = f"{rate:.1f}%"\n'
+        'c = f"{overall:+.1f}%"\n'
+        'd = f"{rate:8.1f}%"\n'  # 宽度填充变体同样拦截
     )
-    html = logic.generate_report(days=7)
-    assert "<h1>收益报告</h1>" in html
-    assert "2026-07-20" in html
-    assert "2026-07-21" in html
+    assert len(_find_inline_rate_literals(bad_source)) == 4
 
 
-def test_generate_report_contains_table():
-    """报告包含表格标签。"""
-    logic = ProfitCalculatorLogic(
-        {
-            "2026-07-20": {"cash": 100.0, "warehouse": 500.0},
-            "2026-07-21": {"cash": 150.0, "warehouse": 550.0},
-        }
+def test_guard_ignores_legitimate_formatting_calls():
+    """负例：format_money / format_rate 单源调用 / 非收益率 f-string 不被误报。"""
+    ok_source = (
+        "a = format_money(rate)\n"
+        "b = format_rate(rate)[0]\n"
+        'c = f"{x:.1f}"\n'  # 无 % 后缀
+        'd = f"{pct}%"\n'  # 非 .1f 精度
+        'e = f"{x:.1f} 元"\n'  # % 不紧随
+        'f = f"{x:.1f}{y}%"\n'  # % 前有另一插值
     )
-    html = logic.generate_report(days=7)
-    assert "<table>" in html
-    assert "<thead>" in html
-    assert "<tbody>" in html
-    assert "日期" in html
-    assert "现金" in html
-    assert "仓库" in html
-    assert "较前日" in html
-    assert "收益率" in html
+    assert _find_inline_rate_literals(ok_source) == []
 
 
-def test_generate_report_empty():
-    """空数据报告不崩溃。"""
-    logic = ProfitCalculatorLogic({})
-    html = logic.generate_report(days=7)
-    assert isinstance(html, str)
-    assert len(html) > 0
-    assert "暂无数据" in html
+def test_calculator_has_no_inline_rate_literals():
+    """守卫：calculator.py 的收益率文案唯一来源为 presentation.format_rate（C5）。
+
+    禁止 `f"+{rate:.1f}%"` / `f"{rate:.1f}%"` / `f"{rate:+.1f}%"` 形态的
+    内联字面量在 calculator.py 中再次出现（含删除 generate_report 之后）。
+    """
+    source = Path(calculator.__file__).read_text(encoding="utf-8")
+    assert _find_inline_rate_literals(source) == []
+    # 正例：单源调用仍在（防止守卫空转——format_rate 调用被删时本断言失败）
+    assert "format_rate(" in source
