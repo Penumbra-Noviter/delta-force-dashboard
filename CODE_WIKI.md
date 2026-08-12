@@ -132,7 +132,7 @@ Delta Force Dashboard/
 │   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->24<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
-		│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
+│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -798,7 +798,7 @@ python scripts/install-hooks.bat         # 安装 pre-commit 钩子到 .git/hook
 2. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用，D-05）；总收益 = 仓库价值（已含现金），非 `warehouse + cash`
 3. **保留条数限制**：`ProfitCalculatorLogic.rotate_weekly()` 在每次 `save_today()` 后执行，按「录入条数」超过保留上限 `RETENTION_LIMIT=30` 时从最旧开始删除（满 30 不删、第 31 条才删）；表格/图表/汇总（`recent_records`/`summary`）同以当前视图 7/30 条实际录入记录为基准（随按钮组切换，Q5 存储与视图解耦），而非日历天
 4. **编辑模式**：编辑回填时使用 `unformat_input_value()` 转为纯数字，保存时用原日期覆盖写入
-5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem` + `FillBetweenItem`，仅 `setData()` 更新，避免重建
+5. **图表更新**：`_update_chart()` 使用持久化的 `PlotCurveItem`（双序列各一），仅 `setData()` 更新，避免重建；无填充区域（H-01 删填充）
 6. **输入框去抖**：`MoneyLineEdit` 使用 150ms 去抖的 QTimer，快速输入时避免每次按键都触发校验
 7. **DPI 感知**：Windows 下通过 `SetProcessDpiAwareness(1)` 配合 `Qt.HighDpiScaleFactorRoundingPolicy.PassThrough`
 8. **几何格式兼容**：`_setup_window()` 同时兼容新格式（hex QByteArray）和旧格式（Tkinter `WxH+X+Y` 字符串）
