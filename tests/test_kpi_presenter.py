@@ -83,7 +83,7 @@ def test_update_renders_caption_value_and_style(presenter):
     assert t["cash_summary_label"].text() == format_signed_money(50.0)[0]
     assert t["summary_label"].styleSheet() == summary_style(RateSignal.POSITIVE)
     assert t["cash_summary_label"].styleSheet() == summary_style(RateSignal.POSITIVE)
-    assert p._countup_anim is None  # 首帧 last=None → 直落终态
+    assert not p._countup_anims  # 首帧 last=None → 直落终态
 
 
 def test_update_data_insufficient_direct_terminal(presenter):
@@ -95,11 +95,11 @@ def test_update_data_insufficient_direct_terminal(presenter):
     p.update(logic, 7)
     assert t["summary_label"].text() == "数据不足"
     assert t["summary_caption"].text() == "最近7条总盈亏"
-    assert p._countup_anim is None
+    assert not p._countup_anims
 
     p.update(logic, 7)
     assert t["summary_label"].text() == "数据不足"
-    assert p._countup_anim is None
+    assert not p._countup_anims
 
 
 def test_countup_animates_on_value_change(presenter):
@@ -115,13 +115,15 @@ def test_countup_animates_on_value_change(presenter):
 
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)
-    assert p._countup_anim is not None
+    assert t["summary_label"] in p._countup_anims
     QTest.qWait(400)
     assert t["summary_label"].text() == format_signed_money(200.0)[0]
 
 
 def test_countup_not_triggered_on_same_value(presenter):
-    """数值未变 → 直接设置，不新建动画（动画对象身份不变）。"""
+    """数值未变 → 直落：旧动画按 label 弹出落终、entry 移除，不新建动画。"""
+    from PySide6.QtCore import QAbstractAnimation
+
     p, labels = presenter
     t = _tiles(labels)
     logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
@@ -129,15 +131,17 @@ def test_countup_not_triggered_on_same_value(presenter):
     p.update(logic, 7)  # 首帧直落
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)  # 动画触发
-    anim_before = p._countup_anim
+    anim_before = p._countup_anims[t["summary_label"]]
 
-    p.update(logic, 7)  # 数值未变
-    assert p._countup_anim is anim_before
+    p.update(logic, 7)  # 数值未变 → 直落路径：pop + 落终，无新 entry
+    assert t["summary_label"] not in p._countup_anims
+    assert anim_before.state() == QAbstractAnimation.State.Stopped
     assert t["summary_label"].text() == format_signed_money(200.0)[0]
 
 
 def test_countup_replaces_previous_animation(presenter):
-    """动画中重复触发替换旧动画（新对象，防 GC 持有）。"""
+    """动画中重复触发替换旧动画（新对象，防 GC 持有），旧动画已 Stopped。"""
+    from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
 
     p, labels = presenter
@@ -147,20 +151,23 @@ def test_countup_replaces_previous_animation(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)
-    anim1 = p._countup_anim
+    anim1 = p._countup_anims[t["summary_label"]]
     assert anim1 is not None
 
     logic._summary[7] = (2, 300.0)
     p.update(logic, 7)
-    anim2 = p._countup_anim
+    anim2 = p._countup_anims[t["summary_label"]]
     assert anim2 is not None and anim2 is not anim1  # 替换旧动画
+    assert anim1.state() == QAbstractAnimation.State.Stopped  # 旧动画已落终
 
     QTest.qWait(400)
     assert t["summary_label"].text() == format_signed_money(300.0)[0]
 
 
 def test_countup_skipped_when_value_data_insufficient(presenter):
-    """value ==「数据不足」时不触发动画（防御分支），文本直落。"""
+    """value ==「数据不足」时不触发动画（防御分支）：旧动画落终、entry 移除。"""
+    from PySide6.QtCore import QAbstractAnimation
+
     p, labels = presenter
     t = _tiles(labels)
     logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
@@ -168,12 +175,13 @@ def test_countup_skipped_when_value_data_insufficient(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)
-    anim_before = p._countup_anim
+    anim_before = p._countup_anims[t["summary_label"]]
 
     logic._summary[7] = (0, None)
     p.update(logic, 7)
     assert t["summary_label"].text() == "数据不足"
-    assert p._countup_anim is anim_before  # 未替换/未新建动画
+    assert t["summary_label"] not in p._countup_anims  # 直落：entry 移除
+    assert anim_before.state() == QAbstractAnimation.State.Stopped  # 旧动画已落终
 
 
 def test_apply_theme_styles_changes_color_only(presenter):
@@ -191,12 +199,12 @@ def test_apply_theme_styles_changes_color_only(presenter):
 
     assert t["summary_label"].styleSheet() == summary_style(RateSignal.NEGATIVE)
     assert t["summary_label"].text() == text_before  # 数值文本不受影响
-    assert p._countup_anim is None  # 不触发动画
+    assert not p._countup_anims  # 不触发动画
 
     # 随后的 update 仍正常动画（apply_theme_styles 不扰动 last 值）
     logic._summary[7] = (2, 300.0)
     p.update(logic, 7)
-    assert p._countup_anim is not None
+    assert t["summary_label"] in p._countup_anims
 
 
 def test_view_switch_7_30_linked(presenter):
@@ -222,9 +230,8 @@ def test_view_switch_7_30_linked(presenter):
     assert t["summary_label"].text() == format_signed_money(300.0)[0]
     assert t["cash_summary_label"].text() == format_signed_money(150.0)[0]
 
-    anim_before = p._countup_anim
-    p.update(logic, 30)  # 同视图重复更新 → 数值未变，无新动画
-    assert p._countup_anim is anim_before
+    p.update(logic, 30)  # 同视图重复更新 → 数值未变：旧动画落终、entry 移除
+    assert t["summary_label"] not in p._countup_anims
 
 
 def test_reset_lands_terminal_without_roll_animation(presenter):
@@ -238,17 +245,17 @@ def test_reset_lands_terminal_without_roll_animation(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)  # 在途动画（跨账号滚动风险源）
-    assert p._countup_anim is not None
+    assert p._countup_anims
 
     p.reset()
     assert p._last_summary_total is None
     assert p._last_cash_delta is None
-    assert p._countup_anim is None  # 在途动画已停
+    assert not p._countup_anims  # 在途动画已停、映射已清空
 
     logic._summary[7] = (2, 300.0)
     logic._cash_summary[7] = (2, 99.0)
     p.update(logic, 7)
-    assert p._countup_anim is None  # 归零后首帧直落，不做跨账号滚动
+    assert not p._countup_anims  # 归零后首帧直落，不做跨账号滚动
     assert t["summary_label"].text() == format_signed_money(300.0)[0]
     assert t["cash_summary_label"].text() == format_signed_money(99.0)[0]
     QTest.qWait(400)  # 若误触发动画，文本会被后续帧改写——等待后仍为终态
@@ -268,7 +275,7 @@ def test_animations_disabled_lands_terminal(presenter):
         p.update(logic, 7)
         logic._summary[7] = (2, 200.0)
         p.update(logic, 7)
-        assert p._countup_anim is None
+        assert not p._countup_anims
         assert t["summary_label"].text() == format_signed_money(200.0)[0]
     finally:
         motion.set_animations_enabled(True)
@@ -291,7 +298,7 @@ def test_inflight_anim_does_not_overwrite_data_insufficient(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)  # count-up 动画触发，未等待（在途）
-    assert p._countup_anim is not None
+    assert t["summary_label"] in p._countup_anims
 
     logic._summary[7] = (0, None)
     p.update(logic, 7)  # 数据不足直落
@@ -301,9 +308,10 @@ def test_inflight_anim_does_not_overwrite_data_insufficient(presenter):
 
 
 def test_inflight_anim_stopped_after_direct_landing(presenter):
-    """数据不足直落后，原动画对象已 Stopped 且槽引用仍指向该对象。
+    """数据不足直落后，entry 移除且原动画对象已 Stopped。
 
-    基线代码下直落不改写槽引用但也不停动画——state() 仍为 Running。
+    旧槽语义：直落不改写槽引用（旧引用保留）；per-tile 映射语义：直落
+    pop 旧动画并统一落终、entry 移除——成员关系与对象状态双双锁定。
     """
     from PySide6.QtCore import QAbstractAnimation
 
@@ -314,13 +322,13 @@ def test_inflight_anim_stopped_after_direct_landing(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)
-    anim_before = p._countup_anim
+    anim_before = p._countup_anims[t["summary_label"]]
     assert anim_before is not None
 
     logic._summary[7] = (0, None)
     p.update(logic, 7)  # 数据不足直落
-    assert p._countup_anim is anim_before  # 旧引用保留（未置 None）
-    assert anim_before.state() == QAbstractAnimation.State.Stopped  # 旧动画已停
+    assert t["summary_label"] not in p._countup_anims  # entry 已移除
+    assert anim_before.state() == QAbstractAnimation.State.Stopped  # 旧动画已落终
 
 
 def test_disable_animations_inflight_lands_terminal(presenter):
@@ -336,7 +344,7 @@ def test_disable_animations_inflight_lands_terminal(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 200.0)
     p.update(logic, 7)  # count-up 在途
-    assert p._countup_anim is not None
+    assert t["summary_label"] in p._countup_anims
 
     motion.set_animations_enabled(False)
     try:
@@ -378,14 +386,14 @@ def test_direct_landing_one_tile_keeps_other_tile_animation(presenter):
 
 
 def test_evicted_anim_lands_terminal_and_does_not_overwrite(presenter):
-    """F1：被顶出槽的动画优雅落终（Stopped），其磁贴直落终态不被残留帧覆盖。
+    """A1 新语义：双磁贴同帧动画互不截断、各自达终值；随后直落保持。
 
-    同帧双磁贴先后触发动画时，cash 动画分支把在途 summary 动画顶出槽——
-    基线代码下出槽动画未停继续跑帧，其后 summary 直落「数据不足」被残留帧
-    覆盖为 +¥500.00；修复后出槽动画落终（同步写终值、自动 Stopped），
-    直落终态保持。
+    旧槽语义：cash 动画分支启动时把在途 summary 动画顶出槽并同步截断至
+    终值（summary 文本立即跳 500.00）。per-tile 映射：两动画各自独立运行
+    ——立即两 entry 均 Running、无同步截断写；qWait 后双终值；随后
+    summary 直落「数据不足」不被残留帧覆盖（F1 回归保持）。
     """
-    from PySide6.QtCore import QAbstractAnimation, QVariantAnimation
+    from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
 
     p, labels = presenter
@@ -395,25 +403,29 @@ def test_evicted_anim_lands_terminal_and_does_not_overwrite(presenter):
     p.update(logic, 7)
     logic._summary[7] = (2, 500.0)
     logic._cash_summary[7] = (2, 200.0)
-    p.update(logic, 7)  # 双磁贴同帧先后触发动画：cash 分支顶出 summary 动画
-    # 出槽动画已优雅落终：同步写终值（E2 不冻结中间值）
+    p.update(logic, 7)  # 双磁贴同帧先后触发动画
+    # A1：两 entry 均 Running（无顶出截断），summary 文本仍为上一帧值
+    assert t["summary_label"] in p._countup_anims
+    assert t["cash_summary_label"] in p._countup_anims
+    assert (
+        p._countup_anims[t["summary_label"]].state()
+        == QAbstractAnimation.State.Running
+    )
+    assert (
+        p._countup_anims[t["cash_summary_label"]].state()
+        == QAbstractAnimation.State.Running
+    )
+    assert t["summary_label"].text() == format_signed_money(100.0)[0]
+
+    QTest.qWait(400)  # 两动画各自自然结束 → 双终值
     assert t["summary_label"].text() == format_signed_money(500.0)[0]
-    # 机制：出槽动画对象已 Stopped（presenter 防 GC 持有，可枚举）；
-    # 槽内 cash 动画仍在 Running
-    assert p._countup_anim.state() == QAbstractAnimation.State.Running
-    evicted = [
-        c
-        for c in p.children()
-        if isinstance(c, QVariantAnimation)
-        and c.state() == QAbstractAnimation.State.Stopped
-    ]
-    assert len(evicted) == 1
+    assert t["cash_summary_label"].text() == format_signed_money(200.0)[0]
 
     logic._summary[7] = (0, None)
     p.update(logic, 7)  # summary 直落「数据不足」
     assert t["summary_label"].text() == "数据不足"
     QTest.qWait(400)
-    assert t["summary_label"].text() == "数据不足"  # 基线：被 anim_s 残留帧覆盖
+    assert t["summary_label"].text() == "数据不足"  # 终态不被残留帧覆盖
     assert t["cash_summary_label"].text() == format_signed_money(200.0)[0]
 
 
@@ -447,4 +459,141 @@ def test_reset_without_update_no_crash(qapp):
     p = KpiPresenter(QLabel(), QLabel(), QLabel(), QLabel())
     p.reset()
     assert p._last_summary_total is None
-    assert p._countup_anim is None
+    assert not p._countup_anims
+
+
+# ── C4-债2：per-tile 独立动画槽（A1 根治 + 不变式）──
+
+
+def test_n1_concurrent_animations_do_not_interfere(presenter):
+    """N1：双磁贴同帧并发动画互不干扰——在途时无截断写，qWait 后双终值。"""
+    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 400.0)
+    logic._cash_summary[7] = (2, 300.0)
+    p.update(logic, 7)  # 双磁贴同帧先后触发动画
+
+    anim_s = p._countup_anims[t["summary_label"]]
+    anim_c = p._countup_anims[t["cash_summary_label"]]
+    assert anim_s.state() == QAbstractAnimation.State.Running
+    assert anim_c.state() == QAbstractAnimation.State.Running
+    # 无同步截断写：在途时两磁贴文本仍为上一帧值
+    assert t["summary_label"].text() == format_signed_money(100.0)[0]
+    assert t["cash_summary_label"].text() == format_signed_money(50.0)[0]
+
+    QTest.qWait(400)
+    assert t["summary_label"].text() == format_signed_money(400.0)[0]
+    assert t["cash_summary_label"].text() == format_signed_money(300.0)[0]
+
+
+def test_n2_retrigger_one_tile_keeps_other_inflight(presenter):
+    """N2：双在途时其一再触发动画，另一磁贴动画不受扰、各自达终值。
+
+    第二次落值只 pop 本磁贴 entry（summary 再触发绝不触碰 cash entry）；
+    cash 动画因自身再触发替换为新对象——qWait 后双磁贴各达自身终值
+    （旧共享槽下同帧再触发会把先入槽动画同步截断至其终值）。
+    """
+    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    logic._cash_summary[7] = (2, 150.0)
+    p.update(logic, 7)  # 双磁贴同帧并发动画
+    anim_c = p._countup_anims[t["cash_summary_label"]]
+    assert anim_c.state() == QAbstractAnimation.State.Running
+
+    logic._summary[7] = (2, 300.0)
+    logic._cash_summary[7] = (2, 250.0)
+    p.update(logic, 7)  # 双磁贴各自再触发（pop 落终 + 新动画接管）
+    anim_c2 = p._countup_anims[t["cash_summary_label"]]
+    assert anim_c2 is not anim_c  # cash 自己再触发替换（非被 summary 触碰）
+    assert anim_c.state() == QAbstractAnimation.State.Stopped  # 落终而非残留
+    assert anim_c2.state() == QAbstractAnimation.State.Running
+
+    QTest.qWait(400)
+    assert t["summary_label"].text() == format_signed_money(300.0)[0]
+    assert t["cash_summary_label"].text() == format_signed_money(250.0)[0]
+
+
+def test_n3_natural_end_keeps_stopped_entry(presenter):
+    """N3：动画自然结束后 entry 残留且 Stopped（Q2 定案：有界不清理）。"""
+    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtTest import QTest
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)
+    logic._summary[7] = (2, 200.0)
+    p.update(logic, 7)
+    anim = p._countup_anims[t["summary_label"]]
+    assert anim.state() == QAbstractAnimation.State.Running
+
+    QTest.qWait(400)  # 自然结束：最后一帧同步写终值，动画自动 Stopped
+    assert p._countup_anims[t["summary_label"]] is anim  # entry 残留
+    assert anim.state() == QAbstractAnimation.State.Stopped
+    assert t["summary_label"].text() == format_signed_money(200.0)[0]
+
+
+def test_n4_mixed_sequence_bounded_entries(presenter):
+    """N4：混合操作序列（触发/再触发/直落/动效关闭/reset）后 entry 数有界。
+
+    US-7 不变式：任意序列后 0 ≤ len(_countup_anims) ≤ 2——映射结构无
+    无界增长路径；update 是全量双磁贴渲染，未变化磁贴走同值直落移除
+    entry，残留 Stopped entry 在下次同磁贴落值 / reset 时回收。
+    """
+    from PySide6.QtTest import QTest
+
+    from app import motion
+
+    p, labels = presenter
+    t = _tiles(labels)
+    logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
+
+    p.update(logic, 7)  # ① 首帧直落（last=None）
+    assert len(p._countup_anims) == 0
+
+    logic._summary[7] = (2, 200.0)
+    logic._cash_summary[7] = (2, 150.0)
+    p.update(logic, 7)  # ② 双磁贴并发动画
+    assert len(p._countup_anims) == 2
+
+    logic._summary[7] = (2, 300.0)
+    logic._cash_summary[7] = (2, 250.0)
+    p.update(logic, 7)  # ③ 双磁贴各自再触发（pop 落终 + 替换，len 不变）
+    assert len(p._countup_anims) == 2
+
+    logic._cash_summary[7] = (0, None)
+    p.update(logic, 7)  # ④ cash 数据不足直落 + summary 同值直落：两 entry 移除
+    assert len(p._countup_anims) == 0
+    assert t["cash_summary_label"].text() == "数据不足"
+    QTest.qWait(400)  # 直落路径无在途动画残留
+    assert len(p._countup_anims) == 0
+
+    motion.set_animations_enabled(False)
+    try:
+        logic._summary[7] = (2, 400.0)
+        p.update(logic, 7)  # ⑤ 动效关闭：pop 落终 + 直落（animate_value 返回 None）
+        assert len(p._countup_anims) == 0
+        assert t["summary_label"].text() == format_signed_money(400.0)[0]
+    finally:
+        motion.set_animations_enabled(True)
+
+    p.reset()  # ⑥ reset：遍历 stop + 清空 + last 归 None
+    logic._summary[7] = (2, 500.0)
+    logic._cash_summary[7] = (2, 450.0)
+    p.update(logic, 7)  # 归零后首帧直落
+    assert len(p._countup_anims) == 0
+    assert len(p._countup_anims) <= 2  # 不变式上界

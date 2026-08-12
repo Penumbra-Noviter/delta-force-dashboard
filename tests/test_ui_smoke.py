@@ -291,7 +291,7 @@ def test_w01_kpi_countup(qapp):
     # 数值变化（100 → 200）→ 动画触发，结束后文本 == 新值格式化
     logic._total = 200.0
     presenter.update(logic, 7)
-    assert presenter._countup_anim is not None
+    assert label in presenter._countup_anims
     QTest.qWait(400)
     assert label.text() == format_signed_money(200.0)[0]
 
