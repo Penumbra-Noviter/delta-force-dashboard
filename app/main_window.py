@@ -85,10 +85,9 @@ if platform.system() == "Windows":
 def _kpi_signal(count: int, total: float | None, label: str, days: int) -> RateSignal:
     """KPI 磁贴信号的共享纯函数：经 format_window_text 取信号（AA-01）。
 
-    _update_summary 与 _apply_kpi_styles 两处都以「logic.summary(_view_n) →
-    format_window_text」重算 signal，此前各自内联同一段——抽取后信号判定
-    只有本函数一个入口（判定规则仍归 presentation.format_window_text），
-    消除 Divergent Change。纯函数：同输入必同输出，可安全双调用。
+    C4-02 后信号判定入口收敛于此：KpiPresenter 的 update / apply_theme_styles
+    均经本函数重算（判定规则仍归 presentation.format_window_text），
+    MainWindow 不再直算。纯函数：同输入必同输出，可安全双调用。
     """
     return format_window_text(count, total, label, days)[1]
 

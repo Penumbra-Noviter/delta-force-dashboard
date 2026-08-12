@@ -1,7 +1,7 @@
 # Delta Force Dashboard — Code Wiki
 
-> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K 系列 + L 系列全部完成）  
-> 生成日期：2026-08-08  
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次全部完成）  
+> 生成日期：2026-08-12  
 > 测试状态：<!--AUTO:tests_total:total-->561<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
@@ -18,7 +18,7 @@
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
 | 测试框架 | pytest（<!--AUTO:tests_total:total-->561<!--/AUTO--> 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）全部完成 |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）全部完成 |
 
 ---
 
@@ -162,7 +162,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~644 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~643 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
