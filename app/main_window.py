@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QGraphicsDropShadowEffect,
     QHBoxLayout,
     QInputDialog,
-    QLabel,
     QMainWindow,
     QMessageBox,
     QStackedWidget,
@@ -41,10 +40,10 @@ from app.theme import (
     get_color,
     set_theme,
     signal_color,
-    summary_style,
 )
 from app.dashboard_page import build_dashboard
-from app.motion import animate_value, set_animations_enabled
+from app.kpi_presenter import KpiPresenter
+from app.motion import set_animations_enabled
 from app.profit_page import ProfitPage
 from app.sidebar import Sidebar
 from app.ui_text import EMOJI
@@ -54,7 +53,6 @@ from calculator import DayRecord, ProfitCalculatorLogic
 from kkrb_client import KkrbClient
 from presentation import (
     format_saved_indicator,
-    format_signed_money,
     format_window_text,
 )
 from settings_store import (
@@ -133,9 +131,6 @@ class MainWindow(QMainWindow):
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
         self._view_n = VIEW_DAYS[0]
         self._pinned = False
-        # W-01：KPI count-up 的上一帧数值（None = 尚未渲染过/数据不足）
-        self._last_summary_total: float | None = None
-        self._last_cash_delta: float | None = None
 
         # C2-02：kkrb API 客户端注入 seam——None → 自建（生产唯一创建点）；
         # 注入 fake 后利润页两子模块共享同一实例（01 加锁保证并发安全）。
@@ -322,8 +317,7 @@ class MainWindow(QMainWindow):
         self.input_panel.cancel_reuse()
         # KPI count-up 上一帧归零：账号切换是数据源更换，数字直接落终态
         # （不做「旧账号数值滚动到新账号数值」的误导动画，Y-05 风险点）
-        self._last_summary_total = None
-        self._last_cash_delta = None
+        self._kpi_presenter.reset()
 
         self.refresh_display()
         self._update_account_title()
@@ -380,6 +374,13 @@ class MainWindow(QMainWindow):
         self._cash_summary_label = bundle.cash_summary_label
         self._cash_summary_caption = bundle.cash_summary_caption
         self._hint_label = bundle.hint_label
+        # C4 块 2：KPI 双磁贴渲染收敛到 KpiPresenter（count-up 状态/动画归它管）
+        self._kpi_presenter = KpiPresenter(
+            summary_label=bundle.summary_label,
+            summary_caption=bundle.summary_caption,
+            cash_summary_label=bundle.cash_summary_label,
+            cash_summary_caption=bundle.cash_summary_caption,
+        )
         dashboard = self._dashboard_page
         self._title_label = dashboard._title_label
         self._today_status_label = dashboard._today_status_label
@@ -507,19 +508,12 @@ class MainWindow(QMainWindow):
         self._apply_kpi_styles()
 
     def _apply_kpi_styles(self) -> None:
-        """重算两 KPI 磁贴的 signal 并重应用 summary_style（C1-08 E1）。
+        """重算两 KPI 磁贴的 signal 并重应用样式（C1-08 E1，委托 KpiPresenter）。
 
         纯内存读（logic.summary / cash_summary，零 I/O）；不动数值文本、
-        不触发 count-up 动画（不调用 _set_kpi_value）——主题切换只换色。
-        signal 经共享纯函数 _kpi_signal 计算（AA-01，与 _update_summary 同源）。
+        不触发 count-up 动画——主题切换只换色（presenter.apply_theme_styles）。
         """
-        count, total = self.logic.summary(self._view_n)
-        signal = _kpi_signal(count, total, "总盈亏", self._view_n)
-        self._summary_label.setStyleSheet(summary_style(signal))
-
-        cash_count, cash_delta = self.logic.cash_summary(self._view_n)
-        cash_signal = _kpi_signal(cash_count, cash_delta, "现金总变化", self._view_n)
-        self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
+        self._kpi_presenter.apply_theme_styles(self.logic, self._view_n)
 
     # ═══════════════════════════════════════════════════════
     # 置顶
@@ -760,72 +754,11 @@ class MainWindow(QMainWindow):
             self.logic.get_record(self.today) is None
         )
 
-    @staticmethod
-    def _split_kpi_text(text: str) -> tuple[str, str]:
-        """拆分汇总文本为 (说明, 数值)：`最近7条总盈亏：+¥41.0M` → 两段。
-
-        U-01 磁贴化：说明行（小字）与数值行（大字）分居两个 QLabel；
-        无分隔符时整体作说明，数值留空。
-        """
-        if "：" in text:
-            caption, value = text.split("：", 1)
-            return caption, value
-        return text, ""
-
     def _update_summary(self) -> None:
-        """读取 logic 的最近记录汇总，拆分为磁贴「说明 + 大数字」渲染。
+        """KPI 双磁贴全量渲染（说明 + 大数字 + count-up + 样式，委托 KpiPresenter）。
 
-        D-07：文本与信号由 format_summary / format_cash_summary 纯函数生成，
-        本方法只做信号→颜色映射与样式落地（颜色映射留 UI）。
-        signal 经共享纯函数 _kpi_signal 计算（AA-01，与 _apply_kpi_styles 同源；
-        文本仍直接取 format_window_text——纯函数双调用同输入必同输出）。
-        总盈亏（_summary_label）与现金总变化（_cash_summary_label）双磁贴，
-        同源 recent_records(_view_n)，随视图 7/30 联动。
-        W-01：数值变化时数字从旧值滚动到新值（count-up，300ms），
-        数据不足（total 为 None）或数值未变时直接落终态。
+        D-07 / W-01 语义归 presenter：文本与信号由 format_summary 纯函数生成、
+        数值变化时 count-up 滚动、数据不足直落终态；随视图 7/30 联动
+        （同源 recent_records(_view_n)）。
         """
-        count, total = self.logic.summary(self._view_n)
-        signal = _kpi_signal(count, total, "总盈亏", self._view_n)
-        text, _ = format_window_text(count, total, "总盈亏", self._view_n)
-        caption, value = self._split_kpi_text(text)
-        self._summary_caption.setText(caption)
-        self._set_kpi_value(self._summary_label, value, self._last_summary_total, total)
-        self._last_summary_total = total
-        self._summary_label.setStyleSheet(summary_style(signal))
-
-        cash_count, cash_delta = self.logic.cash_summary(self._view_n)
-        cash_signal = _kpi_signal(cash_count, cash_delta, "现金总变化", self._view_n)
-        cash_text, _ = format_window_text(
-            cash_count, cash_delta, "现金总变化", self._view_n
-        )
-        caption, value = self._split_kpi_text(cash_text)
-        self._cash_summary_caption.setText(caption)
-        self._set_kpi_value(
-            self._cash_summary_label, value, self._last_cash_delta, cash_delta
-        )
-        self._last_cash_delta = cash_delta
-        self._cash_summary_label.setStyleSheet(summary_style(cash_signal))
-
-    def _set_kpi_value(
-        self, label: QLabel, value: str, old: float | None, new: float | None
-    ) -> None:
-        """KPI 磁贴数字落值：数值变化时 count-up 滚动（W-01），否则直接设置。
-
-        动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致；
-        动画对象挂 MainWindow 防 GC，动画中重复触发会替换旧动画。
-        """
-        if (
-            old is not None
-            and new is not None
-            and old != new
-            and value != "数据不足"
-        ):
-            self._kpi_countup_anim = animate_value(
-                self,
-                old,
-                new,
-                lambda v: label.setText(format_signed_money(v)[0]),
-                duration_ms=300,
-            )
-        else:
-            label.setText(value)
+        self._kpi_presenter.update(self.logic, self._view_n)
