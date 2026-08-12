@@ -24,13 +24,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
-    QPushButton,
     QStackedWidget,
-    QVBoxLayout,
     QWidget,
 )
 
-from app.chart_widget import ChartWidget
 from account_store import AccountStore, validate_account_name
 from config import (
     DATA_DIR,
@@ -46,11 +43,9 @@ from app.theme import (
     signal_color,
     summary_style,
 )
-from app.input_panel import InputPanel
-from app.table_widget import TableWidget
+from app.dashboard_page import build_dashboard
 from app.motion import animate_value, set_animations_enabled
 from app.profit_page import ProfitPage
-from app.registry import AppWidget, WidgetRegistry
 from app.sidebar import Sidebar
 from app.ui_text import EMOJI
 from data_store import DataStore
@@ -100,59 +95,12 @@ def _kpi_signal(count: int, total: float | None, label: str, days: int) -> RateS
     return format_window_text(count, total, label, days)[1]
 
 
-class DashboardPage(QWidget):
-    """记账仪表盘页面（QStackedWidget Page 0）。
-
-    包含标题栏、日期标签、以及通过 WidgetRegistry 注册的所有输入/展示组件。
-    """
-
-    def __init__(self, registry: WidgetRegistry, main_window: MainWindow,
-                 today: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("dashboardPage")
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 24, 32, 16)
-        layout.setSpacing(0)
-
-        # 标题栏（简化版：只保留标题 + 今日未录入提醒）
-        title_bar = QWidget()
-        title_layout = QHBoxLayout(title_bar)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-
-        self._title_label = QLabel("Delta Force Dashboard")
-        self._title_label.setObjectName("titleLabel")
-        title_layout.addWidget(self._title_label)
-
-        self._today_status_label = QLabel("今日未录入")
-        self._today_status_label.setObjectName("todayStatusLabel")
-        title_layout.addWidget(self._today_status_label)
-
-        title_layout.addStretch()
-        layout.addWidget(title_bar)
-
-        # 日期
-        self._date_label = QLabel(today)
-        self._date_label.setObjectName("dateLabel")
-        # U-07：与标题同侧左对齐，消除「标题左、日期居中」的轴线错位
-        self._date_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
-        layout.addSpacing(4)
-        layout.addWidget(self._date_label)
-        layout.addSpacing(12)
-
-        # 注册的 widgets（输入面板、汇总条、表格、图表、提示栏）
-        registry.build_all(layout, main_window)
-
-
 class MainWindow(QMainWindow):
     """Delta Force Dashboard 主窗口。"""
 
     def __init__(self, store: DataStore | None = None,
                  logic: ProfitCalculatorLogic | None = None,
                  settings_store: SettingsStore | None = None,
-                 registry: WidgetRegistry | None = None,
                  account_store: AccountStore | None = None,
                  client: KkrbClient | None = None) -> None:
         super().__init__()
@@ -181,7 +129,6 @@ class MainWindow(QMainWindow):
             self.store = store or DataStore()
             self.logic = logic or ProfitCalculatorLogic(self.store.load())
 
-        self._registry = registry or self._default_registry()
         self.today = datetime.now().strftime(DATE_FORMAT)
         # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
         self._view_n = VIEW_DAYS[0]
@@ -199,7 +146,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
-        # C1-08：registry 组件已全部入树后收集主题刷新器并首次应用
+        # C1-08：仪表盘组件已全部入树后收集主题刷新器并首次应用
         # （E2：sidebar 首帧主题完整，不依赖首次切换）
         self._collect_theme_refreshers()
         self._apply_theme_refreshers()
@@ -423,8 +370,17 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
         root_layout.addWidget(self._stack, 1)
 
-        # ── Page 0：记账仪表盘 ──
-        dashboard = DashboardPage(self._registry, self, self.today)
+        # ── Page 0：记账仪表盘（C4 块 1：build_dashboard 直构装配）──
+        bundle = build_dashboard(self)
+        self.input_panel = bundle.input_panel
+        self.table = bundle.table
+        self.chart = bundle.chart
+        self._summary_label = bundle.summary_label
+        self._summary_caption = bundle.summary_caption
+        self._cash_summary_label = bundle.cash_summary_label
+        self._cash_summary_caption = bundle.cash_summary_caption
+        self._hint_label = bundle.hint_label
+        dashboard = self._dashboard_page
         self._title_label = dashboard._title_label
         self._today_status_label = dashboard._today_status_label
         self._date_label = dashboard._date_label
@@ -466,8 +422,7 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _connect_signals(self) -> None:
-        # Widget 信号（从 registry 连接）
-        self._registry.connect_all(self)
+        # 仪表盘组件信号已由 build_dashboard 显式连接（C4 块 1 直构）
 
         # 侧边栏按钮
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
@@ -874,130 +829,3 @@ class MainWindow(QMainWindow):
             )
         else:
             label.setText(value)
-
-    # ═══════════════════════════════════════════════════════
-    # 默认注册表
-    # ═══════════════════════════════════════════════════════
-
-    def _default_registry(self) -> WidgetRegistry:
-        """创建默认 widget 注册表（InputPanel + TableWidget + ChartWidget + 汇总 + 提示）。"""
-        registry = WidgetRegistry()
-
-        # ── InputPanel ──
-        input_panel = InputPanel()
-        self.input_panel = input_panel
-
-        # 顶部区域（U-01）：输入卡（左，限宽 520）+ KPI 磁贴卡（右，吃剩余空间）
-        top_bar = QWidget()
-        top_bar_layout = QHBoxLayout(top_bar)
-        top_bar_layout.setContentsMargins(0, 0, 0, 0)
-        top_bar_layout.setSpacing(12)
-
-        def setup_input(root_layout, mw):
-            card = mw._build_card()
-            card.setMaximumWidth(520)  # 限宽：宽窗口下输入框不再无限横向拉伸（U-01）
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(10, 8, 10, 8)
-            card_layout.addWidget(input_panel)
-            top_bar_layout.addWidget(card, 0)
-            root_layout.addWidget(top_bar)
-            root_layout.addSpacing(8)
-
-        def connect_input(mw):
-            input_panel.save_requested.connect(mw.save_today)
-            input_panel.cancel_requested.connect(mw._cancel_edit)
-            input_panel.reuse_requested.connect(mw._reuse_last_record)
-            input_panel.reuse_cancel_requested.connect(mw._cancel_reuse)
-
-        registry.register(AppWidget(input_panel, setup_input, connect_input))
-
-        # ── KPI 磁贴卡（总盈亏 / 现金总变化）──
-        # U-01：核心数字从裸 QLabel 升级为卡片磁贴——大数字（summary_style 22px
-        # 信号色）+ 小字说明（caption），与输入卡并排，成为页面的读数锚点。
-        self._summary_label = QLabel("")
-        self._summary_label.setObjectName("summaryLabel")
-        self._summary_label.setWordWrap(True)
-        self._summary_caption = QLabel("")
-        self._summary_caption.setObjectName("summaryCaption")
-
-        self._cash_summary_label = QLabel("")
-        self._cash_summary_label.setObjectName("cashSummaryLabel")
-        self._cash_summary_label.setWordWrap(True)
-        self._cash_summary_caption = QLabel("")
-        self._cash_summary_caption.setObjectName("cashSummaryCaption")
-
-        # KPI 卡片本体在 setup 时由 _build_card 创建（需要 mw）；
-        # widget 字段仅为 registry 契约占位，布局由 setup 回调决定。
-        kpi_card = QWidget()
-
-        def setup_summary(root_layout, mw):
-            kpi_card_real = mw._build_card()
-            kcl = QVBoxLayout(kpi_card_real)
-            kcl.setContentsMargins(14, 10, 14, 10)
-            kcl.setSpacing(6)
-            for caption, value in (
-                (self._summary_caption, self._summary_label),
-                (self._cash_summary_caption, self._cash_summary_label),
-            ):
-                tile = QVBoxLayout()
-                tile.setSpacing(2)
-                tile.addWidget(caption)
-                tile.addWidget(value)
-                kcl.addLayout(tile)
-            kcl.addStretch()
-            top_bar_layout.addWidget(kpi_card_real, 1)
-
-        registry.register(AppWidget(kpi_card, setup_summary, None))
-
-        # ── TableWidget ──
-        table = TableWidget()
-        self.table = table
-
-        def setup_table(root_layout, mw):
-            table_card = mw._build_card()
-            tcl = QVBoxLayout(table_card)
-            tcl.setContentsMargins(10, 8, 10, 8)
-            tcl.addWidget(table)
-            # 表格全量展示优先（H-01 语义，U-02 弹性翻转后用户实测回退）：
-            # 表格吃窗口增长空间，超高时 _DaySubTable 内部滚动仅作极端兜底
-            root_layout.addWidget(table_card, 1)
-            root_layout.addSpacing(8)
-
-        def connect_table(mw):
-            table.edit_requested.connect(mw._start_edit)
-            table.delete_requested.connect(mw._delete_record)
-            table.view_changed.connect(mw._on_view_changed)
-
-        registry.register(AppWidget(table, setup_table, connect_table))
-
-        # ── ChartWidget ──
-        chart = ChartWidget()
-        self.chart = chart
-
-        def setup_chart(root_layout, mw):
-            chart_card = mw._build_card()
-            ccl = QVBoxLayout(chart_card)
-            ccl.setContentsMargins(10, 8, 10, 8)
-            ccl.addWidget(chart)
-            # 折线图固定小卡片（H-01 语义）：不随窗口扩张，为表格全量展示让位；
-            # 高度区间按屏幕可用空间自适应（_window_preset，U-09 方案 A）
-            chart.setMinimumHeight(mw._chart_min_h)
-            chart.setMaximumHeight(mw._chart_max_h)
-            root_layout.addWidget(chart_card, 0)
-            root_layout.addSpacing(8)
-
-        registry.register(AppWidget(chart, setup_chart, None))
-
-        # ── 底部提示栏 ──
-        self._hint_label = QLabel(
-            "Enter 保存 ｜ Ctrl+A 全选 ｜ Esc 清空 ｜ "
-            "支持 K/M/B 后缀（如 1.5K = 1,500）"
-        )
-        self._hint_label.setObjectName("hintLabel")
-
-        def setup_hint(root_layout, mw):
-            root_layout.addWidget(self._hint_label)
-
-        registry.register(AppWidget(self._hint_label, setup_hint, None))
-
-        return registry
