@@ -8,6 +8,7 @@
 
 ## 滚动摘要（2026-08-12）
 
+- **C5 calculator 展示边界收敛完成（2026-08-12，kickoff 全自动档）**：`d718a3e`——export_csv 行比率改调单源 `presentation.format_rate(rate)[0]`（None 占位符保留）；删除孤儿 HTML 报告 `generate_report`/`export_html`/`_build_empty_report`（生产零调用，3 测试同删）；`+0.0%` 不一致随报告删除自然收敛（唯一出现点在被删报告内）；新增 AST 守卫 3 测试（calculator 内禁比率 f-string 字面量，防 `f"{rate:8.1f}%"` 宽度变体）；calculator.py 579→412 行（−167），覆盖率 91%→93%（stmt −43）；**556/556**；import_csv 注释更新为「兼容历史导出的可视化格式」
 - **C4 MainWindow 编排收敛完成（2026-08-12，kickoff 全自动档，基线 98b2ee1）**：C4-01 `f53a1ea` widget 装配抽离——新 `app/dashboard_page.py`（DashboardBundle 8 成员 + build_dashboard 直构，信号显式连接零 registry 回调），main_window 删 `_default_registry`/`DashboardPage`/`connect_all`/registry 参数（1002→831 行，dashboard_page 覆盖 100%）；C4-02 `0ed4f76` KPI 渲染收敛——新 `app/kpi_presenter.py`（KpiPresenter 三出口 update/apply_theme_styles/reset，QObject 继承承载动画 parent，_kpi_signal 调用期延迟解析规避循环 import，reset 比旧行为更严格：终止在途动画防跨账号残留帧），main_window 831→764 行（kpi_presenter 覆盖 100%）；C4-03 波末文档批次（CODE_WIKI 4.18/4.19 + 结构图 + 主题契约叙述 + doc_sync 171 标记）；AA-01 测试源锁定目标随 signal 计算点收敛移向 KpiPresenter（语义 1:1 保留，已记录偏差）；merge `…` **556/556**；过程注记：主分支 merge 首次被 pre-commit（doc_sync 漂移）与 ort 引擎部分写入残留拦截，还原残留后以空 hooks merge 成功——波末文档批次机制不变，merge 钩子由波末刷新后恢复
 - **打包 + 发布（2026-08-12，基线 `7cab13c`）**：残留修复版重新打包（onedir 67M，offscreen 烟测 EXE ALIVE 8s 无崩溃 dump）；GitHub release（tag `default`）资产替换为 `default.zip`（43.5M，旧 asset 删除 204），release body 补基线/修复说明
 
