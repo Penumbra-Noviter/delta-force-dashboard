@@ -24,7 +24,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| （技术债区当前为空——C4-债3 已归档见下） |  |  |  |  |
+| C4-债4 | chart_widget 曲线绘制动画对象泄漏：`_play_draw_anim`（app/chart_widget.py，`animate_property` 创建）每次 `draw()`（含 `_update_data` 高频路径）无 stop 覆盖 `_draw_anim`，旧动画（KeepWhenStopped、parent=ChartWidget）无界累积——与 C4-债3 同款「对象有界」债（Grilling 实测），泄漏速率低于 KPI 但同类；修复方向：`_play_draw_anim` 启动前 stop 旧动画（同 fade_in_widget 反竞态模式）+ deleteLater/DeleteWhenStopped | C4-债3 批次 Grilling 实测 + DEV_LOG 认知 | 🟡 Worth exploring | 📝 |
 
 ---
 
