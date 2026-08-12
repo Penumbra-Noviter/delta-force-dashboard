@@ -24,7 +24,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C4-债4 | chart_widget 曲线绘制动画对象泄漏：`_play_draw_anim`（app/chart_widget.py，`animate_property` 创建）每次 `draw()`（含 `_update_data` 高频路径）无 stop 覆盖 `_draw_anim`，旧动画（KeepWhenStopped、parent=ChartWidget）无界累积——与 C4-债3 同款「对象有界」债（Grilling 实测），泄漏速率低于 KPI 但同类；修复方向：`_play_draw_anim` 启动前 stop 旧动画（同 fade_in_widget 反竞态模式）+ deleteLater/DeleteWhenStopped | C4-债3 批次 Grilling 实测 + DEV_LOG 认知 | 🟡 Worth exploring | 📝 |
+| C4-债5 | 图表动画生命周期后续观察（⚪ 条件性）：① 动画生命周期收敛模式（stop 旧 + finished→identity→deleteLater）第三份拷贝（fade_in_widget / kpi_presenter / chart_widget）——若出现第 4 实例（如 hover/export 类动画）应抽 motion.py 共享 helper（现在抽是 Speculative）；② `_clear_all` 不停止在途揭示动画（依赖 ≤200ms 自然回收 + 闭包 None 检查，F5 实证无残留无崩溃）——可选加固：stop + 句柄复位使语义即时 | C4-债4 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
 
 ---
 
@@ -307,6 +307,7 @@
 | C4-债1 | KPI 动画竞态修复（per-label 分槽 + 出槽动画优雅落终，回归 5 用例覆盖 100%） | ✅ 2026-08-12 | `e26f1a6` + `cc937c9`（merge `2a66972`/`8ba15eb`） |
 | C4-债2 | KPI 动画结构性根治（per-tile 独立动画槽 `_countup_anims: dict[QLabel, ...]`，A1 顶出截断消除 + A2 Data Clump 消解 + S1 引用比较随 dict 身份寻址消失；测试 20→24，kpi_presenter 覆盖 100%） | ✅ 2026-08-12 | `2448053`（merge `0edcaa7`） |
 | C4-债3 | KPI 动画对象生命周期收敛（finished→identity pop + deleteLater，weakref 闭包破引用环，reset 显式回收；测试 24→26，kpi_presenter 覆盖 99%） | ✅ 2026-08-12 | `32adbe1`（merge `9728af2`） |
+| C4-债4 | chart 绘制动画生命周期收敛（stop 旧动画防竞态 + finished→deleteLater 回收，chart 单文件闭环；测试 96→99，反证锚点 16 残留/2 Running 红验证） | ✅ 2026-08-12 | `044d926`（merge `f1a3671`） |
 
 ### C7（2026-08-12，kickoff 全自动档）
 
