@@ -410,6 +410,102 @@ def test_u06_motion_feedback(sample_window):
     assert box.property("_fade_anim") is None
 
 
+def test_u06_draw_anim_bounded_lifecycle(sample_window):
+    """C4-债4 AC-1：15 次连续 draw → qWait(400) → chart 零 QVariantAnimation 残留。
+
+    旧实现每次 draw 覆盖 _draw_anim 不回收旧动画，16 次 draw 残留 16 个动画
+    子对象（反证锚点）；修复后 stop + deleteLater + finished 自回收，归零。
+    必须按 QVariantAnimation 类型过滤——chart 有 PlotWidget 等常驻子控件。
+    """
+    from PySide6.QtCore import QVariantAnimation
+    from PySide6.QtTest import QTest
+
+    from app.chart_widget import ChartWidget
+
+    win = sample_window
+    records = win.logic.recent_records(7)
+    # 用全新 ChartWidget：MainWindow 构造期已 draw 过一次（旧实现遗留永不
+    # 回收），计数锚点（16 / 2）须在无历史残留的 chart 上复现，且不随构造
+    # 时机漂移
+    chart = ChartWidget()
+    chart.draw(records)
+    for _ in range(15):
+        chart.draw(records)
+    QTest.qWait(400)
+    assert sum(
+        isinstance(c, QVariantAnimation) for c in chart.children()
+    ) == 0
+    # U-5：动画自然结束后句柄复位 None（不再残留 Stopped 动画引用）
+    assert chart._draw_anim is None
+
+
+def test_u06_draw_anim_race_single_running(sample_window):
+    """C4-债4 AC-2：动画半程二次 draw → 立即 Running 动画数 == 1。
+
+    旧实现旧动画不 stop，二次 draw 后同目标两条动画竞争写 opacity
+    （可见 0.88→0.20 抖动）；修复后旧动画被 stop（零帧零 finished），
+    只余新动画 Running（现状=2、修复=1，不依赖采样时序）。
+    """
+    from PySide6.QtCore import QAbstractAnimation, QVariantAnimation
+    from PySide6.QtTest import QTest
+
+    from app.chart_widget import ChartWidget
+
+    win = sample_window
+    records = win.logic.recent_records(7)
+    chart = ChartWidget()  # 同 AC-1：全新 chart 复现锚点，不随构造时机漂移
+    chart.draw(records)
+    QTest.qWait(100)  # 动画半程（200ms 时长）
+    chart.draw(records)
+    running = sum(
+        isinstance(c, QVariantAnimation)
+        and c.state() == QAbstractAnimation.State.Running
+        for c in chart.children()
+    )
+    assert running == 1
+    # 排水等待：断言已完成，qWait 让在途动画自然结束、deleteLater 全部处理，
+    # 避免 chart 局部变量随测试结束被 Python GC 时残留待删动画子对象
+    # （PySide6 会延迟双重删除导致后续事件循环 abort）
+    QTest.qWait(400)
+
+
+def test_u06_draw_anim_final_state_and_switch_off(sample_window):
+    """C4-债4 AC-3/AC-4：动画结束 opacity==1.0；关闭动效时零动画对象 + 句柄 None。
+
+    AC-4 用全新 ChartWidget 验证——sample_window 的 chart 在 MainWindow 构造期
+    已被 draw 过（旧实现遗留动画永不回收），「无动画对象」须在无历史残留的
+    chart 上断言才能证明该次 draw 本身零产生。
+    """
+    from PySide6.QtCore import QVariantAnimation
+    from PySide6.QtTest import QTest
+
+    from app import motion
+    from app.chart_widget import ChartWidget
+
+    win = sample_window
+    records = win.logic.recent_records(7)
+
+    # AC-4：全局动效关闭 → draw 仍立即完整显示，零动画对象、句柄 None
+    chart = ChartWidget()
+    motion.set_animations_enabled(False)
+    try:
+        chart.draw(records)
+        assert chart._draw_anim is None
+        assert sum(
+            isinstance(c, QVariantAnimation) for c in chart.children()
+        ) == 0
+        if chart._warehouse_curve is not None:
+            assert chart._warehouse_curve.opacity() == 1.0
+    finally:
+        motion.set_animations_enabled(True)
+
+    # AC-3：启用路径动画结束 → opacity 归 1（0→1 揭示 200ms 语义不变）
+    win.chart.draw(records)
+    QTest.qWait(400)
+    if win.chart._warehouse_curve is not None:
+        assert win.chart._warehouse_curve.opacity() == 1.0
+
+
 def test_u06_motion_global_switch(qapp):
     """U-06：全局动效开关关闭时 fade_in 不设 effect、属性动画直接落终态。"""
     from PySide6.QtWidgets import QFrame

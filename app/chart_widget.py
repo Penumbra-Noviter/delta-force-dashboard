@@ -269,8 +269,17 @@ class ChartWidget(QWidget):
     _DRAW_ANIM_MS = 200
 
     def _play_draw_anim(self) -> None:
+        # C4-债4：启动新动画前 stop + deleteLater 旧动画。stop 零帧零 finished
+        # ——旧动画残帧不再写 opacity（防同目标竞态抖动），也不会触发旧动画的
+        # finished 去干扰新动画句柄；deleteLater 防旧动画对象无界累积。
+        # _draw_anim 是寻址句柄（防 GC 由 animate_property 的 C++ parent 承担），
+        # __init__ 未初始化该属性，读取需 getattr 兜底。
         if self._warehouse_curve is None or self._cash_curve is None:
             return
+        old = getattr(self, "_draw_anim", None)
+        if old is not None:
+            old.stop()
+            old.deleteLater()
 
         def set_opacity(v: float) -> None:
             if self._warehouse_curve is not None:
@@ -279,9 +288,19 @@ class ChartWidget(QWidget):
                 self._cash_curve.setOpacity(v)
 
         set_opacity(0.0)
-        self._draw_anim = animate_property(
-            self, set_opacity, duration_ms=self._DRAW_ANIM_MS
-        )
+        anim = animate_property(self, set_opacity, duration_ms=self._DRAW_ANIM_MS)
+        self._draw_anim = anim
+        if anim is None:  # 动画关闭路径：animate_property 直接落终态返回 None
+            return
+
+        def on_finished(a=anim):
+            # identity 检查：防旧动画（被 stop 后不再触发 finished）迟到清理
+            # 误清新动画句柄；动画自然结束后自回收。
+            if self._draw_anim is a:
+                self._draw_anim = None
+            a.deleteLater()
+
+        anim.finished.connect(on_finished)
 
     def _create(self, x, warehouse_vals, cash_vals, dates) -> None:
         """从零创建 PlotWidget + 双 ViewBox + 全部子元素。"""
