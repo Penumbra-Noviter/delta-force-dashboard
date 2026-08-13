@@ -222,6 +222,8 @@ Delta Force Dashboard/
 | <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusInEvent-->`focusInEvent(event)`<!--/AUTO--> | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
 | <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusOutEvent-->`focusOutEvent(event)`<!--/AUTO--> | 失焦时格式化：`1234.56` → `¥1,234.56` |
 
+**非法输入抖动（W-02 + C4-债5）**：`_shake` 在状态从非 invalid 变 invalid 时触发 150ms 水平平移反馈（防抖：连续非法不重复；动效关闭直接跳过）；动画对象生命周期——`DeleteWhenStopped` 自删（防子对象无界累积）+ `finished` 回调清 `_shake_anim` 句柄（DWS 后指针悬空防访问已删对象）+ 闭包 `weakref.ref(self)` 破环（C4-债5 实测：强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩 → access violation，C4-债3 同款定案）。
+
 **信号**：`validity_changed(bool)`
 
 #### 类：`InputPanel(QWidget)`
@@ -326,9 +328,9 @@ MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均�
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._setup_context_menu-->`_setup_context_menu()`<!--/AUTO--> | 为 PlotWidget 绑定右键菜单（导出 PNG） |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget._show_context_menu-->`_show_context_menu(pos)`<!--/AUTO--> | 在指定位置弹出右键菜单 |
 | <!--AUTO:sig:app/chart_widget.py:ChartWidget.export_png-->`export_png()`<!--/AUTO--> | 导出当前图表为 PNG 文件 |
-| <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_all-->`_clear_all()`<!--/AUTO--> | 销毁图表及占位组件 |
+| <!--AUTO:sig:app/chart_widget.py:ChartWidget._clear_all-->`_clear_all()`<!--/AUTO--> | 销毁图表及占位组件；**C4-债5**：停止在途绘制动画（`stop()` 零帧零 finished + `deleteLater()` 回收 + `_draw_anim` 句柄复位，`getattr` 兜底未初始化）——不再依赖 ≤200ms 自然回收，语义即时 |
 
-**绘制揭示动画生命周期（C4-债4）**：`_play_draw_anim` 每次数据更新以 0→1 opacity 揭示曲线（200ms，U-06 feedback-only）——启动新动画前 `stop()` 旧动画（防同目标 opacity 残帧竞态：旧实现 0.88→0.20 抖动可见 bug）+ `deleteLater()`（防 KeepWhenStopped 对象无界累积）；新动画挂 `finished` 回调（identity 检查 `self._draw_anim is a` 清句柄 + `deleteLater`）；`_draw_anim` 为寻址句柄（防 GC 由 C++ parent 承担）；`anim is None` 判空覆盖动效关闭路径；`getattr` 兜底 `__init__` 未初始化。
+**绘制揭示动画生命周期（C4-债4 + C4-债5）**：`_play_draw_anim` 每次数据更新以 0→1 opacity 揭示曲线（200ms，U-06 feedback-only）——启动新动画前 `stop()` 旧动画（防同目标 opacity 残帧竞态：旧实现 0.88→0.20 抖动可见 bug）+ `deleteLater()`（防 KeepWhenStopped 对象无界累积）；新动画挂 `finished` 回调（identity 检查 `self._draw_anim is a` 清句柄 + `deleteLater`）；`_draw_anim` 为寻址句柄（防 GC 由 C++ parent 承担）；`anim is None` 判空覆盖动效关闭路径；`getattr` 兜底 `__init__` 未初始化；**C4-债5**：`_clear_all` 同步停止在途动画（stop + deleteLater + 句柄复位，stop 不发 finished → 手动复位无竞争）。
 
 **图表结构**：
 
