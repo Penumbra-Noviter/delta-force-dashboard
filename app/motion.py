@@ -65,6 +65,12 @@ def fade_in_widget(
     C4-债6：finished 闭包 weakref 破环 + stop 后同步清 property（对齐
     C4-债3/5 生命周期收敛定案，防 DWS 残留窗口与在途销毁崩溃路径）。
     """
+    # C4-债9：duration<=0 护栏——QPropertyAnimation duration=0 时 start 即
+    # Stopped、finished 不触发，DWS 已删 C++ 对象但 _fade_anim property
+    # 残留悬空 wrapper，对返回值调任何方法 → access violation（Falsify
+    # 实测进程 abort）；钳到 1ms 保证走正常「Running → finished → 清理」路径。
+    duration_ms = max(1, duration_ms)
+
     if not _animations_enabled:
         return None
 

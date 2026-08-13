@@ -440,6 +440,45 @@ def test_u06_fade_in_widget_consecutive_contract(qapp):
         motion.set_animations_enabled(prev)
 
 
+def test_u06_fade_in_widget_zero_duration_guard(qapp):
+    """C4-债9：fade_in_widget duration_ms<=0 护栏（反证锚点 0 + Falsify 负值边界）。
+
+    修复前 duration_ms 直接透传 setDuration：duration=0 时 QPropertyAnimation
+    start 即 Stopped、finished 不触发，DWS 已删 C++ 对象但 _fade_anim property
+    残留悬空 wrapper——对返回值调任何方法抛 RuntimeError（红）；max(1, ...)
+    护栏后返回有效动画对象，排水后 property/graphicsEffect 收敛 None 无崩溃
+    （绿）。时长 1ms 的动画极快自然结束，不断言具体状态值，只断言语义
+    「有效动画 + 最终收敛」。
+    """
+    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QFrame
+
+    from app import motion
+    from app.motion import fade_in_widget
+
+    prev = motion.animations_enabled()
+    motion.set_animations_enabled(True)
+    try:
+        for duration in (0, -1):
+            box = QFrame()
+            anim = fade_in_widget(box, duration_ms=duration)
+            # 修复前此行抛 RuntimeError（start 即 Stopped + finished 不触发 +
+            # DWS 已删 C++ 对象）；护栏后为有效动画（启动瞬间 Running/Stopped
+            # 均合法，不按时序断言）
+            assert anim is not None
+            assert anim.state() in (
+                QAbstractAnimation.State.Running,
+                QAbstractAnimation.State.Stopped,
+            )
+            assert box.property("_fade_anim") is not None
+            QTest.qWait(200)  # 排水：1ms 动画极快自然结束 + DWS 自删 + finished 清理
+            assert box.property("_fade_anim") is None
+            assert box.graphicsEffect() is None
+    finally:
+        motion.set_animations_enabled(prev)
+
+
 def test_u06_draw_anim_bounded_lifecycle(sample_window):
     """C4-债4 AC-1：15 次连续 draw → qWait(400) → chart 零 QVariantAnimation 残留。
 
