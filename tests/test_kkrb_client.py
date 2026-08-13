@@ -18,6 +18,7 @@ import pytest
 
 from kkrb_client import (
     AmmoPackageItem,
+    BonusDoorItem,
     CraftingProduct,
     KkrbClient,
     KkrbError,
@@ -47,6 +48,20 @@ class TestDataModels:
         assert item.single_price == 555
         assert item.total_price == 111000
         assert item.profit == 98790
+
+    def test_bonus_door_item_frozen(self) -> None:
+        """BonusDoorItem：全 str 字段 + frozen（BD-01，密码门数据层）。"""
+        from dataclasses import FrozenInstanceError
+
+        item = BonusDoorItem(
+            key="db", name="零号大坝", password="870140", updated="20260813000000"
+        )
+        assert item.key == "db"
+        assert item.name == "零号大坝"
+        assert item.password == "870140"
+        assert item.updated == "20260813000000"
+        with pytest.raises(FrozenInstanceError):
+            item.password = "000000"  # type: ignore[misc]
 
 
 class TestKkrbClient:
@@ -93,6 +108,55 @@ class TestKkrbClient:
         with pytest.raises(KkrbError):
             client.fetch_ov_data()
 
+    def test_fetch_bonus_door_data_excludes_az3r6(self, monkeypatch) -> None:
+        """BD-01：fetch_bonus_door_data 走 _BONUS_DOOR_ENDPOINT，单点剔除 az3r6。
+
+        7 张图全量传入 → 返回 6 项（az3r6 被剔除），字段完整、端点 URL 正确。
+        """
+        calls: list[str] = []
+        payload = {
+            "code": 1,
+            "data": {
+                "db": {"password": "870140", "updated": "20260813000000"},
+                "cgxg": {"password": "123456", "updated": "20260813000000"},
+                "bks": {"password": "654321", "updated": "20260813000000"},
+                "htjd": {"password": "135790", "updated": "20260813000000"},
+                "cxjy": {"password": "888888", "updated": "20260813000000"},
+                "az3": {"password": "246810", "updated": "20260813000000"},
+                "az3r6": {"password": "000000", "updated": "20260813000000"},
+            },
+        }
+
+        def fake_post_json(self, url: str):
+            calls.append(url)
+            return payload
+
+        monkeypatch.setattr(KkrbClient, "_post_json", fake_post_json)
+        client = KkrbClient()
+        items = client.fetch_bonus_door_data()
+
+        assert calls == ["https://www.kkrb.net/getBonusDoorData"]
+        assert len(items) == 6
+        assert "az3r6" not in {i.key for i in items}
+        assert {i.key for i in items} == {
+            "db", "cgxg", "bks", "htjd", "cxjy", "az3",
+        }
+        by_key = {i.key: i for i in items}
+        assert by_key["db"].name == "零号大坝"
+        assert by_key["db"].password == "870140"
+        assert by_key["db"].updated == "20260813000000"
+
+    def test_fetch_bonus_door_data_network_error_raises(self, monkeypatch) -> None:
+        """BD-01：网络/解析错误 → KkrbError 传播（不静默）。"""
+
+        def fake_post_json(self, url: str):
+            raise KkrbError("POST 失败")
+
+        monkeypatch.setattr(KkrbClient, "_post_json", fake_post_json)
+        client = KkrbClient()
+        with pytest.raises(KkrbError, match="POST"):
+            client.fetch_bonus_door_data()
+
 
 # ── 传输层 fake（fake opener 注入）──────────────────────
 
@@ -127,6 +191,19 @@ _AMMO_PAYLOAD = {
                 "profit": 98790,
             }
         ]
+    },
+}
+_BONUS_DOOR_URL = "https://www.kkrb.net/getBonusDoorData"
+_BONUS_DOOR_PAYLOAD = {
+    "code": 1,
+    "data": {
+        "db": {"password": "870140", "updated": "20260813000000"},
+        "cgxg": {"password": "123456", "updated": "20260813000000"},
+        "bks": {"password": "654321", "updated": "20260813000000"},
+        "htjd": {"password": "135790", "updated": "20260813000000"},
+        "cxjy": {"password": "888888", "updated": "20260813000000"},
+        "az3": {"password": "246810", "updated": "20260813000000"},
+        "az3r6": {"password": "000000", "updated": "20260813000000"},
     },
 }
 
@@ -453,6 +530,24 @@ class TestEndToEnd:
         )
         with pytest.raises(KkrbError):
             client.fetch_ammo_package_data()
+
+    def test_fetch_bonus_door_data_full_transport(self, transport_client) -> None:
+        """BD-01：真实传输链路（握手 + POST getBonusDoorData）→ 6 项（az3r6 剔除）。"""
+        client, opener = transport_client(
+            [b"home", b"menu", json.dumps(_BONUS_DOOR_PAYLOAD).encode()]
+        )
+        items = client.fetch_bonus_door_data()
+        assert len(items) == 6
+        assert "az3r6" not in {i.key for i in items}
+        assert items[0].name == "零号大坝"
+        assert items[0].password == "870140"
+        assert len(opener.requests) == 3  # 首页 + getMenu + POST
+
+    def test_fetch_bonus_door_data_transport_error(self, transport_client) -> None:
+        """BD-01：密码门端点传输失败 → KkrbError 传播。"""
+        client, _ = transport_client([b"home", b"menu", OSError("timeout")])
+        with pytest.raises(KkrbError, match="POST"):
+            client.fetch_bonus_door_data()
 
 
 class TestConcurrency:

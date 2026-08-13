@@ -10,7 +10,12 @@ from __future__ import annotations
 import pytest
 
 from kkrb_models import KkrbError
-from kkrb_parsing import _int_or_zero, parse_ammo_package_response, parse_ov_response
+from kkrb_parsing import (
+    _int_or_zero,
+    parse_ammo_package_response,
+    parse_bonus_door_response,
+    parse_ov_response,
+)
 
 
 class TestIntOrZero:
@@ -377,3 +382,96 @@ class TestParseAmmoPackageResponse:
             {"data": {"cn": [{"profit": "abc"}]}}
         )
         assert items[0].profit == 0
+
+
+class TestParseBonusDoorResponse:
+    """解析 getBonusDoorData 响应测试（BD-01，密码门数据层）。
+
+    响应格式（§5.1 实测）：{code:1, data:{<key>:{password, updated, overridden}}}。
+    输出按 BONUS_DOOR_NAMES 定义顺序（稳定顺序）；映射外键跳过——
+    kkrb 新增地图需扩展 BONUS_DOOR_NAMES 映射（docstring 契约）。
+    """
+
+    def test_parse_valid_all_maps(self) -> None:
+        """7 张图全量：按映射定义顺序输出，地图名/密码/更新时间完整。"""
+        from kkrb_models import BONUS_DOOR_NAMES
+
+        data = {
+            "code": 1,
+            "data": {
+                # 故意乱序传入：输出必须按 BONUS_DOOR_NAMES 定义顺序
+                "cxjy": {"password": "888888", "updated": "20260813000000"},
+                "db": {"password": "870140", "updated": "20260813000000"},
+                "az3r6": {"password": "000000", "updated": "20260813000000"},
+                "bks": {"password": "654321", "updated": "20260813000000"},
+                "htjd": {"password": "135790", "updated": "20260813000000"},
+                "cgxg": {"password": "123456", "updated": "20260813000000"},
+                "az3": {"password": "246810", "updated": "20260813000000"},
+            },
+        }
+        items = parse_bonus_door_response(data)
+        assert len(items) == 7
+        # 稳定顺序 = BONUS_DOOR_NAMES 定义顺序
+        assert [i.key for i in items] == list(BONUS_DOOR_NAMES)
+        # 地图名来自映射单源
+        for item in items:
+            assert item.name == BONUS_DOOR_NAMES[item.key]
+        assert items[0].name == "零号大坝"
+        assert items[0].password == "870140"
+        assert items[0].updated == "20260813000000"
+
+    def test_parse_missing_data_key(self) -> None:
+        assert parse_bonus_door_response({}) == []
+
+    def test_parse_data_not_dict(self) -> None:
+        """data 字段不是 dict → 空列表（不回退、不抛）。"""
+        assert parse_bonus_door_response({"code": 1, "data": "oops"}) == []
+
+    def test_parse_malformed_top_level(self) -> None:
+        with pytest.raises(KkrbError):
+            parse_bonus_door_response("not a dict")
+
+    def test_parse_entry_not_dict(self) -> None:
+        """畸形条目跳过，合法条目保留。"""
+        data = {
+            "data": {
+                "db": "not a dict",
+                "cgxg": {"password": "123456", "updated": "20260813000000"},
+            }
+        }
+        items = parse_bonus_door_response(data)
+        assert len(items) == 1
+        assert items[0].key == "cgxg"
+
+    def test_parse_unknown_key_skipped(self) -> None:
+        """映射外键跳过（kkrb 新增图需扩展 BONUS_DOOR_NAMES）。"""
+        data = {
+            "data": {
+                "db": {"password": "870140", "updated": "20260813000000"},
+                "new_map": {"password": "111111", "updated": "20260813000000"},
+            }
+        }
+        items = parse_bonus_door_response(data)
+        assert [i.key for i in items] == ["db"]
+
+    def test_parse_missing_fields_default(self) -> None:
+        """password/updated 缺省 → 空串兜底，不抛。"""
+        items = parse_bonus_door_response({"data": {"db": {}}})
+        assert len(items) == 1
+        assert items[0].password == ""
+        assert items[0].updated == ""
+
+    def test_parse_none_fields_default(self) -> None:
+        """password/updated 为 None → 空串兜底（str() 不产生 'None'）。"""
+        items = parse_bonus_door_response(
+            {"data": {"db": {"password": None, "updated": None}}}
+        )
+        assert items[0].password == ""
+        assert items[0].updated == ""
+
+    def test_parse_az3r6_included_by_parsing(self) -> None:
+        """解析层不剔除 az3r6——排除是 client 层单点过滤（fetch_bonus_door_data）。"""
+        items = parse_bonus_door_response(
+            {"data": {"az3r6": {"password": "000000", "updated": ""}}}
+        )
+        assert [i.key for i in items] == ["az3r6"]
