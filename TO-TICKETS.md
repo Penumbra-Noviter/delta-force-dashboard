@@ -21,13 +21,11 @@
 ## 技术债区
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
+>
+> **技术债区（2026-08-13）：当前为空——C4-债1~12 批次已全部消费归档。**
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C4-债9 | fade_in_widget `duration_ms<=0` 无护栏（motion.py:52）：duration=0 时 QPropertyAnimation start 即 Stopped、finished 不触发、DWS 已删 C++ 对象但 `_fade_anim` property 残留悬空 wrapper——对返回值调任何方法 → `RuntimeError: Internal C++ object already deleted`（Falsify 实测）；C4-债6「读路径要么 None 要么有效动画」不变式在此路径不成立（修复只覆盖 stop() 路径）；当前无调用方传 0（默认 150/180），isinstance 侥幸缓解——修复方向：`max(1, duration_ms)` 护栏或启动前校验 | C4-债6/7/8 批次期末四轴（Falsify） | ⚪ Speculative | 📝 |
-| C4-债10 | identity 守卫惯用法 4 处重复（chart_widget on_finished / kpi_presenter / _shake / fade_in_widget 债6）——模式族一致性系文档化定案可接受；**第 5 处出现时**提取共享助手（如 motion 内 `current_anim_guard`）控一致性成本 | C4-债6/7/8 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
-| C4-债11 | `_saved_indicator_anim`（input_panel.py:402）为只写句柄——写入从不读取，GC 实由 C++ 父链 + 债6 property 承担，冗余可删（改动前既有） | C4-债6/7/8 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
-| C4-债12 | test_w02_shake_identity_guard 中间断言时序余量仅 20ms（anim2 断言时剩 20ms；Windows 定时器粒度 ~15.6ms，10/10 本地稳定但高负载有偶发 flake 风险）——修复方向：补 `anim2.state() == Running` 辅助断言加固 | C4-债6/7/8 批次期末四轴（Falsify 观察） | ⚪ Speculative | 📝 |
 
 ---
 
@@ -302,6 +300,15 @@
 ---
 
 ## 已完成归档
+
+### 技术债批次 C4-债9/11/12（2026-08-13，kickoff 轻量档全自动，基线 f70347d）+ C4-债10 复核关闭
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| C4-债9 | fade_in_widget duration 护栏——`max(1, duration_ms)`（duration=0 时 start 即 Stopped、finished 不触发 → property 残留悬空 wrapper，Falsify 实测比预测更硬：调返回值方法 access violation 致 pytest 进程 abort）；反证测试真红真绿（state() 触碰悬空 wrapper）+ 契约断言（非 None + property 收敛 + effect None）；评审微修 docstring 补钳制语义 | ✅ 2026-08-13 | `23817ff`（merge `6d0b1a7`）+ `92a06ce` |
+| C4-债10 | identity 守卫惯用法提取候选——复核关闭（grep：显式 identity 比较恰 3 处 chart_widget:299/input_panel:116/kpi_presenter:263 + fade property 清理集中 motion，「第 5 实例」触发条件未成立） | ❌ 复核关闭 2026-08-13 | — |
+| C4-债11 | 删 `_saved_indicator_anim` 只写句柄——改直接调用 fade_in_widget 不接返回值（属性零读取、无 __init__ 初始化；防 GC 由 C++ parent + C4-债6 `_fade_anim` property 承担）；补契约测试 test_saved_indicator_fade_contract（填补既有 fade 覆盖全在 motion 层、无 InputPanel 公开 API 链路的真实缺口） | ✅ 2026-08-13 | `23817ff`（merge `6d0b1a7`） |
+| C4-债12 | test_w02_shake_identity_guard 时序加固——identity 断言前补 `anim2.state() == Running` 辅助断言（时序漂移先红在辅助断言而非误判 identity；确定性论证：动画时钟只随事件处理推进，130ms 处理 < 150ms 总时长） | ✅ 2026-08-13 | `23817ff`（merge `6d0b1a7`） |
 
 ### 技术债批次 C4-债6/7/8（2026-08-13，kickoff 轻量档全自动，基线 5103092）
 
