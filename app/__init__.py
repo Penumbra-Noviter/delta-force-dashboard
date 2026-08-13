@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.bonus_door_page import BonusDoorPage
 from app.chart_widget import adaptive_range, ChartSeries, ChartState, ChartWidget
 from app.crafting_page import CraftingPage
 from app.exchange_page import ExchangePage
@@ -22,6 +23,7 @@ from app.theme import (
 
 __all__ = [
     "adaptive_range",
+    "BonusDoorPage",
     "ChartSeries",
     "ChartState",
     "ChartWidget",

@@ -37,7 +37,11 @@ class Sidebar(QWidget):
     account_selected = Signal(str)
     # Y-04：点「新建账号」按钮（命名对话框由 MainWindow 弹出）
     create_account_requested = Signal()
-    NAV_ITEMS = [f"{EMOJI['nav_ledger']} 记账", f"{EMOJI['nav_profit']} 利润"]
+    NAV_ITEMS = [
+        f"{EMOJI['nav_ledger']} 记账",
+        f"{EMOJI['nav_profit']} 利润",
+        f"{EMOJI['nav_bonus_door']} 密码门",
+    ]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
