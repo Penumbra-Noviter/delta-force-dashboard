@@ -1,7 +1,7 @@
 # Delta Force Dashboard — Code Wiki
 
-> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次全部完成）  
-> 生成日期：2026-08-12  
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）全部完成）  
+> 生成日期：2026-08-13  
 > 测试状态：<!--AUTO:tests_total:total-->614<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
@@ -18,7 +18,7 @@
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
 | 测试框架 | pytest（<!--AUTO:tests_total:total-->614<!--/AUTO--> 项） |
-| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）全部完成 |
+| 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
 
@@ -89,7 +89,11 @@ Delta Force Dashboard/
 │   ├── kpi_presenter.py     ← [C4] KPI 双磁贴渲染（update/apply_theme_styles/reset 三出口）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
+│   ├── fetch_page_base.py   ← 数据页公共基类（懒加载状态机 + 后台取数，T-03/V-02/C2）
 │   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
+│   ├── load_state.py        ← 数据页四态状态机（idle/loading/loaded/failed，V-02）
+│   ├── motion.py            ← 反馈型动效（fade_in_widget/animate_property，U-06/W 系列）
+│   ├── ui_text.py           ← UI 文案与 emoji 单一来源（U-05）
 │   ├── profit_page.py       ← 利润页面单页滚动容器（制造产物 + 兑换利润纵向堆叠）
 │   ├── bonus_door_page.py   ← 密码门页面（BD-02：动态网格卡片，地图名 + 密码大字，无更新时间）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
@@ -103,6 +107,8 @@ Delta Force Dashboard/
 ├── data_store.py            ← [持久化] DataStore — JSON 原子写入 + 滚动备份
 ├── json_file.py             ← [持久化 seam] JSON 原子写 + 容错读（D-02）
 ├── kkrb_client.py           ← [Delta Force] kkrb.net API 客户端，零外部依赖（L-02）
+├── kkrb_models.py           ← [Delta Force] kkrb.net 数据模型零依赖叶子（V-01/BD-01）
+├── kkrb_parsing.py          ← [Delta Force] kkrb.net 响应解析纯函数（V-01/BD-01）
 ├── settings_store.py        ← [持久化] SettingsStore — 设置容错读 + 原子写（D-02）
 ├── formatting.py            ← [工具] 金额格式化、输入解析、校验
 ├── scripts/                 ← [F-01 文档同步工具链] CODE_WIKI 机械标记生成/校验

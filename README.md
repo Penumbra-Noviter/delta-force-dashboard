@@ -19,6 +19,7 @@
 - **亮 / 暗双主题** — 亮色 Sage Ledger 青绿暖纸 + 暗色 Midnight & Amber 琥珀午夜，降低长时间使用疲劳
 - **窗口置顶** — 可将窗口固定在最前，方便边操作其他软件边录入
 - **数据安全** — JSON 原子写入 + 滚动备份 + 损坏自动恢复 + 运行日志（`delta_force_dashboard.log`）
+- **每日密码门速查** — 密码门页面实时展示 kkrb.net 每日地图密码（6 图大字卡片，随利润页启动预加载，BD 批次）
 - **单实例运行** — 防止多开冲突
 - **多账号记账** — 侧边栏账号区可新建 / 切换多个账号，各账号独立数据（`accounts/<账号名>/data.json`，目录即账号名），旧数据自动复制迁移为「主账号」（永不删源）；当前账号持久化于 `settings.json`，重启自动回到上次账号
 
@@ -40,6 +41,10 @@
 - **制造产物**：4 个制造台位（技术中心/工作台/制药台/防具台）的最新推荐产物，按利润降序排列
 - **兑换利润**：7 种子弹自选包（3/4/5 级 + 通行证基础/高级 + 进阶/特级物流）中利润最高的子弹兑换方案
 
+### 密码门（每日地图密码，BD 批次）
+- 6 张地图卡片（零号大坝/长弓溪谷/巴克什/航天基地/潮汐监狱/AZ3），地图名 + 密码大字
+- 数据源 kkrb.net `getBonusDoorData`，与利润页共享 client、随启动预加载；空态/错误态占位可点击重试
+
 ---
 
 ## 技术栈
@@ -51,7 +56,7 @@
 | 图表库 | pyqtgraph |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller |
-| 测试框架 | pytest（580 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
+| 测试框架 | pytest（614 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -110,7 +115,13 @@ delta-force-dashboard/
 │   ├── sidebar.py           # 左侧导航栏（记账/利润 + 底部操作按钮）
 │   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
 │   ├── exchange_page.py     # 兑换利润页面（7 种子弹自选包）
+│   ├── fetch_page_base.py   # 数据页公共基类（懒加载四态 + 后台取数 + 错误重试）
+│   ├── fetch_worker.py      # 后台请求 worker（QThread，网络调用移出 UI 线程）
 │   ├── profit_page.py       # 利润页面（纵向堆叠：制造产物 + 兑换利润）
+│   ├── bonus_door_page.py   # 密码门页面（第三模块：地图密码大字卡片，BD 批次）
+│   ├── motion.py            # 反馈型动效（fade_in_widget / animate_property）
+│   ├── load_state.py        # 数据页四态状态机（idle/loading/loaded/failed）
+│   ├── ui_text.py           # UI 文案与 emoji 单一来源
 │   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
 │   ├── table_widget.py      # 7/30 视图可切换数据表格
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出
@@ -122,10 +133,12 @@ delta-force-dashboard/
 ├── formatting.py            # 金额格式化与输入解析
 ├── json_file.py             # JSON 原子写 seam（atomic_write_json / try_load_json，D-02）
 ├── kkrb_client.py           # kkrb.net API 客户端（纯 stdlib，零外部依赖）
+├── kkrb_models.py           # kkrb.net 数据模型（CraftingProduct/AmmoPackageItem/BonusDoorItem）
+├── kkrb_parsing.py          # kkrb.net 响应解析纯函数（畸形输入容错）
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（580 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（614 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）
