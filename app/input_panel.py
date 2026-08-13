@@ -90,6 +90,8 @@ class MoneyLineEdit(QLineEdit):
         强持有会让「控件在动画在途时被销毁」的路径依赖循环 GC 整链回收，
         DWS 的延迟删除与循环回收互踩 → access violation（C4-债5 实测复现；
         同 kpi_presenter C4-债3 的破环定案）。
+        C4-债7：finished 回调带 identity 检查（默认参数捕获 anim）——并发
+        在途时旧动画 finished 不误清新句柄（与 chart_widget on_finished 同款）。
         """
         if not animations_enabled():
             return
@@ -104,9 +106,14 @@ class MoneyLineEdit(QLineEdit):
 
         owner = weakref.ref(self)
 
-        def _on_finished() -> None:
+        def _on_finished(a=anim) -> None:
             edit = owner()
-            if edit is not None:
+            # C4-债7：identity 检查（默认参数捕获 anim 保 identity 比较，
+            # 与 chart_widget on_finished 同款）——并发在途时旧动画的
+            # finished 不得误清新句柄（直调路径可绕过防抖；Qt 同 property
+            # 新动画 start 自动停旧动画使其 finished 不触发，此处为防御性
+            # 一致性加固，对齐 C4-债3/5 定案）。
+            if edit is not None and edit._shake_anim is a:
                 edit._shake_anim = None
 
         anim.finished.connect(_on_finished)

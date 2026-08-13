@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次全部完成）  
 > 生成日期：2026-08-12  
-> 测试状态：<!--AUTO:tests_total:total-->577<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->578<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->577<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->578<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）全部完成 |
 
 ---
@@ -116,7 +116,7 @@ Delta Force Dashboard/
 │   ├── test_data_store.py   ← <!--AUTO:tests:tests/test_data_store.py-->20<!--/AUTO--> 个测试（保存/加载/备份/恢复/日志）
 │   ├── test_account_store.py ← <!--AUTO:tests:tests/test_account_store.py-->52<!--/AUTO--> 个测试（Y-01 多账号存储层：扫描/新建校验/resolve 兜底/DataStore 路径注入继承）
 │   ├── test_formatting.py   ← <!--AUTO:tests:tests/test_formatting.py-->58<!--/AUTO--> 个测试（格式化/解析/校验）
-│   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
+│   ├── test_input_panel.py  ← <!--AUTO:tests:tests/test_input_panel.py-->23<!--/AUTO--> 个测试（C4 seam + C9 静态守卫 + O-02 seam + O-08 不变式 + D-04 真实事件/焦点链路）
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->34<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
@@ -206,7 +206,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~376 行<!--/AUTO-->）
+### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~383 行<!--/AUTO-->）
 
 #### 类：`MoneyLineEdit(QLineEdit)`
 
@@ -222,7 +222,7 @@ Delta Force Dashboard/
 | <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusInEvent-->`focusInEvent(event)`<!--/AUTO--> | 聚焦时反格式化：`¥1,234.56` → `1234.56`，全选 |
 | <!--AUTO:sig:app/input_panel.py:MoneyLineEdit.focusOutEvent-->`focusOutEvent(event)`<!--/AUTO--> | 失焦时格式化：`1234.56` → `¥1,234.56` |
 
-**非法输入抖动（W-02 + C4-债5）**：`_shake` 在状态从非 invalid 变 invalid 时触发 150ms 水平平移反馈（防抖：连续非法不重复；动效关闭直接跳过）；动画对象生命周期——`DeleteWhenStopped` 自删（防子对象无界累积）+ `finished` 回调清 `_shake_anim` 句柄（DWS 后指针悬空防访问已删对象）+ 闭包 `weakref.ref(self)` 破环（C4-债5 实测：强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩 → access violation，C4-债3 同款定案）。
+**非法输入抖动（W-02 + C4-债5 + C4-债7）**：`_shake` 在状态从非 invalid 变 invalid 时触发 150ms 水平平移反馈（防抖：连续非法不重复；动效关闭直接跳过）；动画对象生命周期——`DeleteWhenStopped` 自删（防子对象无界累积）+ `finished` 回调清 `_shake_anim` 句柄（DWS 后指针悬空防访问已删对象）+ 闭包 `weakref.ref(self)` 破环（C4-债5 实测：强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩 → access violation，C4-债3 同款定案）+ **C4-债7**：finished 回调带 identity 检查（默认参数捕获 anim 保 identity 比较，与 chart_widget on_finished 同款）——并发在途时旧动画 finished 不误清新句柄（Qt 同 target 同 property 新动画 start 自动停旧动画使其 finished 零触发，identity 为防御性/一致性加固）。
 
 **保存指示淡入（U-06 + C4-债6）**：`set_saved_indicator` 经 `motion.fade_in_widget` 让提示文字 180ms 淡入（feedback-only，动画对象挂 self 防 GC）；动画生命周期收敛（C4-债6，对齐 C4-债3/5 定案）——同控件连续触发先 `stop()` 旧动画并同步清 `_fade_anim` property（DWS 自删不发 finished、清理回调不执行 → 若不清则 property 残留已删对象指针，use-after-free 窗口；同步清后读路径要么 None 要么有效动画）+ `finished` 闭包 `weakref.ref(widget)` 破环（强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩，C4-债5 实测同款）——属防御性/一致性加固，无行为级反证锚点。
 
@@ -604,7 +604,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->577<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->578<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -716,7 +716,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->101<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->30<!--/AUTO--> | 数据模型 + OV 响应解析 |
 | `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->34<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
-| `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->22<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
+| `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->23<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 
 **运行方式**：在项目根目录执行 `pytest`（所有 Qt 用例均自动使用 offscreen 平台）

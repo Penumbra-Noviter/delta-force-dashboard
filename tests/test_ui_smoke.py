@@ -547,19 +547,28 @@ def test_u06_clear_all_stops_running_draw_anim(sample_window):
     from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
 
+    from app import motion
     from app.chart_widget import ChartWidget
 
     win = sample_window
     records = win.logic.recent_records(7)
-    chart = ChartWidget()  # 同 AC-1：全新 chart 复现锚点，不随构造时机漂移
-    chart.draw(records)
-    QTest.qWait(100)  # 动画半程（200ms 时长）；Running 断言自证半程成立
-    assert chart._draw_anim.state() == QAbstractAnimation.State.Running
-    chart._clear_all()
-    assert getattr(chart, "_draw_anim", None) is None  # 句柄复位
-    # 排水等待：stop 后无在途回调 + deleteLater 全部处理，避免 chart 随
-    # 测试结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
-    QTest.qWait(400)
+    # C4-债8：环境态自持——本用例依赖动效开启（Running 断言），显式置开 +
+    # try/finally 恢复（同 test_u06_motion_global_switch 惯例；关闭态下
+    # _draw_anim 为 None，Running 断言会 AttributeError，历史红证）。
+    prev = motion.animations_enabled()
+    motion.set_animations_enabled(True)
+    try:
+        chart = ChartWidget()  # 同 AC-1：全新 chart 复现锚点，不随构造时机漂移
+        chart.draw(records)
+        QTest.qWait(100)  # 动画半程（200ms 时长）；Running 断言自证半程成立
+        assert chart._draw_anim.state() == QAbstractAnimation.State.Running
+        chart._clear_all()
+        assert getattr(chart, "_draw_anim", None) is None  # 句柄复位
+        # 排水等待：stop 后无在途回调 + deleteLater 全部处理，避免 chart 随
+        # 测试结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
+        QTest.qWait(400)
+    finally:
+        motion.set_animations_enabled(prev)
 
 
 def test_u06_motion_global_switch(qapp):
