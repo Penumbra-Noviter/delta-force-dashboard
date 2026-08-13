@@ -24,9 +24,10 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C4-债6 | fade_in_widget 悬空指针 + 强闭包环（motion.py:74-85）：DWS 下 `old.stop()` 自删不发 finished → `_fade_anim` dynamic property 残留已删 C++ 指针 → 下次 fade_in_widget 读 property isinstance 通过 → `old.stop()` 调用已释放内存（use-after-free，C4-债3 kpi 崩溃同族）；强闭包环（widget → property → anim → finished → lambda → widget）为第二通道；当前无测试踩中（fade 均作用于新建控件）——修复方向：finished 回调改 weakref 破环 + 读 property 前判空/移除悬空清理依赖 | C4-债5 批次期末四轴（Falsify F-5） | 🟡 Worth exploring | 📝 |
-| C4-债7 | `_shake` 并发触发缺 identity 检查 + 不 stop 旧动画（input_panel.py:106-111）：旧动画 finished 无条件清 `_shake_anim`（若并发可达会误清新动画句柄），与项目其他两实例（kpi_presenter/chart_widget）的 identity 检查不一致；当前不可达（隐式不变式：debounce=150ms==shake=150ms + `prev != "invalid"` 属性守卫使两次抖动间隔 ≥300ms）——修复方向：`_on_finished` 加 `if edit._shake_anim is anim` identity 检查 | C4-债5 批次期末四轴（Standards S-1/S-2 + Falsify F-3 + Architecture A-2 同源合并） | ⚪ Speculative | 📝 |
-| C4-债8 | `test_u06_clear_all_stops_running_draw_anim`（test_ui_smoke.py:509-529）依赖全局动效开关默认 True（未自持开关，同文件开关测试有 finally 恢复惯例）——动效关闭时 `_draw_anim` 为 None → `.state()` AttributeError；修复方向：测试内显式 `set_animations_enabled(True)`（try/finally） | C4-债5 批次期末四轴（Falsify F-4） | ⚪ Speculative | 📝 |
+| C4-债9 | fade_in_widget `duration_ms<=0` 无护栏（motion.py:52）：duration=0 时 QPropertyAnimation start 即 Stopped、finished 不触发、DWS 已删 C++ 对象但 `_fade_anim` property 残留悬空 wrapper——对返回值调任何方法 → `RuntimeError: Internal C++ object already deleted`（Falsify 实测）；C4-债6「读路径要么 None 要么有效动画」不变式在此路径不成立（修复只覆盖 stop() 路径）；当前无调用方传 0（默认 150/180），isinstance 侥幸缓解——修复方向：`max(1, duration_ms)` 护栏或启动前校验 | C4-债6/7/8 批次期末四轴（Falsify） | ⚪ Speculative | 📝 |
+| C4-债10 | identity 守卫惯用法 4 处重复（chart_widget on_finished / kpi_presenter / _shake / fade_in_widget 债6）——模式族一致性系文档化定案可接受；**第 5 处出现时**提取共享助手（如 motion 内 `current_anim_guard`）控一致性成本 | C4-债6/7/8 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
+| C4-债11 | `_saved_indicator_anim`（input_panel.py:402）为只写句柄——写入从不读取，GC 实由 C++ 父链 + 债6 property 承担，冗余可删（改动前既有） | C4-债6/7/8 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
+| C4-债12 | test_w02_shake_identity_guard 中间断言时序余量仅 20ms（anim2 断言时剩 20ms；Windows 定时器粒度 ~15.6ms，10/10 本地稳定但高负载有偶发 flake 风险）——修复方向：补 `anim2.state() == Running` 辅助断言加固 | C4-债6/7/8 批次期末四轴（Falsify 观察） | ⚪ Speculative | 📝 |
 
 ---
 
@@ -301,6 +302,14 @@
 ---
 
 ## 已完成归档
+
+### 技术债批次 C4-债6/7/8（2026-08-13，kickoff 轻量档全自动，基线 5103092）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| C4-债6 | fade_in_widget 生命周期收敛——stop 后同步清 `_fade_anim` property（DWS 不发 finished 的残留窗口结构性消除）+ finished 闭包 weakref 破环（强闭包环 → 在途销毁与 DWS 延迟删除互踩，C4-债3/5 同款定案）；诚实声明无行为级反证（防御性/一致性加固），契约测试保持；motion 覆盖 100% | ✅ 2026-08-13 | `510330a`（merge `b9d01ce`） |
+| C4-债7 | `_shake` finished 加 identity 检查（默认参数 `a=anim` + `edit._shake_anim is a`，对齐 chart_widget on_finished 定案）；**实证**：PySide6 6.11.1 同 target 同 property 启动新动画自动停旧动画（anim2.start() 瞬间 anim1→Stopped + DWS 自删 + finished 零触发）——并发路径从根上不可构造，identity 属防御/一致性（Qt 层结构保证比防抖更强）；测试转契约守卫，docstring 如实注明 | ✅ 2026-08-13 | `858bc15`（merge `b9d01ce`） |
+| C4-债8 | `test_u06_clear_all_stops_running_draw_anim` 环境态自持——`prev = animations_enabled()` + try/finally 恢复（比既有 hardcode-True 恢复惯例更强）；反证真红真绿（关闭态原测试 AttributeError → 修复后关闭/正常双绿） | ✅ 2026-08-13 | `858bc15`（merge `b9d01ce`） |
 
 ### 技术债批次 C4-债5（2026-08-13，kickoff 轻量档，基线 641ab0c）
 
