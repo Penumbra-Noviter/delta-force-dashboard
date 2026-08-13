@@ -23,13 +23,15 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 >
-> **技术债区（2026-08-13）：3 条新录入（BD 批次期末四轴非阻断），同日消费清零（BD-债1~3 批次，见归档）。**
+> **技术债区（2026-08-13）：BD-债1~3 已消费清零；IC 批次 code-review 新录入 2 条（IC-债1~2，见下表）。**
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
 | BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | ✅ 已修 2026-08-13 |
 | BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | ✅ 已修 2026-08-13 |
 | BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | ✅ 已修 2026-08-13 |
+| IC-债1 | `sidebar.py` `NAV_ITEMS`/`_NAV_ICONS` 平行列表按索引 `zip()` 配对（Data Clumps）——长度错位时静默截断，新增导航项无图标且零报错；建议捆成 `[(text, icon_name)]` 元组列表或加长度断言（文件:行号主键 sidebar.py:40-52） | IC 批次 code-review Standards | ⚪ Speculative | 📝 已录入 |
+| IC-债2 | `sidebar.py:184` `.pixmap(16, 16)` 硬编码与 `render_icon` 默认 `size=16` 重复耦合（Magic Number）——默认尺寸变更时此处静默失效；建议显式传 `render_icon(..., size=16)` 或提取常量 | IC 批次 code-review Standards | ⚪ Speculative | 📝 已录入 |
 
 ---
 
@@ -89,7 +91,7 @@
 `app/main_window.py`、`app/fetch_page_base.py`、`app/chart_widget.py`、
 `app/theme.py`、`tests/test_ui_smoke.py`、`tests/test_fetch_pages.py`、
 `tests/test_bonus_door_page.py`；删除 `app/ui_text.py`
-**共享文件（申报改动）**：`CODE_WIKI.md`、`DEV_LOG.md`、`TO-TICKETS.md`（归档）、`docs/adr/ADR-0006.md`（本批次落档）
+**共享文件（申报改动）**：`CODE_WIKI.md`、`DEV_LOG.md`、`TO-TICKETS.md`（归档）、`docs/adr/0006-svg-icons-replace-emoji.md`（本批次落档）
 
 **验收标准**：
 - [ ] 全量 pytest 全绿（icons.py 100% 覆盖）；doc_sync 双绿

@@ -126,7 +126,7 @@ class BonusDoorPage(FetchPageBase):
         self._show_placeholder("加载失败，点击重试")
 
     def apply_theme(self) -> None:
-        """主题切换钩子：空操作（C1-07）。
+        """主题切换钩子：仅刷新基类图标（IC-03）。
 
         密码门卡颜色全部由 QSS 选择器驱动（QFrame#bonusDoorCard /
         QLabel#bonusDoorMap / QLabel#bonusDoorPassword 在 generate_qss

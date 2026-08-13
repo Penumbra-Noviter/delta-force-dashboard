@@ -625,7 +625,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 
 ### 4.22 `app/bonus_door_page.py` — 密码门页面（BD-02/03，<!--AUTO:lines:app/bonus_door_page.py-->~104 行<!--/AUTO-->）
 
-`BonusDoorPage(FetchPageBase)`——QStackedWidget Page 2（侧边栏第三导航「密码门」，BD-03）。网格卡片**动态构建**：`_render_data` 清空网格按数据重建（当前 6 图固定、未来可能变化，数据量小重建成本可忽略）；每卡 = 地图名（`#bonusDoorMap`，FG_MUTED）+ 密码大字（`#bonusDoorPassword`，内联 34px bold，颜色走 QSS → TEXT_PRIMARY，**不展示更新时间** v5 拍板）。空态占位「暂无数据」/ 错误态占位「加载失败，点击重试」（C2-05 可区分，`_show_placeholder` 共用）。`apply_theme` 空操作（颜色全 QSS 选择器驱动，C1-07）；MainWindow 启动预加载与 closeEvent 回收（`_preload_data_pages` 单出口）。
+`BonusDoorPage(FetchPageBase)`——QStackedWidget Page 2（侧边栏第三导航「密码门」，BD-03）。网格卡片**动态构建**：`_render_data` 清空网格按数据重建（当前 6 图固定、未来可能变化，数据量小重建成本可忽略）；每卡 = 地图名（`#bonusDoorMap`，FG_MUTED）+ 密码大字（`#bonusDoorPassword`，内联 34px bold，颜色走 QSS → TEXT_PRIMARY，**不展示更新时间** v5 拍板）。空态占位「暂无数据」/ 错误态占位「加载失败，点击重试」（C2-05 可区分，`_show_placeholder` 共用）。`apply_theme` 仅刷新基类刷新按钮图标（IC-03，super()；卡片颜色全 QSS 选择器驱动，C1-07）；MainWindow 启动预加载与 closeEvent 回收（`_preload_data_pages` 单出口）。
 
 | 方法 | 说明 |
 |------|------|
@@ -754,7 +754,7 @@ main.py
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
-| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme 空操作/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
+| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme super() 刷新基类图标（IC-03）/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`
 

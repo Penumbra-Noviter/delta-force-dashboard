@@ -48,11 +48,17 @@ def test_icon_keys_stable(qapp):
 
 
 def test_render_valid_for_all_keys(qapp):
-    """每键可渲染：逻辑尺寸 16×16、非全透明、含主题色像素。"""
+    """每键可渲染：逻辑尺寸 16×16、非全透明、含主题色像素。
+
+    deviceIndependentSize 断言逻辑口径——QIcon.pixmap 返回尺寸随屏幕 DPR
+    缩放（DPR-2 屏为 32×32@DPR2），直接断言 width 会在高 DPR 屏失败
+    （code-review 发现，IC 批次评审）。
+    """
     for name in _ICON_KEYS:
         icon = render_icon(name, "#3c4a43")
         pm = icon.pixmap(16, 16)
-        assert pm.width() == 16 and pm.height() == 16
+        size = pm.deviceIndependentSize()
+        assert size.width() == 16 and size.height() == 16
         _assert_close_to(_dominant_color(icon, 16).getRgb()[:3],
                          (0x3C, 0x4A, 0x43), tol=6), name
 
@@ -66,10 +72,17 @@ def test_render_color_injected(qapp):
 
 
 def test_render_size_respected(qapp):
-    """size 参数生效（HiDPI 物理像素为 size×2，逻辑显示为 size）。"""
+    """size 参数生效：逻辑尺寸=size、物理像素=size×DPR（任意屏幕 DPR 成立）。
+
+    QIcon.pixmap 返回的 pixmap 已按屏幕 DPR 缩放（DPR-1 → size×1、DPR-2 →
+    size×2），故逻辑口径用 deviceIndependentSize、物理口径用 DPR 推导——
+    修复 code-review 发现：原断言 width==24 在 DPR-2 屏（实际 48）会失败。
+    """
     icon = render_icon("plus", "#000000", size=24)
     pm = icon.pixmap(24, 24)
-    assert pm.width() == 24 and pm.height() == 24
+    size = pm.deviceIndependentSize()
+    assert size.width() == 24 and size.height() == 24
+    assert pm.width() == int(24 * pm.devicePixelRatio())
 
 
 def test_render_unknown_key_raises(qapp):
