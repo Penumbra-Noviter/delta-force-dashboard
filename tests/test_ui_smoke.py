@@ -364,7 +364,7 @@ def test_ic_emoji_free_and_icon_single_source(sample_window):
     win = sample_window
 
     # 文案层：导航/按钮为纯文本（图标走 QIcon，不拼进文案）
-    assert win.sidebar.NAV_ITEMS == ["记账", "利润", "密码门"]
+    assert win.sidebar.NAV_ITEMS == [("记账", "ledger"), ("利润", "wrench"), ("密码门", "key")]
     assert win.sidebar.pin_btn.text() == "置顶"
     assert win.sidebar.new_account_btn.text() == "新建账号"
     assert win.sidebar.account_title.text() == "账号"
@@ -2431,8 +2431,8 @@ def test_bonus_door_nav_item_is_third(sample_window):
     """BD-03：侧边栏第三导航项「密码门」（IC-02：图标走 QIcon 不拼文案）。"""
     win = sample_window
     assert len(win.sidebar.NAV_ITEMS) == 3
-    assert win.sidebar.NAV_ITEMS[2] == "密码门"
-    assert win.sidebar._NAV_ICONS[2] == "key"
+    assert win.sidebar.NAV_ITEMS[2][0] == "密码门"
+    assert win.sidebar.NAV_ITEMS[2][1] == "key"
 
 
 def test_bonus_door_page_assembled_as_third_stack_page(sample_window):

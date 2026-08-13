@@ -15,6 +15,8 @@ from __future__ import annotations
 
 __all__ = ["Sidebar"]
 
+from typing import ClassVar
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
@@ -29,6 +31,10 @@ from PySide6.QtWidgets import (
 
 from app.icons import render_icon
 
+# 导航图标渲染尺寸（IC-债2：与 app/icons.py render_icon 默认 size=16 解耦，
+# 图标默认尺寸变更时导航侧不会静默失效；沿用 _RENDER_DPR 私有常量先例）
+_NAV_ICON_SIZE: int = 16
+
 
 class Sidebar(QWidget):
     """左侧导航栏：顶部账号区 + 导航项列表 + 底部操作按钮。"""
@@ -38,14 +44,10 @@ class Sidebar(QWidget):
     account_selected = Signal(str)
     # Y-04：点「新建账号」按钮（命名对话框由 MainWindow 弹出）
     create_account_requested = Signal()
-    # 导航项文本（IC-02：emoji 由 SVG 图标替代，双态色见 apply_theme）
-    NAV_ITEMS = [
-        "记账",
-        "利润",
-        "密码门",
-    ]
-    # 导航项图标键（顺序与 NAV_ITEMS 一一对应）
-    _NAV_ICONS = ["ledger", "wrench", "key"]
+    # 导航项「(文本, 图标键)」元组列表（IC-债1：替代文本/图标键平行列表，
+    # 消除 zip 按索引配对的数据团）。新增导航项必须带图标键——缺失即
+    # render_icon KeyError 快速失败，而非静默截断/无图标。
+    NAV_ITEMS: ClassVar[list[tuple[str, str]]] = [("记账", "ledger"), ("利润", "wrench"), ("密码门", "key")]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -94,7 +96,7 @@ class Sidebar(QWidget):
         self._nav_list.setCursor(Qt.CursorShape.PointingHandCursor)
         self._nav_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._nav_items: list[QListWidgetItem] = []
-        for text in self.NAV_ITEMS:
+        for text, _icon_name in self.NAV_ITEMS:
             item = QListWidgetItem(text)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._nav_list.addItem(item)
@@ -178,10 +180,12 @@ class Sidebar(QWidget):
         nav_hover_bg = get_color("NAV_HOVER_BG")
 
         # IC-02：导航图标双态色（QIcon Selected 模式，选中行图标换 accent）
-        for item, icon_name in zip(self._nav_items, self._NAV_ICONS):
-            icon = render_icon(icon_name, fg)
+        for item, (_text, icon_name) in zip(self._nav_items, self.NAV_ITEMS):
+            icon = render_icon(icon_name, fg, size=_NAV_ICON_SIZE)
             icon.addPixmap(
-                render_icon(icon_name, accent).pixmap(16, 16),
+                render_icon(icon_name, accent, size=_NAV_ICON_SIZE).pixmap(
+                    _NAV_ICON_SIZE, _NAV_ICON_SIZE
+                ),
                 QIcon.Mode.Selected,
             )
             item.setIcon(icon)
