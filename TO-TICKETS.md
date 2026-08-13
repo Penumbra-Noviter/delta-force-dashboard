@@ -12,9 +12,13 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-12）：当前为空——C4→C5→C6→C7 批次已全部归档；非阻断技术债见下方「技术债区」。
+> 活跃表（2026-08-13）：桌面端密码门批次（来源：DESIGN_MOBILE.md v5 §5.2；移动端 PWA 暂缓，不入本表）。
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
+| BD-01 | kkrb 数据层：`BonusDoorItem` + `parse_bonus_door_response` + `fetch_bonus_door_data()`（默认剔除 `az3r6`，复用会话/锁/60s 缓存） | 功能（数据层） | 📝 已录入 | — |
+| BD-02 | 桌面端密码门页面 `app/bonus_door_page.py`：网格卡片（地图名 + 密码大字，无更新时间）、`FetchPageBase` 基建复用、`apply_theme` 钩子、加载/错误/空态 | 功能（UI） | 📝 已录入 | — |
+| BD-03 | 装配：侧边栏第三导航「密码门」+ `QStackedWidget` 第三页 + 信号显式连接（C4 契约）+ UI 测试 | 功能（装配） | 📝 已录入 | — |
+| BD-04 | 文档收尾：CODE_WIKI §4 模块表 + doc_sync --update + 设计稿状态同步 | 文档 | 📝 已录入 | — |
 
 ---
 
@@ -30,6 +34,72 @@
 ---
 
 ## 工单详情
+
+### BD 系列（2026-08-13，桌面端密码门模块，来源：DESIGN_MOBILE.md v5 §5.2）
+
+**设计要点**（来自 DESIGN_MOBILE v5，先做桌面端，移动端暂缓）：
+- 数据接口 `POST https://www.kkrb.net/getBonusDoorData`（空 body，需 CSRF 握手）；响应 `{code:1, data:{<key>:{password, updated, overridden}}}`；地图键 `db`零号大坝/`cgxg`长弓溪谷/`bks`巴克什/`htjd`航天基地/`cxjy`潮汐监狱/`az3`AZ3/`az3r6`AZ3彩六联动房
+- **排除策略**：默认剔除 `az3r6`，两端一致硬排除不做开关；过滤单点放 `fetch_bonus_door_data()`（桌面端 UI 与未来手机代理同源）
+- 密码大字 + 地图名，**不展示更新时间**（v5 拍板）；位置图明确不做
+- 页面复用 `FetchPageBase` 懒加载状态机 + `FetchWorker` + 错误重试（利润页同款基建）；遵循主题契约（`apply_theme` 自动纳入 `_theme_refreshers`）、C4 装配契约（信号显式连接）、测试构造注入 stub client 惯例
+
+#### BD-01：kkrb 数据层
+
+**目标**：`kkrb_client.fetch_bonus_door_data()` 获取每日地图密码（默认剔除 `az3r6`）。
+
+**具体改动**：
+1. `kkrb_models.py` — 新增 `BonusDoorItem`（key/name/password/updated）模型 + 地图键→中文名映射常量（`BONUS_DOOR_MAP` 或等价单源）
+2. `kkrb_parsing.py` — 新增 `parse_bonus_door_response(data) -> list[BonusDoorItem]` 纯函数（畸形输入容错矩阵同 V-01 惯例）
+3. `kkrb_client.py` — 新增 `fetch_bonus_door_data()`：`_post_json(_BONUS_DOOR_ENDPOINT)` + 解析 + 剔除 `az3r6`（单点过滤，docstring 注明排除策略）
+
+**影响范围**：`kkrb_models.py`、`kkrb_parsing.py`、`kkrb_client.py`
+
+**验收标准**：
+- [ ] `fetch_bonus_door_data()` 返回 6 项（剔除 `az3r6`），字段完整（key/name/password/updated）
+- [ ] 解析纯函数畸形输入不抛异常（V-01 矩阵惯例）
+- [ ] FakeOpener 注入传输测试（握手/缓存/错误降级，V-05 惯例）；模块覆盖率口径不变
+- [ ] pytest 全绿
+
+#### BD-02：密码门页面
+
+**目标**：桌面端第三模块页面（网格卡片，地图名 + 密码大字，无更新时间）。
+
+**具体改动**：
+1. 新增 `app/bonus_door_page.py` — `BonusDoorPage(FetchPageBase)`：网格卡片布局（跟随利润页视觉语言）、每卡地图名 + 密码大字、`apply_theme` 钩子（get_color 运行期）、加载/错误/空态（`_render_error` 钩子）
+2. 主题键：页面所需色键走 `get_color`（新增键进 theme.py 双主题 + AST 守卫覆盖，C1 契约）
+
+**影响范围**：新增 `app/bonus_door_page.py`、`app/theme.py`（如需新色键）
+
+**验收标准**：
+- [ ] 页面三态（加载/失败/数据）可测试；空数据渲染显式占位
+- [ ] 双主题下 apply_theme 后卡片颜色随主题更新（无构建期冻结色）
+- [ ] 构造注入 stub client 可断网测试（C2 惯例）
+
+#### BD-03：装配
+
+**目标**：侧边栏第三导航 + QStackedWidget 第三页 + 信号连接。
+
+**具体改动**：
+1. `app/sidebar.py` — 第三导航项「密码门」（图标/emoji 走 `ui_text.py` EMOJI 单一来源）
+2. `app/main_window.py` — 装配第三页（构造注入 client 共享利润页同款 client 或独立实例待实现定）、信号显式连接（C4 契约：新组件改 bundle 而非 MainWindow 解包？——第三页为独立页，遵循利润页装配模式）、`preload` 策略跟随利润页（启动预加载或懒加载待实现定）
+3. `app/__init__.py` — 导出同步
+
+**影响范围**：`app/sidebar.py`、`app/main_window.py`、`app/__init__.py`
+
+**验收标准**：
+- [ ] 侧边栏三项可切换、选中高亮；密码门页数据/错误/主题行为正常
+- [ ] UI 测试（QTest 链路）+ 装配断言；pytest 全绿
+
+#### BD-04：文档收尾
+
+**目标**：CODE_WIKI §4 模块表（新模块行数/方法表）+ doc_sync --update + 测试计数刷新。
+
+**影响范围**：`CODE_WIKI.md`、`DEV_LOG.md`、`TO-TICKETS.md`（归档）
+
+**验收标准**：
+- [ ] doc_sync --check 双绿；测试计数与全量 pytest 一致
+
+---
 
 ### Z 系列（2026-08-10，主题联动收尾，来源：U-03 遗留）
 
