@@ -8,11 +8,21 @@ KkrbClient 保留会话/传输/缓存，这里只做「响应数据 → 领域�
 
 from __future__ import annotations
 
-__all__ = ["parse_ammo_package_response", "parse_ov_response"]
+__all__ = [
+    "parse_ammo_package_response",
+    "parse_bonus_door_response",
+    "parse_ov_response",
+]
 
 from typing import Any
 
-from kkrb_models import AmmoPackageItem, CraftingProduct, KkrbError
+from kkrb_models import (
+    AmmoPackageItem,
+    BonusDoorItem,
+    BONUS_DOOR_NAMES,
+    CraftingProduct,
+    KkrbError,
+)
 
 
 def parse_ov_response(data: Any) -> list[CraftingProduct]:
@@ -133,6 +143,55 @@ def parse_ammo_package_response(data: Any) -> list[AmmoPackageItem]:
 
     # 按利润降序排列
     items.sort(key=lambda p: p.profit, reverse=True)
+    return items
+
+
+def parse_bonus_door_response(data: Any) -> list[BonusDoorItem]:
+    """解析 getBonusDoorData 响应为密码门条目列表（BD-01）。
+
+    实际格式：
+    {
+        "code": 1,
+        "data": {
+            "db":    { "password": "870140", "updated": "20260813000000",
+                       "overridden": false },
+            "cgxg":  { ... },
+            ...
+        }
+    }
+
+    输出按 ``BONUS_DOOR_NAMES`` 定义顺序（稳定顺序，与响应键序无关）；
+    **映射外键跳过**——kkrb 新增地图时需扩展 kkrb_models.BONUS_DOOR_NAMES
+    映射（单源契约，§5.1）。本函数不剔除 ``az3r6``：排除策略（两端一致
+    硬排除）单点落在 kkrb_client.fetch_bonus_door_data（§5.2）。
+
+    Args:
+        data: _post_json 的产物（任意 JSON 值）。
+
+    Returns:
+        地图条目列表；顶层非 dict 抛 KkrbError；data 缺失/非 dict → []；
+        畸形条目（非 dict）跳过；password/updated 缺省空串。
+    """
+    if not isinstance(data, dict):
+        raise KkrbError(f"密码门数据格式异常: 期望 dict，got {type(data).__name__}")
+
+    raw = data.get("data", {})
+    if not isinstance(raw, dict):
+        return []
+
+    items: list[BonusDoorItem] = []
+    for key, name in BONUS_DOOR_NAMES.items():
+        entry = raw.get(key)
+        if not isinstance(entry, dict):
+            continue
+        items.append(
+            BonusDoorItem(
+                key=key,
+                name=name,
+                password=str(entry.get("password") or ""),
+                updated=str(entry.get("updated") or ""),
+            )
+        )
     return items
 
 

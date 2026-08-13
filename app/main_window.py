@@ -42,6 +42,7 @@ from app.theme import (
     signal_color,
 )
 from app.dashboard_page import build_dashboard
+from app.bonus_door_page import BonusDoorPage
 from app.kpi_presenter import KpiPresenter
 from app.motion import set_animations_enabled
 from app.profit_page import ProfitPage
@@ -155,10 +156,10 @@ class MainWindow(QMainWindow):
         # 初始渲染
         self.refresh_display()
 
-        # 仪表盘渲染完成后，后台预加载利润页面数据
+        # 仪表盘渲染完成后，后台预加载利润页 + 密码门页数据
         self._preload_timer = QTimer(self)
         self._preload_timer.setSingleShot(True)
-        self._preload_timer.timeout.connect(self._preload_profit_page)
+        self._preload_timer.timeout.connect(self._preload_data_pages)
         self._preload_timer.start(500)
 
         # 恢复置顶状态
@@ -339,6 +340,7 @@ class MainWindow(QMainWindow):
         # T-01：请求在途时安全回收后台线程，避免运行中的 QThread 随窗口销毁 abort
         self._preload_timer.stop()
         self.profit_page.shutdown()
+        self.bonus_door_page.shutdown()
         self._save_settings()
         super().closeEvent(event)
 
@@ -389,6 +391,10 @@ class MainWindow(QMainWindow):
         # ── Page 1：利润（制造产物 + 兑换利润，共享同一 client）──
         self.profit_page = ProfitPage(client=self._client)
         self._stack.addWidget(self.profit_page)
+
+        # ── Page 2：密码门（BD-03，与利润页共享同一 client 实例，C2-02 惯例）──
+        self.bonus_door_page = BonusDoorPage(client=self._client)
+        self._stack.addWidget(self.bonus_door_page)
 
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
@@ -731,17 +737,18 @@ class MainWindow(QMainWindow):
         self.table.draw(records, self.today)
         self.chart.draw(records)
 
-    def _preload_profit_page(self) -> None:
-        """仪表盘渲染完成后，后台并行预加载利润页两个子模块数据。
+    def _preload_data_pages(self) -> None:
+        """仪表盘渲染完成后，后台并行预加载利润页两子模块 + 密码门页数据。
 
         用户反馈：兑换利润此前等首次点击才拉取（10s 超时 HTTP），点击后
-        才有卡顿感——改为启动即预加载制造产物 + 兑换利润（各自后台线程，
-        kkrb 60s TTL 缓存复用）。导航到 ProfitPage 时数据已就绪，零闪烁。
-        预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动刷新即可；
-        C2-03：测试经构造注入 stub client 压制网络，preload 不再读取
-        环境变量哨兵。
+        才有卡顿感——改为启动即预加载制造产物 + 兑换利润 + 密码门（各自
+        后台线程，kkrb 60s TTL 缓存复用）。导航到对应页时数据已就绪，
+        零闪烁。预加载失败不弹窗，仅由 preload() 内部记录日志，用户手动
+        刷新即可；C2-03：测试经构造注入 stub client 压制网络，preload
+        不再读取环境变量哨兵。
         """
         self.profit_page.preload()
+        self.bonus_door_page.preload()
 
     def _update_today_status(self) -> None:
         """更新「今日未录入」提醒：今日无记录时显示，有记录时隐藏。

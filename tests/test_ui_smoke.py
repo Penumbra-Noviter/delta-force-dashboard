@@ -361,6 +361,7 @@ def test_u05_emoji_single_source(sample_window):
     # 导航项/置顶按钮文案由 EMOJI 常量拼装
     assert win.sidebar.NAV_ITEMS[0].startswith(EMOJI["nav_ledger"])
     assert win.sidebar.NAV_ITEMS[1].startswith(EMOJI["nav_profit"])
+    assert win.sidebar.NAV_ITEMS[2].startswith(EMOJI["nav_bonus_door"])  # BD-03
     assert win.sidebar.pin_btn.text().startswith(EMOJI["pin"])
 
     # 全局字体族统一（微软雅黑 + Segoe UI Emoji，消基线错位）
@@ -2193,7 +2194,14 @@ def test_theme_refreshers_collected_at_startup(sample_window):
     refreshers = win._theme_refreshers
     assert refreshers, "启动期必须收集到主题刷新器"
     members = {id(w) for w in refreshers}
-    for expected in (win.sidebar, win.input_panel, win.chart, win.table, win.profit_page):
+    for expected in (
+        win.sidebar,
+        win.input_panel,
+        win.chart,
+        win.table,
+        win.profit_page,
+        win.bonus_door_page,  # BD-03：密码门页具 apply_theme，自动纳入（C1-08 契约）
+    ):
         assert id(expected) in members, f"{type(expected).__name__} 未入列"
     # 防双扇出：profit_page 入列时 crafting/exchange 不得重复入列
     assert id(win.profit_page.crafting_page) not in members, "crafting 不应重复入列"
@@ -2367,3 +2375,113 @@ def test_full_chain_theme_toggle_roundtrip(sample_window):
     assert_chain_themed()
     win.sidebar.theme_btn.click()  # → light（往返）
     assert_chain_themed()
+
+
+# ── BD-03. 密码门装配（侧边栏第三导航 + QStackedWidget 第三页）──
+
+
+def test_bonus_door_nav_item_is_third(sample_window):
+    """BD-03：侧边栏第三导航项「密码门」（emoji 走 EMOJI 单一来源）。"""
+    from app.ui_text import EMOJI
+
+    win = sample_window
+    assert len(win.sidebar.NAV_ITEMS) == 3
+    assert win.sidebar.NAV_ITEMS[2] == f"{EMOJI['nav_bonus_door']} 密码门"
+    assert win.sidebar.NAV_ITEMS[2].startswith(EMOJI["nav_bonus_door"])
+
+
+def test_bonus_door_page_assembled_as_third_stack_page(sample_window):
+    """BD-03：MainWindow 装配——bonus_door_page 存在、stack 第三页、共享同一 client。"""
+    win = sample_window
+    assert hasattr(win, "bonus_door_page")
+    assert win._stack.count() == 3
+    assert win._stack.widget(2) is win.bonus_door_page
+    # C2-02 惯例：与利润页共享同一注入 client 实例
+    assert win.bonus_door_page._client is win.profit_page.crafting_page._client
+    assert win.bonus_door_page._client is win._client
+
+
+def test_bonus_door_nav_switch_shows_page2(sample_window):
+    """BD-03：nav_changed 索引 2 → QStackedWidget 切到第三页（密码门）。"""
+    win = sample_window
+    win.show()
+    win.sidebar.set_current_index(2)
+    assert win._stack.currentIndex() == 2
+    assert win._stack.currentWidget() is win.bonus_door_page
+    # 切回记账页仍正常
+    win.sidebar.set_current_index(0)
+    assert win._stack.currentIndex() == 0
+
+
+def test_bonus_door_page_preloaded_on_startup(qapp, settings_guard, tmp_path):
+    """BD-03：启动预加载走 _preload_data_pages（利润页 + 密码门页，C2-02 单出口）。"""
+    import time
+
+    from PySide6.QtTest import QTest
+
+    from app.main_window import MainWindow
+    from calculator import ProfitCalculatorLogic
+    from data_store import DataStore
+    from kkrb_client import BonusDoorItem
+    from tests.conftest import make_stub_client
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=make_stub_client(
+            bonus_impl=lambda: [
+                BonusDoorItem("db", "零号大坝", "870140", "20260813000000"),
+            ]
+        ),
+    )
+    win.show()
+
+    def wait_loaded(page, timeout_ms: int = 5000) -> bool:
+        deadline = time.monotonic() + timeout_ms / 1000
+        while time.monotonic() < deadline:
+            QTest.qWait(50)
+            qapp.processEvents()
+            if page.is_loaded:
+                return True
+        return False
+
+    assert wait_loaded(win.bonus_door_page)
+    assert win.bonus_door_page._cards[0]._map_label.text() == "零号大坝"
+    win.close()
+
+
+def test_bonus_door_preload_single_exit_via_main_window(qapp, settings_guard, tmp_path):
+    """BD-03：_preload_data_pages 单出口扇出——spy 断言 bonus_door_page.preload 被调。"""
+    from types import SimpleNamespace
+
+    from app.main_window import MainWindow
+
+    win = MainWindow(
+        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        logic=ProfitCalculatorLogic(make_sample_data()),
+        client=SimpleNamespace(),
+    )
+    calls: list[str] = []
+    win.profit_page.preload = lambda: calls.append("profit")  # type: ignore[method-assign]
+    win.bonus_door_page.preload = lambda: calls.append("bonus")  # type: ignore[method-assign]
+    win._preload_data_pages()
+    assert calls == ["profit", "bonus"]
+    win.close()
+
+
+def test_bonus_door_page_shutdown_on_close(sample_window, monkeypatch):
+    """BD-03：closeEvent 回收密码门页后台线程（T-01 同款：shutdown 被调用）。"""
+    win = sample_window
+    calls: list[str] = []
+    monkeypatch.setattr(
+        win.bonus_door_page, "shutdown", lambda: calls.append("shutdown")
+    )
+    win.close()
+    assert calls == ["shutdown"]
+
+
+def test_bonus_door_page_exported_from_app_package():
+    """BD-03：app/__init__ 导出 BonusDoorPage。"""
+    from app import BonusDoorPage  # noqa: F401
+
+    assert BonusDoorPage.__name__ == "BonusDoorPage"

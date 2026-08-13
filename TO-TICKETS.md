@@ -12,13 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-13）：桌面端密码门批次（来源：DESIGN_MOBILE.md v5 §5.2；移动端 PWA 暂缓，不入本表）。
+> 活跃表（2026-08-13）：桌面端密码门批次（来源：DESIGN_MOBILE.md v5 §5.2；移动端 PWA 暂缓，不入本表）——**BD-01~04 已全部完成并归档（见「已完成归档」）**。
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| BD-01 | kkrb 数据层：`BonusDoorItem` + `parse_bonus_door_response` + `fetch_bonus_door_data()`（默认剔除 `az3r6`，复用会话/锁/60s 缓存） | 功能（数据层） | 📝 已录入 | — |
-| BD-02 | 桌面端密码门页面 `app/bonus_door_page.py`：网格卡片（地图名 + 密码大字，无更新时间）、`FetchPageBase` 基建复用、`apply_theme` 钩子、加载/错误/空态 | 功能（UI） | 📝 已录入 | — |
-| BD-03 | 装配：侧边栏第三导航「密码门」+ `QStackedWidget` 第三页 + 信号显式连接（C4 契约）+ UI 测试 | 功能（装配） | 📝 已录入 | — |
-| BD-04 | 文档收尾：CODE_WIKI §4 模块表 + doc_sync --update + 设计稿状态同步 | 文档 | 📝 已录入 | — |
+| （空） | BD-01~04 已归档（2026-08-13） | — | ✅ | — |
 
 ---
 
@@ -370,6 +367,15 @@
 ---
 
 ## 已完成归档
+
+### BD 系列（2026-08-13，桌面端密码门模块，来源：DESIGN_MOBILE.md v5 §5.2，基线 4a235ca，分支 kickoff/bd-bonus-door）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| BD-01 | kkrb 数据层：`BonusDoorItem`（frozen，全 str）+ `BONUS_DOOR_NAMES` 映射单源（7 键，定义序=输出序）+ `parse_bonus_door_response` 纯函数（畸形矩阵 V-01 惯例）+ `fetch_bonus_door_data()`（`_EXCLUDED_BONUS_DOOR_KEYS = {az3r6}` 单点剔除，复用会话/锁/60s 缓存）；FakeOpener 传输/缓存/错误降级 V-05 惯例；kkrb 三文件覆盖 100%，72/72 | ✅ 2026-08-13 | `ec35780` |
+| BD-02 | 密码门页面 `app/bonus_door_page.py`：`BonusDoorPage(FetchPageBase)` 动态卡片网格（`_render_data` 清空重建）、地图名 + 密码大字 34px bold 内联（颜色全 QSS 选择器 `#bonusDoorCard/#bonusDoorMap/#bonusDoorPassword`，双主题）、空态「暂无数据」/ 错误态「加载失败，点击重试」`_show_placeholder` 共用（C2-05）、`apply_theme` 空钩子、**不展示更新时间**（v5）；`make_stub_client` 增 `bonus_impl` 参数（既有调用零改动）；页面 100% / theme 98%，13/13 | ✅ 2026-08-13 | `6e3059c` |
+| BD-03 | 装配：侧边栏第三导航「🔑 密码门」（`EMOJI['nav_bonus_door']` 单一来源）+ `QStackedWidget` 第三页（共享同一 client，C2-02 惯例）+ `_preload_profit_page` 改名 `_preload_data_pages` 扇出密码门 preload + closeEvent shutdown；`app/__init__` 导出；main_window 90% / sidebar 99% / ui_text 100% | ✅ 2026-08-13 | `c9b30cc` |
+| BD-04 | 文档收尾：CODE_WIKI §4 补 kkrb_models/kkrb_parsing/bonus_door_page 三节（lines+sig 标记）+ kkrb_client 方法表（fetch_bonus_door_data 等）+ §3 文件树 + doc_sync 双绿（614 项 tests_total 一致）；DEV_LOG 批次记录；本表归档 | ✅ 2026-08-13 | 本提交 |
 
 ### 技术债批次 C4-债9/11/12（2026-08-13，kickoff 轻量档全自动，基线 f70347d）+ C4-债10 复核关闭
 

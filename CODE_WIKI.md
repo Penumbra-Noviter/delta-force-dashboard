@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次全部完成）  
 > 生成日期：2026-08-12  
-> 测试状态：<!--AUTO:tests_total:total-->580<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->614<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->580<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->614<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）全部完成 |
 
 ---
@@ -91,6 +91,7 @@ Delta Force Dashboard/
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
 │   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
 │   ├── profit_page.py       ← 利润页面单页滚动容器（制造产物 + 兑换利润纵向堆叠）
+│   ├── bonus_door_page.py   ← 密码门页面（BD-02：动态网格卡片，地图名 + 密码大字，无更新时间）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
@@ -120,9 +121,9 @@ Delta Force Dashboard/
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->34<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
-│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->102<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
-│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->30<!--/AUTO--> 个测试（数据模型 + 客户端会话/传输/缓存 + 解析收敛验证）
-│   ├── test_kkrb_parsing.py ← <!--AUTO:tests:tests/test_kkrb_parsing.py-->28<!--/AUTO--> 个测试（解析纯函数 + 畸形输入矩阵：非 dict/缺字段/类型异常/排序/回退 key）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->109<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> 个测试（数据模型 + 客户端会话/传输/缓存 + 解析收敛验证）
+│   ├── test_kkrb_parsing.py ← <!--AUTO:tests:tests/test_kkrb_parsing.py-->37<!--/AUTO--> 个测试（解析纯函数 + 畸形输入矩阵：非 dict/缺字段/类型异常/排序/回退 key）
 │   ├── test_load_state.py   ← <!--AUTO:tests:tests/test_load_state.py-->8<!--/AUTO--> 个测试（LoadState 四态转移矩阵：防重入/失败重试/loaded 手动刷新）
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
@@ -132,6 +133,7 @@ Delta Force Dashboard/
 │   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->26<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
+│   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->13<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -162,7 +164,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~643 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~649 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -357,7 +359,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~671 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~686 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -568,11 +570,18 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.16 `kkrb_client.py` — kkrb.net API 客户端（L-02/V-01，<!--AUTO:lines:kkrb_client.py-->~156 行<!--/AUTO-->）
+### 4.16 `kkrb_client.py` — kkrb.net API 客户端（L-02/V-01，<!--AUTO:lines:kkrb_client.py-->~187 行<!--/AUTO-->）
 
-kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie 提取）/ HTTP 传输 / TTL 缓存三合一，纯 stdlib 零外部依赖；数据入口 `fetch_ov_data()` / `fetch_ammo_package_data()`；解析收敛于 `kkrb_models` / `kkrb_parsing`（V-01），本模块只留会话 / 传输 / 缓存。
+kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie 提取）/ HTTP 传输 / TTL 缓存三合一，纯 stdlib 零外部依赖；数据入口 `fetch_ov_data()` / `fetch_ammo_package_data()` / `fetch_bonus_door_data()`（BD-01）；解析收敛于 `kkrb_models` / `kkrb_parsing`（V-01），本模块只留会话 / 传输 / 缓存。
 
 **C2-01 并发契约**：`__init__` 持有 `threading.Lock`；`_post_json` 对「缓存检查 → 握手 → 请求 → 缓存写入」**整体持锁**（`_ensure_csrf` 仅在本方法内被调用，无锁内重入），保证共享 client 被多后台线程并发调用时握手恰一次、缓存无脏读（C2-02 共享 client 的必要前提）。`reset()` 清会话与缓存（无锁，当前无生产调用点——AA-03 注记）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_ov_data-->`fetch_ov_data()`<!--/AUTO--> | 获取制造产物推荐（4 台位，按利润降序） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_ammo_package_data-->`fetch_ammo_package_data()`<!--/AUTO--> | 获取子弹自选包兑换利润（cn 区，按利润降序） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_bonus_door_data-->`fetch_bonus_door_data()`<!--/AUTO--> | 获取每日地图密码门数据（BD-01，映射定义顺序；**默认剔除 `az3r6`**——§5.1 排除策略单点，两端一致硬排除） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.reset-->`reset()`<!--/AUTO--> | 重置 CSRF token / cookie 会话 / 缓存（AA-03 锁边界，强制下次重新握手） |
 
 ---
 
@@ -593,6 +602,31 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 - **C2-05 错误/空态分离**：`_render_error()` 钩子（默认实现 = 空态渲染，与既有 `_on_fetch_error` 行为逐字节等价）；`_on_fetch_error` = status label 逻辑（KkrbError/非 KkrbError 文案 + 点击重试）+ `self._render_error()`；CraftingPage 覆盖为「加载失败，点击重试」卡片，与空态「暂无数据」可区分；
 - **单出口**：`ProfitPage` 在父层扇出 `preload()` / `apply_theme()`（C2-02 / C1-07），页面外部不再直插子页方法。
 
+### 4.20 `kkrb_models.py` — kkrb.net 数据模型（零依赖叶子，BD-01，<!--AUTO:lines:kkrb_models.py-->~55 行<!--/AUTO-->）
+
+零依赖叶子（仿 `signals.py` 先例）：模型 / 异常被解析、客户端与 UI 页共同引用。BD-01 新增 `BonusDoorItem`（key/name/password/updated 全 str，frozen dataclass——updated 为 `YYYYMMDDHHMMSS` 时间戳原样字符串，展示层不展示，v5 拍板）与 `BONUS_DOOR_NAMES: dict[str, str]`（地图键 → 中文名映射**单源**：`db`零号大坝 / `cgxg`长弓溪谷 / `bks`巴克什 / `htjd`航天基地 / `cxjy`潮汐监狱 / `az3`AZ3 / `az3r6`AZ3彩六联动房，§5.1；**定义顺序即解析输出顺序**，kkrb 新增地图在此扩展）。
+
+### 4.21 `kkrb_parsing.py` — kkrb.net 响应解析（纯函数，BD-01，<!--AUTO:lines:kkrb_parsing.py-->~171 行<!--/AUTO-->）
+
+从 kkrb_client 拆出的纯函数模块（零网络依赖）：畸形输入矩阵可脱离网络直接单测。BD-01 新增 `parse_bonus_door_response`——按 `BONUS_DOOR_NAMES` 定义顺序输出、映射外键跳过、password/updated 缺省空串；**不剔除 `az3r6`**（排除单点在 client 层）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:kkrb_parsing.py:parse_ov_response-->`parse_ov_response(data)`<!--/AUTO--> | 解析 getOVData 响应（4 台位，利润降序） |
+| <!--AUTO:sig:kkrb_parsing.py:parse_ammo_package_response-->`parse_ammo_package_response(data)`<!--/AUTO--> | 解析 getAmmoPackageData 响应（cn 区，利润降序） |
+| <!--AUTO:sig:kkrb_parsing.py:parse_bonus_door_response-->`parse_bonus_door_response(data)`<!--/AUTO--> | 解析 getBonusDoorData 响应（BD-01：映射定义顺序稳定输出；畸形矩阵同 V-01 惯例） |
+
+### 4.22 `app/bonus_door_page.py` — 密码门页面（BD-02/03，<!--AUTO:lines:app/bonus_door_page.py-->~96 行<!--/AUTO-->）
+
+`BonusDoorPage(FetchPageBase)`——QStackedWidget Page 2（侧边栏第三导航「密码门」，BD-03）。网格卡片**动态构建**：`_render_data` 清空网格按数据重建（当前 6 图固定、未来可能变化，数据量小重建成本可忽略）；每卡 = 地图名（`#bonusDoorMap`，FG_MUTED）+ 密码大字（`#bonusDoorPassword`，内联 34px bold，颜色走 QSS → TEXT_PRIMARY，**不展示更新时间** v5 拍板）。空态占位「暂无数据」/ 错误态占位「加载失败，点击重试」（C2-05 可区分，`_show_placeholder` 共用）。`apply_theme` 空操作（颜色全 QSS 选择器驱动，C1-07）；MainWindow 启动预加载与 closeEvent 回收（`_preload_data_pages` 单出口）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._fetch-->`_fetch()`<!--/AUTO--> | 后台线程取数：`client.fetch_bonus_door_data()`（az3r6 已在 client 层剔除） |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._render_data-->`_render_data(data)`<!--/AUTO--> | 清空卡片网格按数据重建；空数据 → 占位「暂无数据」 |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._render_error-->`_render_error()`<!--/AUTO--> | 错误态：清空卡片 + 占位「加载失败，点击重试」（与空态可区分） |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换钩子：空操作（C1-07，颜色全 QSS 选择器驱动） |
+
 ---
 
 ## 五、依赖关系
@@ -604,7 +638,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->580<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->614<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -703,6 +737,7 @@ main.py
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
+| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->13<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme 空操作/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`
 
@@ -713,8 +748,8 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->102<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
-| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->30<!--/AUTO--> | 数据模型 + OV 响应解析 |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->109<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
+| `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> | 数据模型 + OV 响应解析 |
 | `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->34<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->24<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |

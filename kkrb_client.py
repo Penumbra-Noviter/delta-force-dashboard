@@ -11,6 +11,7 @@ from __future__ import annotations
 
 __all__ = [
     "AmmoPackageItem",
+    "BonusDoorItem",
     "CraftingProduct",
     "KkrbClient",
     "KkrbError",
@@ -26,16 +27,31 @@ from typing import Any
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
 # 重新导出（协议表面保持）：模型/异常定义在 kkrb_models 叶子
-from kkrb_models import AmmoPackageItem, CraftingProduct, KkrbError  # noqa: F401
-from kkrb_parsing import parse_ammo_package_response, parse_ov_response
+from kkrb_models import (  # noqa: F401
+    AmmoPackageItem,
+    BonusDoorItem,
+    CraftingProduct,
+    KkrbError,
+)
+from kkrb_parsing import (
+    parse_ammo_package_response,
+    parse_bonus_door_response,
+    parse_ov_response,
+)
 
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.kkrb.net"
 _OV_ENDPOINT = f"{_BASE_URL}/getOVData"
 _AMMO_PACKAGE_ENDPOINT = f"{_BASE_URL}/getAmmoPackageData"
+_BONUS_DOOR_ENDPOINT = f"{_BASE_URL}/getBonusDoorData"
 _TIMEOUT = 10
 _CACHE_TTL = 60  # 秒；缓存有效期内不重复请求
+
+#: 密码门排除键（BD-01，§5.1 排除策略）：az3r6（AZ3 彩六联动房）两端一致
+#: 硬排除、不做开关；过滤单点在本模块 fetch_bonus_door_data（桌面端 UI 与
+#: 未来手机代理端点同源同结果）。
+_EXCLUDED_BONUS_DOOR_KEYS: frozenset[str] = frozenset({"az3r6"})
 
 
 # ── 客户端 ──────────────────────────────────────────────
@@ -81,6 +97,26 @@ class KkrbClient:
         """
         data = self._post_json(_AMMO_PACKAGE_ENDPOINT)
         return parse_ammo_package_response(data)
+
+    def fetch_bonus_door_data(self) -> list[BonusDoorItem]:
+        """获取每日地图密码门数据（BD-01）。
+
+        **排除策略（§5.1）**：默认剔除 ``az3r6``（AZ3 彩六联动房）——
+        两端一致硬排除、不做开关，过滤单点在本方法（桌面端 UI 与未来
+        手机代理端点同源同结果）；如需恢复显示，改本方法一处即可。
+
+        Returns:
+            BonusDoorItem 列表（映射定义顺序，6 张图，az3r6 已剔除）。
+
+        Raises:
+            KkrbError: 网络请求失败或数据解析失败。
+        """
+        data = self._post_json(_BONUS_DOOR_ENDPOINT)
+        return [
+            item
+            for item in parse_bonus_door_response(data)
+            if item.key not in _EXCLUDED_BONUS_DOOR_KEYS
+        ]
 
     # ── CSRF 管理 ───────────────────────────────────────
 
