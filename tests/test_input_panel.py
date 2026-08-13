@@ -151,6 +151,51 @@ def test_w02_shake_on_invalid_input(qapp, type_and_settle):
     ip.close()
 
 
+def test_w02_shake_identity_guard(qapp):
+    """C4-债7：_shake finished 的 identity 检查契约保持（并发在途不误清新句柄）。
+
+    诚实声明：本测为契约守卫而非红绿反证——Qt 在「同 target 同 property」
+    上启动新 QPropertyAnimation 会自动停掉旧动画（stop 零帧零 finished，
+    PySide6 6.11.1 实测 finished_log 仅新动画），「旧动画自然结束触发
+    finished 时新动画仍在 Running」的并发路径当前不可构造，修复前本测
+    同样通过。identity 检查与 chart_widget on_finished 同款，属防御性
+    一致性加固（C4-债3/5 定案）；本测锁定其可观察契约：直调 _shake 二次
+    覆盖句柄后，旧动画的 finished（若将来 Qt 行为变化或路径可达）不得
+    误清新句柄，句柄只随新动画自然结束清空。
+    """
+    from PySide6.QtTest import QTest
+
+    from app import motion
+    from app.input_panel import InputPanel
+
+    ip = InputPanel()
+    ip.show()
+    QTest.qWait(30)
+
+    # 环境态自持：本用例依赖动效开启（_shake 直调路径），显式置开 +
+    # try/finally 恢复（关闭态 _shake 直接 return，无动画可断言）。
+    prev = motion.animations_enabled()
+    motion.set_animations_enabled(True)
+    try:
+        entry = ip.cash_entry
+        entry._shake()  # anim1：150ms
+        QTest.qWait(50)  # anim1 在途（约剩 100ms）
+        anim1 = entry._shake_anim
+        entry._shake()  # anim2：新启动（Qt 自动停 anim1），句柄覆盖为 anim2
+        anim2 = entry._shake_anim
+        assert anim2 is not anim1
+        QTest.qWait(130)  # anim1 原定结束点已过（其 finished 未触发）；anim2 仍在 Running
+        assert entry._shake_anim is anim2  # 句柄未被陈旧 finished 误清
+        QTest.qWait(100)  # anim2（150ms）自然结束
+        assert entry._shake_anim is None
+    finally:
+        motion.set_animations_enabled(prev)
+    # 排水等待：在途动画自然结束 + DWS 自删全部处理，避免 entry 随测试
+    # 结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
+    QTest.qWait(100)
+    ip.close()
+
+
 def test_invariant_warning_border_on_cash_over_warehouse(qapp, type_and_settle):
     """现金 > 仓库 → 两个输入框进入 warning 态（越界红边，O-08）。"""
     ip = InputPanel()
