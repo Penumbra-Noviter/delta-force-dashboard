@@ -125,6 +125,29 @@ def test_bonus_door_empty_data_shows_placeholder(qapp) -> None:
     page.hide()
 
 
+def test_bonus_door_render_data_none_fields_defensive(qapp) -> None:
+    """BD-债3：None 字段的 BonusDoorItem（仅 stub 手造可达）渲染不崩，显示空串。
+
+    契约守卫（C4-债6 先例）：实测 PySide6 6.11.1 下 QLabel(None) 不崩、
+    退化为空文本——无行为级反证，改动属防御性/一致性加固（QLabel 构造
+    入参契约是 str），测试锁定「None 字段 → 空串显示」行为。
+    """
+    from app.bonus_door_page import BonusDoorPage
+    from kkrb_client import BonusDoorItem
+
+    page = BonusDoorPage(client=make_stub_client())
+    page._render_data(
+        [
+            BonusDoorItem(key="db", name=None, password=None, updated=None),  # type: ignore[arg-type]
+            BonusDoorItem(key="cgxg", name=None, password=None, updated=None),  # type: ignore[arg-type]
+        ]
+    )
+    assert len(page._cards) == 2
+    for card in page._cards:
+        assert card._map_label.text() == ""
+        assert card._password_label.text() == ""
+
+
 def test_bonus_door_render_data_none_falls_back_to_empty(qapp) -> None:
     """Falsify：_render_data(None) 与空数据等价（data or [] 兜底，不抛）。"""
     from app.bonus_door_page import BonusDoorPage

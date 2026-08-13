@@ -61,6 +61,9 @@ class BonusDoorPage(FetchPageBase):
         密码大字字号/字重为内联样式（34px bold，与 KPI 同字号体系），
         颜色全部 QSS 选择器驱动（#bonusDoorPassword → TEXT_PRIMARY），
         无构建期冻结色（C1 契约）。
+
+        文本入参 ``or ""`` 兜底（BD-债3）：QLabel 构造入参契约是 str，
+        None 字段仅 stub 手造可达（真实路径 parse 恒产 str），纯防御。
         """
         card = QFrame()
         card.setObjectName("bonusDoorCard")
@@ -70,11 +73,11 @@ class BonusDoorPage(FetchPageBase):
         cl.setContentsMargins(16, 14, 16, 14)
         cl.setSpacing(6)
 
-        card._map_label = QLabel(item.name)
+        card._map_label = QLabel(item.name or "")
         card._map_label.setObjectName("bonusDoorMap")
         cl.addWidget(card._map_label)
 
-        card._password_label = QLabel(item.password)
+        card._password_label = QLabel(item.password or "")
         card._password_label.setObjectName("bonusDoorPassword")
         card._password_label.setStyleSheet(
             "font-size: 34px; font-weight: bold;"

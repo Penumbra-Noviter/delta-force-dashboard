@@ -12,10 +12,7 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-13）：BD 技术债消费批次（轻量档）。
-| Ticket | 标题 | 类型 | 状态 | 强度 |
-|--------|------|------|------|------|
-| BD-债1~3 | 技术债消费：业务错误码检查 + 未知地图键 warning + None 字段防御 | 修复（技术债） | 🔄 进行中 | ⚪/🟡/⚪ |
+> 活跃表（2026-08-13）：无进行中工单（BD-债1~3 已归档，技术债区清零）。
 
 ---
 
@@ -23,13 +20,13 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 >
-> **技术债区（2026-08-13）：3 条新录入（BD 批次期末四轴非阻断）。**
+> **技术债区（2026-08-13）：3 条新录入（BD 批次期末四轴非阻断），同日消费清零（BD-债1~3 批次，见归档）。**
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | 🔄 已立项（BD-债1~3 批次） |
-| BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | 🔄 已立项（BD-债1~3 批次） |
-| BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | 🔄 已立项（BD-债1~3 批次） |
+| BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | ✅ 已修 2026-08-13 |
+| BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | ✅ 已修 2026-08-13 |
+| BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | ✅ 已修 2026-08-13 |
 
 ---
 
@@ -396,6 +393,14 @@
 ---
 
 ## 已完成归档
+
+### BD-债1~3 技术债消费批次（2026-08-13，kickoff 轻量档，基线 84ea3a8，分支 kickoff/bd-debt）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| BD-债1 | kkrb 业务错误码检查——`parse_bonus_door_response` code 存在且 != 1 → `KkrbError`（消息带响应 msg，无 msg 不悬挂空冒号）；code 缺失/为 1 正常解析（容错，既有无 code 畸形矩阵用例保持通过）；docstring 分层一致（顶层非 dict 在前） | ✅ 2026-08-13 | 本提交 |
+| BD-债2 | 未知地图键 warning——解析前对比 data 键集与 `BONUS_DOOR_NAMES`，映射外键 `logger.warning`（列出键名，str 映射后排序稳定）；遍历逻辑不变（未知键仍跳过）；模块新增 `logger = logging.getLogger(__name__)`；Falsify：非 str 键（仅手造可达）不崩 | ✅ 2026-08-13 | 本提交 |
+| BD-债3 | None 字段防御——`_build_card` `item.name/password or ""`（QLabel 构造入参契约 str，纯防御；实测 PySide6 6.11.1 `QLabel(None)` 不崩退化为空文本——契约守卫，C4-债6 先例）；测试 614→621（+7），kkrb_parsing 100% / bonus_door_page 100% | ✅ 2026-08-13 | 本提交 |
 
 ### BD 系列（2026-08-13，桌面端密码门模块，来源：DESIGN_MOBILE.md v5 §5.2，基线 4a235ca，分支 kickoff/bd-bonus-door）
 

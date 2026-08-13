@@ -427,6 +427,39 @@ class TestParseBonusDoorResponse:
         """data 字段不是 dict → 空列表（不回退、不抛）。"""
         assert parse_bonus_door_response({"code": 1, "data": "oops"}) == []
 
+    # ── BD-债1：业务错误码检查 ──────────────────────────────
+
+    def test_parse_business_error_code_raises_with_msg(self) -> None:
+        """code 存在且 != 1 → KkrbError，消息携带响应 msg（业务失败不吞为「暂无数据」）。"""
+        with pytest.raises(KkrbError) as exc_info:
+            parse_bonus_door_response({"code": 0, "msg": "服务器维护"})
+        assert "密码门业务失败" in str(exc_info.value)
+        assert "服务器维护" in str(exc_info.value)
+
+    def test_parse_business_error_code_without_msg(self) -> None:
+        """code != 1 且无 msg → KkrbError 消息不悬挂空冒号。"""
+        with pytest.raises(KkrbError) as exc_info:
+            parse_bonus_door_response({"code": 0})
+        assert str(exc_info.value) == "密码门业务失败"
+
+    def test_parse_code_one_is_normal(self) -> None:
+        """code == 1 → 正常解析（与响应契约一致）。"""
+        items = parse_bonus_door_response(
+            {
+                "code": 1,
+                "data": {"db": {"password": "870140", "updated": "20260813000000"}},
+            }
+        )
+        assert [i.key for i in items] == ["db"]
+        assert items[0].password == "870140"
+
+    def test_parse_missing_code_with_data_is_normal(self) -> None:
+        """code 缺失但有 data → 正常解析（容错，不破坏既有无 code 用例）。"""
+        items = parse_bonus_door_response(
+            {"data": {"db": {"password": "870140", "updated": ""}}}
+        )
+        assert [i.key for i in items] == ["db"]
+
     def test_parse_malformed_top_level(self) -> None:
         with pytest.raises(KkrbError):
             parse_bonus_door_response("not a dict")
@@ -453,6 +486,41 @@ class TestParseBonusDoorResponse:
         }
         items = parse_bonus_door_response(data)
         assert [i.key for i in items] == ["db"]
+
+    def test_parse_unknown_key_logs_warning(self, caplog) -> None:
+        """BD-债2：映射外键 logger.warning 列出键名（可观测性），解析结果不含它。"""
+        import logging
+
+        data = {
+            "data": {
+                "db": {"password": "870140", "updated": "20260813000000"},
+                "new_map": {"password": "111111", "updated": "20260813000000"},
+            }
+        }
+        with caplog.at_level(logging.WARNING):
+            items = parse_bonus_door_response(data)
+
+        assert [i.key for i in items] == ["db"]
+        warnings = [r.message for r in caplog.records if r.name == "kkrb_parsing"]
+        assert warnings, "映射外键必须留下 warning 日志"
+        assert any("new_map" in w for w in warnings)
+        assert any("BONUS_DOOR_NAMES" in w for w in warnings)
+
+    def test_parse_unknown_key_non_str_logs_warning(self, caplog) -> None:
+        """Falsify：畸形非 str 键（仅手造可达）不崩，warning 仍列出键名。"""
+        import logging
+
+        data = {
+            "data": {
+                "db": {"password": "870140", "updated": "20260813000000"},
+                1: {"password": "111111", "updated": "20260813000000"},
+            }
+        }
+        with caplog.at_level(logging.WARNING):
+            items = parse_bonus_door_response(data)
+
+        assert [i.key for i in items] == ["db"]
+        assert any("1" in r.message for r in caplog.records if r.name == "kkrb_parsing")
 
     def test_parse_missing_fields_default(self) -> None:
         """password/updated 缺省 → 空串兜底，不抛。"""

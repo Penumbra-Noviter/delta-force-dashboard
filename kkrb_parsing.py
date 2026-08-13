@@ -14,6 +14,7 @@ __all__ = [
     "parse_ov_response",
 ]
 
+import logging
 from typing import Any
 
 from kkrb_models import (
@@ -23,6 +24,8 @@ from kkrb_models import (
     CraftingProduct,
     KkrbError,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def parse_ov_response(data: Any) -> list[CraftingProduct]:
@@ -161,23 +164,40 @@ def parse_bonus_door_response(data: Any) -> list[BonusDoorItem]:
     }
 
     输出按 ``BONUS_DOOR_NAMES`` 定义顺序（稳定顺序，与响应键序无关）；
-    **映射外键跳过**——kkrb 新增地图时需扩展 kkrb_models.BONUS_DOOR_NAMES
-    映射（单源契约，§5.1）。本函数不剔除 ``az3r6``：排除策略（两端一致
-    硬排除）单点落在 kkrb_client.fetch_bonus_door_data（§5.2）。
+    **映射外键跳过并 logger.warning**（BD-债2：kkrb 新增地图时需扩展
+    kkrb_models.BONUS_DOOR_NAMES 映射，单源契约 §5.1，未知键留日志）。
+    本函数不剔除 ``az3r6``：排除策略（两端一致硬排除）单点落在
+    kkrb_client.fetch_bonus_door_data（§5.2）。
 
     Args:
         data: _post_json 的产物（任意 JSON 值）。
 
     Returns:
-        地图条目列表；顶层非 dict 抛 KkrbError；data 缺失/非 dict → []；
+        地图条目列表；顶层非 dict 抛 KkrbError；业务失败（code 存在且
+        != 1）抛 KkrbError（消息携带响应 msg）；data 缺失/非 dict → []；
         畸形条目（非 dict）跳过；password/updated 缺省空串。
     """
     if not isinstance(data, dict):
         raise KkrbError(f"密码门数据格式异常: 期望 dict，got {type(data).__name__}")
 
+    code = data.get("code")
+    if code is not None and code != 1:
+        # BD-债1：业务失败（如 {"code": 0, "msg": "..."}）不能被吞成「暂无数据」
+        msg = data.get("msg", "")
+        suffix = f": {msg}" if msg else ""
+        raise KkrbError(f"密码门业务失败{suffix}")
+
     raw = data.get("data", {})
     if not isinstance(raw, dict):
         return []
+
+    # BD-债2：映射外键静默跳过不可观测——未知键留 warning（键名可读，排序稳定）
+    unknown_keys = sorted(str(key) for key in set(raw) - set(BONUS_DOOR_NAMES))
+    if unknown_keys:
+        logger.warning(
+            "密码门未知地图键（需扩展 BONUS_DOOR_NAMES）: %s",
+            ", ".join(unknown_keys),
+        )
 
     items: list[BonusDoorItem] = []
     for key, name in BONUS_DOOR_NAMES.items():
