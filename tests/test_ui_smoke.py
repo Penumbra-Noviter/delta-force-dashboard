@@ -410,6 +410,36 @@ def test_u06_motion_feedback(sample_window):
     assert box.property("_fade_anim") is None
 
 
+def test_u06_fade_in_widget_consecutive_contract(qapp):
+    """C4-债6：连续 fade 契约保持——在途二次 fade 停旧覆盖新，排水后清零。
+
+    诚实声明：本测为契约保持而非红绿反证——同调用内 setProperty 覆盖使
+    「stop 后 property 残留已删指针」在外部不可观察（读路径要么旧指针要么
+    新动画），在途销毁路径当前亦不崩；修复前后行为等价。修复为防御性/
+    一致性加固（C4-债3/5 定案：weakref 破环 + stop 后同步清 property），
+    本测锁定可观察契约：在途二次触发 → 排水后 effect/property 清零、无崩溃。
+    """
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QFrame
+
+    from app import motion
+    from app.motion import fade_in_widget
+
+    prev = motion.animations_enabled()
+    motion.set_animations_enabled(True)
+    try:
+        box = QFrame()
+        fade_in_widget(box, 50)
+        QTest.qWait(20)  # 在途
+        fade_in_widget(box, 50)  # stop 旧动画 + 覆盖新动画
+        QTest.qWait(150)  # 排水：新动画自然结束 + DWS 自删 + finished 清理
+        assert box.property("_fade_anim") is None
+        assert box.graphicsEffect() is None
+        # 存活即通过（在途连续触发无崩溃）
+    finally:
+        motion.set_animations_enabled(prev)
+
+
 def test_u06_draw_anim_bounded_lifecycle(sample_window):
     """C4-债4 AC-1：15 次连续 draw → qWait(400) → chart 零 QVariantAnimation 残留。
 

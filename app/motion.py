@@ -26,6 +26,7 @@ __all__ = [
     "set_animations_enabled",
 ]
 
+import weakref
 from typing import Callable
 
 from PySide6.QtCore import QEasingCurve, QObject, QPropertyAnimation, QVariantAnimation
@@ -60,15 +61,22 @@ def fade_in_widget(
         widget: 目标控件（动画期间短暂挂 QGraphicsOpacityEffect）
         duration_ms: 淡入时长（毫秒）
         easing: 缓动曲线
+
+    C4-债6：finished 闭包 weakref 破环 + stop 后同步清 property（对齐
+    C4-债3/5 生命周期收敛定案，防 DWS 残留窗口与在途销毁崩溃路径）。
     """
     if not _animations_enabled:
         return None
 
     # 防竞态：同 widget 连续触发时停掉旧动画——QPropertyAnimation.stop()
     # 不发 finished，旧动画的 effect 清理回调不会误删新 effect。
+    # C4-债6：stop 后同步清 property——DWS 自删不发 finished，清理 lambda
+    # 不执行，property 会残留已删对象的悬空指针（读路径 use-after-free 窗口）；
+    # 同步清后读路径要么 None 要么有效动画，结构性消除残留窗口。
     old = widget.property("_fade_anim")
     if isinstance(old, QPropertyAnimation):
         old.stop()
+        widget.setProperty("_fade_anim", None)
 
     effect = QGraphicsOpacityEffect(widget)
     widget.setGraphicsEffect(effect)
@@ -80,8 +88,20 @@ def fade_in_widget(
     anim.setEasingCurve(easing)
     # DeleteWhenStopped 自删动画后，dynamic property 里的 QObject 指针会悬空
     # （下次读取访问已删对象可能崩溃）——finished 时同步清 property。
-    anim.finished.connect(lambda: widget.setGraphicsEffect(None))
-    anim.finished.connect(lambda: widget.setProperty("_fade_anim", None))
+    # C4-债6：finished 闭包以 weakref 持有 widget 破环（保持原顺序：
+    # 先 setGraphicsEffect(None) 再清 property）——强闭包环在「widget 动画
+    # 在途时销毁」路径与 DWS 延迟删除互踩 → access violation（C4-债5 实测
+    # kpi_presenter/_shake 同款）；weakref 后闭包随动画自删一起释放，
+    # 不依赖循环 GC 整链回收。
+    owner = weakref.ref(widget)
+
+    def _on_finished() -> None:
+        w = owner()
+        if w is not None:
+            w.setGraphicsEffect(None)
+            w.setProperty("_fade_anim", None)
+
+    anim.finished.connect(_on_finished)
     anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
     widget.setProperty("_fade_anim", anim)
     return anim
