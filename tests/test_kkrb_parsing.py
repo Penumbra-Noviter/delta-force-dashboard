@@ -423,6 +423,17 @@ class TestParseBonusDoorResponse:
     def test_parse_missing_data_key(self) -> None:
         assert parse_bonus_door_response({}) == []
 
+    def test_parse_code_str_one_ok(self) -> None:
+        """code 为字符串 "1"（PHP 弱类型可能返回 str）→ 正常解析，不误判业务失败。
+
+        BD-债批次评审①：`"1" != 1` 字面比较会把成功响应误判为业务失败。
+        """
+        items = parse_bonus_door_response(
+            {"code": "1", "data": {"db": {"password": "0003", "updated": ""}}}
+        )
+        assert len(items) == 1
+        assert items[0].password == "0003"
+
     def test_parse_data_not_dict(self) -> None:
         """data 字段不是 dict → 空列表（不回退、不抛）。"""
         assert parse_bonus_door_response({"code": 1, "data": "oops"}) == []

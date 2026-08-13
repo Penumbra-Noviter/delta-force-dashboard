@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）全部完成）  
 > 生成日期：2026-08-13  
-> 测试状态：<!--AUTO:tests_total:total-->621<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->623<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->621<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->623<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -129,7 +129,7 @@ Delta Force Dashboard/
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
 │   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->109<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> 个测试（数据模型 + 客户端会话/传输/缓存 + 解析收敛验证）
-│   ├── test_kkrb_parsing.py ← <!--AUTO:tests:tests/test_kkrb_parsing.py-->43<!--/AUTO--> 个测试（解析纯函数 + 畸形输入矩阵：非 dict/缺字段/类型异常/排序/回退 key）
+│   ├── test_kkrb_parsing.py ← <!--AUTO:tests:tests/test_kkrb_parsing.py-->44<!--/AUTO--> 个测试（解析纯函数 + 畸形输入矩阵：非 dict/缺字段/类型异常/排序/回退 key）
 │   ├── test_load_state.py   ← <!--AUTO:tests:tests/test_load_state.py-->8<!--/AUTO--> 个测试（LoadState 四态转移矩阵：防重入/失败重试/loaded 手动刷新）
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
@@ -139,7 +139,7 @@ Delta Force Dashboard/
 │   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->26<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
-│   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->14<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
+│   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -612,7 +612,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 
 零依赖叶子（仿 `signals.py` 先例）：模型 / 异常被解析、客户端与 UI 页共同引用。BD-01 新增 `BonusDoorItem`（key/name/password/updated 全 str，frozen dataclass——updated 为 `YYYYMMDDHHMMSS` 时间戳原样字符串，展示层不展示，v5 拍板）与 `BONUS_DOOR_NAMES: dict[str, str]`（地图键 → 中文名映射**单源**：`db`零号大坝 / `cgxg`长弓溪谷 / `bks`巴克什 / `htjd`航天基地 / `cxjy`潮汐监狱 / `az3`AZ3 / `az3r6`AZ3彩六联动房，§5.1；**定义顺序即解析输出顺序**，kkrb 新增地图在此扩展）。
 
-### 4.21 `kkrb_parsing.py` — kkrb.net 响应解析（纯函数，BD-01，<!--AUTO:lines:kkrb_parsing.py-->~188 行<!--/AUTO-->）
+### 4.21 `kkrb_parsing.py` — kkrb.net 响应解析（纯函数，BD-01，<!--AUTO:lines:kkrb_parsing.py-->~191 行<!--/AUTO-->）
 
 从 kkrb_client 拆出的纯函数模块（零网络依赖）：畸形输入矩阵可脱离网络直接单测。BD-01 新增 `parse_bonus_door_response`——按 `BONUS_DOOR_NAMES` 定义顺序输出、映射外键跳过、password/updated 缺省空串；**不剔除 `az3r6`**（排除单点在 client 层）。
 
@@ -622,7 +622,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | <!--AUTO:sig:kkrb_parsing.py:parse_ammo_package_response-->`parse_ammo_package_response(data)`<!--/AUTO--> | 解析 getAmmoPackageData 响应（cn 区，利润降序） |
 | <!--AUTO:sig:kkrb_parsing.py:parse_bonus_door_response-->`parse_bonus_door_response(data)`<!--/AUTO--> | 解析 getBonusDoorData 响应（BD-01：映射定义顺序稳定输出；畸形矩阵同 V-01 惯例） |
 
-### 4.22 `app/bonus_door_page.py` — 密码门页面（BD-02/03，<!--AUTO:lines:app/bonus_door_page.py-->~98 行<!--/AUTO-->）
+### 4.22 `app/bonus_door_page.py` — 密码门页面（BD-02/03，<!--AUTO:lines:app/bonus_door_page.py-->~103 行<!--/AUTO-->）
 
 `BonusDoorPage(FetchPageBase)`——QStackedWidget Page 2（侧边栏第三导航「密码门」，BD-03）。网格卡片**动态构建**：`_render_data` 清空网格按数据重建（当前 6 图固定、未来可能变化，数据量小重建成本可忽略）；每卡 = 地图名（`#bonusDoorMap`，FG_MUTED）+ 密码大字（`#bonusDoorPassword`，内联 34px bold，颜色走 QSS → TEXT_PRIMARY，**不展示更新时间** v5 拍板）。空态占位「暂无数据」/ 错误态占位「加载失败，点击重试」（C2-05 可区分，`_show_placeholder` 共用）。`apply_theme` 空操作（颜色全 QSS 选择器驱动，C1-07）；MainWindow 启动预加载与 closeEvent 回收（`_preload_data_pages` 单出口）。
 
@@ -644,7 +644,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->621<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->623<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -743,7 +743,7 @@ main.py
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
-| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->14<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme 空操作/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
+| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme 空操作/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`
 

@@ -181,7 +181,9 @@ def parse_bonus_door_response(data: Any) -> list[BonusDoorItem]:
         raise KkrbError(f"密码门数据格式异常: 期望 dict，got {type(data).__name__}")
 
     code = data.get("code")
-    if code is not None and code != 1:
+    # BD-债1 + 评审①：业务失败判定容错——code 为 str "1"（PHP 弱类型可能）
+    # 或 float 1.0（== 1）均视为成功；仅明确非 1 才判失败
+    if code is not None and code not in (1, "1"):
         # BD-债1：业务失败（如 {"code": 0, "msg": "..."}）不能被吞成「暂无数据」
         msg = data.get("msg", "")
         suffix = f": {msg}" if msg else ""
@@ -191,8 +193,9 @@ def parse_bonus_door_response(data: Any) -> list[BonusDoorItem]:
     if not isinstance(raw, dict):
         return []
 
-    # BD-债2：映射外键静默跳过不可观测——未知键留 warning（键名可读，排序稳定）
-    unknown_keys = sorted(str(key) for key in set(raw) - set(BONUS_DOOR_NAMES))
+    # BD-债2：映射外键静默跳过不可观测——未知键留 warning（键名可读，排序稳定；
+    # 评审③：str 化后 set 去重——int 1 与 str "1" 并存时只列一次）
+    unknown_keys = sorted({str(key) for key in set(raw) - set(BONUS_DOOR_NAMES)})
     if unknown_keys:
         logger.warning(
             "密码门未知地图键（需扩展 BONUS_DOOR_NAMES）: %s",

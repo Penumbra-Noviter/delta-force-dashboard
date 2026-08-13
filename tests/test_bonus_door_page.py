@@ -148,6 +148,26 @@ def test_bonus_door_render_data_none_fields_defensive(qapp) -> None:
         assert card._password_label.text() == ""
 
 
+def test_bonus_door_render_data_none_item_skipped(qapp) -> None:
+    """Falsify（BD-债批次评审②）：list 内 None 条目跳过不崩（仅 stub 手造可达）。
+
+    BD-债3 相邻边界：`_build_card(None)` 的 `item.name` 会 AttributeError；
+    真实路径 parse 恒产 BonusDoorItem，纯防御。
+    """
+    from app.bonus_door_page import BonusDoorPage
+    from kkrb_client import BonusDoorItem
+
+    page = BonusDoorPage(client=make_stub_client())
+    page._render_data(
+        [
+            None,  # type: ignore[list-item]
+            BonusDoorItem(key="db", name="零号大坝", password="0003", updated=""),
+        ]
+    )
+    assert len(page._cards) == 1
+    assert page._cards[0]._password_label.text() == "0003"
+
+
 def test_bonus_door_render_data_none_falls_back_to_empty(qapp) -> None:
     """Falsify：_render_data(None) 与空数据等价（data or [] 兜底，不抛）。"""
     from app.bonus_door_page import BonusDoorPage

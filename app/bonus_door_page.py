@@ -87,13 +87,19 @@ class BonusDoorPage(FetchPageBase):
         return card
 
     def _rebuild_cards(self, items: list[BonusDoorItem]) -> None:
-        """清空卡片网格并按数据重建（数据量小，重建成本可忽略）。"""
+        """清空卡片网格并按数据重建（数据量小，重建成本可忽略）。
+
+        None 条目跳过（BD-债批次评审②）：list 内 None 仅 stub 手造可达，
+        真实路径 parse 恒产 BonusDoorItem，纯防御。
+        """
         while self._card_grid.count():
             widget = self._card_grid.takeAt(0).widget()
             if widget is not None:
                 widget.deleteLater()
         self._cards = []
         for i, item in enumerate(items):
+            if item is None:
+                continue
             card = self._build_card(item)
             self._cards.append(card)
             self._card_grid.addWidget(card, i // _COLS, i % _COLS)
