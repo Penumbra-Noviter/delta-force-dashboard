@@ -12,10 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-13）：桌面端密码门批次（来源：DESIGN_MOBILE.md v5 §5.2；移动端 PWA 暂缓，不入本表）——**BD-01~04 已全部完成并归档（见「已完成归档」）**。
+> 活跃表（2026-08-13）：BD 技术债消费批次（轻量档）。
 | Ticket | 标题 | 类型 | 状态 | 强度 |
 |--------|------|------|------|------|
-| （空） | BD-01~04 已归档（2026-08-13） | — | ✅ | — |
+| BD-债1~3 | 技术债消费：业务错误码检查 + 未知地图键 warning + None 字段防御 | 修复（技术债） | 🔄 进行中 | ⚪/🟡/⚪ |
 
 ---
 
@@ -27,13 +27,39 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | 📝 待立项 |
-| BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | 📝 待立项 |
-| BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | 📝 待立项 |
+| BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | 🔄 已立项（BD-债1~3 批次） |
+| BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | 🔄 已立项（BD-债1~3 批次） |
+| BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | 🔄 已立项（BD-债1~3 批次） |
 
 ---
 
 ## 工单详情
+
+### BD-债1~3 技术债消费批次（2026-08-13，轻量档，来源：BD 批次期末四轴非阻断）
+
+**目标**：三条技术债一次清掉，各配回归测试（TDD 红→绿）。
+
+**BD-债1 — kkrb 业务错误码检查**：
+- `kkrb_parsing.py` `parse_bonus_door_response`：`code` 字段存在且 `!= 1` → 抛 `KkrbError`（消息带 `msg`）；`code` 缺失或为 1 → 正常解析（容错，不破坏既有用例）
+- 测试：`{"code": 0, "msg": "..."} → KkrbError`；`code:1` 正常；无 code 正常
+
+**BD-债2 — 未知地图键 warning**：
+- `kkrb_parsing.py`：解析前对比响应键集与 `BONUS_DOOR_NAMES`，映射外键 `logger.warning`（列出键名），遍历逻辑不变（未知键仍跳过）
+- 测试：含 `"new_map"` 的响应 → caplog 断言 warning 含键名
+
+**BD-债3 — None 字段防御**：
+- `app/bonus_door_page.py` `_render_data`：`item.password or ""`（及 name 同理）防 `QLabel(None)`
+- 测试：手造 `BonusDoorItem(password=None, name=None)` → 渲染不崩、显示空串
+
+**文件范围**：`kkrb_parsing.py`、`app/bonus_door_page.py`、`tests/test_kkrb_parsing.py`、`tests/test_bonus_door_page.py`
+**共享文件（申报改动）**：`CODE_WIKI.md`（doc_sync --update，行数/测试数标记）、`DEV_LOG.md`、`TO-TICKETS.md`（归档）
+
+**验收标准**：
+- [ ] 三条债各自红→绿（先写复现测试再修）
+- [ ] 全量 pytest 全绿（doc_sync 双绿）
+- [ ] 技术债区 BD-债1~3 归档（✅），无新债录入
+
+---
 
 ### BD 系列（2026-08-13，桌面端密码门模块，来源：DESIGN_MOBILE.md v5 §5.2）
 
