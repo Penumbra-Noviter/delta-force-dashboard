@@ -19,9 +19,24 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import re
 
+import pytest
+
 from tests.conftest import make_stub_client
 
 __all__ = []
+
+
+@pytest.fixture(autouse=True)
+def _drain_delete_later(qapp):
+    """排水：每个用例结束后处理 deleteLater 队列（_rebuild_cards 的旧卡删除）。
+
+    仓库既有纪律（test_ui_smoke C4-债4「排水等待」）：deleteLater 的 C++
+    对象随后续事件循环才真正删除——页面测试多次 _render_data 重建卡片若不
+    排水，pending-delete 对象跨用例累积（GDI/字体资源），全量套件跑至数百
+    窗口后触发 pyqtgraph TextItem 原生 access violation（Windows offscreen）。
+    """
+    yield
+    qapp.processEvents()
 
 
 def _sample_items() -> list:

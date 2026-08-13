@@ -91,6 +91,7 @@ Delta Force Dashboard/
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
 │   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
 │   ├── profit_page.py       ← 利润页面单页滚动容器（制造产物 + 兑换利润纵向堆叠）
+│   ├── bonus_door_page.py   ← 密码门页面（BD-02：动态网格卡片，地图名 + 密码大字，无更新时间）
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
@@ -571,9 +572,16 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ### 4.16 `kkrb_client.py` — kkrb.net API 客户端（L-02/V-01，<!--AUTO:lines:kkrb_client.py-->~187 行<!--/AUTO-->）
 
-kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie 提取）/ HTTP 传输 / TTL 缓存三合一，纯 stdlib 零外部依赖；数据入口 `fetch_ov_data()` / `fetch_ammo_package_data()`；解析收敛于 `kkrb_models` / `kkrb_parsing`（V-01），本模块只留会话 / 传输 / 缓存。
+kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie 提取）/ HTTP 传输 / TTL 缓存三合一，纯 stdlib 零外部依赖；数据入口 `fetch_ov_data()` / `fetch_ammo_package_data()` / `fetch_bonus_door_data()`（BD-01）；解析收敛于 `kkrb_models` / `kkrb_parsing`（V-01），本模块只留会话 / 传输 / 缓存。
 
 **C2-01 并发契约**：`__init__` 持有 `threading.Lock`；`_post_json` 对「缓存检查 → 握手 → 请求 → 缓存写入」**整体持锁**（`_ensure_csrf` 仅在本方法内被调用，无锁内重入），保证共享 client 被多后台线程并发调用时握手恰一次、缓存无脏读（C2-02 共享 client 的必要前提）。`reset()` 清会话与缓存（无锁，当前无生产调用点——AA-03 注记）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_ov_data-->`fetch_ov_data()`<!--/AUTO--> | 获取制造产物推荐（4 台位，按利润降序） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_ammo_package_data-->`fetch_ammo_package_data()`<!--/AUTO--> | 获取子弹自选包兑换利润（cn 区，按利润降序） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.fetch_bonus_door_data-->`fetch_bonus_door_data()`<!--/AUTO--> | 获取每日地图密码门数据（BD-01，映射定义顺序；**默认剔除 `az3r6`**——§5.1 排除策略单点，两端一致硬排除） |
+| <!--AUTO:sig:kkrb_client.py:KkrbClient.reset-->`reset()`<!--/AUTO--> | 重置 CSRF token / cookie 会话 / 缓存（AA-03 锁边界，强制下次重新握手） |
 
 ---
 
@@ -593,6 +601,31 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 - **C2-03 删哨兵**：`preload()` 不再读取 `QT_QPA_PLATFORM` 环境变量——测试模式靠构造注入压制网络（`tests/conftest.make_stub_client`），offscreen 哨兵已删除；
 - **C2-05 错误/空态分离**：`_render_error()` 钩子（默认实现 = 空态渲染，与既有 `_on_fetch_error` 行为逐字节等价）；`_on_fetch_error` = status label 逻辑（KkrbError/非 KkrbError 文案 + 点击重试）+ `self._render_error()`；CraftingPage 覆盖为「加载失败，点击重试」卡片，与空态「暂无数据」可区分；
 - **单出口**：`ProfitPage` 在父层扇出 `preload()` / `apply_theme()`（C2-02 / C1-07），页面外部不再直插子页方法。
+
+### 4.20 `kkrb_models.py` — kkrb.net 数据模型（零依赖叶子，BD-01，<!--AUTO:lines:kkrb_models.py-->~55 行<!--/AUTO-->）
+
+零依赖叶子（仿 `signals.py` 先例）：模型 / 异常被解析、客户端与 UI 页共同引用。BD-01 新增 `BonusDoorItem`（key/name/password/updated 全 str，frozen dataclass——updated 为 `YYYYMMDDHHMMSS` 时间戳原样字符串，展示层不展示，v5 拍板）与 `BONUS_DOOR_NAMES: dict[str, str]`（地图键 → 中文名映射**单源**：`db`零号大坝 / `cgxg`长弓溪谷 / `bks`巴克什 / `htjd`航天基地 / `cxjy`潮汐监狱 / `az3`AZ3 / `az3r6`AZ3彩六联动房，§5.1；**定义顺序即解析输出顺序**，kkrb 新增地图在此扩展）。
+
+### 4.21 `kkrb_parsing.py` — kkrb.net 响应解析（纯函数，BD-01，<!--AUTO:lines:kkrb_parsing.py-->~171 行<!--/AUTO-->）
+
+从 kkrb_client 拆出的纯函数模块（零网络依赖）：畸形输入矩阵可脱离网络直接单测。BD-01 新增 `parse_bonus_door_response`——按 `BONUS_DOOR_NAMES` 定义顺序输出、映射外键跳过、password/updated 缺省空串；**不剔除 `az3r6`**（排除单点在 client 层）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:kkrb_parsing.py:parse_ov_response-->`parse_ov_response(data)`<!--/AUTO--> | 解析 getOVData 响应（4 台位，利润降序） |
+| <!--AUTO:sig:kkrb_parsing.py:parse_ammo_package_response-->`parse_ammo_package_response(data)`<!--/AUTO--> | 解析 getAmmoPackageData 响应（cn 区，利润降序） |
+| <!--AUTO:sig:kkrb_parsing.py:parse_bonus_door_response-->`parse_bonus_door_response(data)`<!--/AUTO--> | 解析 getBonusDoorData 响应（BD-01：映射定义顺序稳定输出；畸形矩阵同 V-01 惯例） |
+
+### 4.22 `app/bonus_door_page.py` — 密码门页面（BD-02/03，<!--AUTO:lines:app/bonus_door_page.py-->~96 行<!--/AUTO-->）
+
+`BonusDoorPage(FetchPageBase)`——QStackedWidget Page 2（侧边栏第三导航「密码门」，BD-03）。网格卡片**动态构建**：`_render_data` 清空网格按数据重建（当前 6 图固定、未来可能变化，数据量小重建成本可忽略）；每卡 = 地图名（`#bonusDoorMap`，FG_MUTED）+ 密码大字（`#bonusDoorPassword`，内联 34px bold，颜色走 QSS → TEXT_PRIMARY，**不展示更新时间** v5 拍板）。空态占位「暂无数据」/ 错误态占位「加载失败，点击重试」（C2-05 可区分，`_show_placeholder` 共用）。`apply_theme` 空操作（颜色全 QSS 选择器驱动，C1-07）；MainWindow 启动预加载与 closeEvent 回收（`_preload_data_pages` 单出口）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._fetch-->`_fetch()`<!--/AUTO--> | 后台线程取数：`client.fetch_bonus_door_data()`（az3r6 已在 client 层剔除） |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._render_data-->`_render_data(data)`<!--/AUTO--> | 清空卡片网格按数据重建；空数据 → 占位「暂无数据」 |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage._render_error-->`_render_error()`<!--/AUTO--> | 错误态：清空卡片 + 占位「加载失败，点击重试」（与空态可区分） |
+| <!--AUTO:sig:app/bonus_door_page.py:BonusDoorPage.apply_theme-->`apply_theme()`<!--/AUTO--> | 主题切换钩子：空操作（C1-07，颜色全 QSS 选择器驱动） |
 
 ---
 
