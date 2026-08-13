@@ -163,6 +163,7 @@ def test_w02_shake_identity_guard(qapp):
     覆盖句柄后，旧动画的 finished（若将来 Qt 行为变化或路径可达）不得
     误清新句柄，句柄只随新动画自然结束清空。
     """
+    from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
 
     from app import motion
@@ -185,6 +186,10 @@ def test_w02_shake_identity_guard(qapp):
         anim2 = entry._shake_anim
         assert anim2 is not anim1
         QTest.qWait(130)  # anim1 原定结束点已过（其 finished 未触发）；anim2 仍在 Running
+        # C4-债12：时序加固——Windows 定时器粒度 ~15.6ms，高负载下 anim2 此时
+        # 仅剩 ~20ms；先断言 Running 再断言句柄 identity：时序漂移时红在辅助
+        # 断言（明确提示）而非误判 identity 契约（旧断言失败含义含混）。
+        assert anim2.state() == QAbstractAnimation.State.Running
         assert entry._shake_anim is anim2  # 句柄未被陈旧 finished 误清
         QTest.qWait(100)  # anim2（150ms）自然结束
         assert entry._shake_anim is None
@@ -471,3 +476,39 @@ def test_save_today_allows_boundary_equal(main_window):
     assert rec is not None
     assert rec.cash == 100.0
     assert rec.warehouse == 100.0
+
+
+# ── 保存指示淡入契约（U-06 + C4-债11）────────────────────
+
+
+def test_saved_indicator_fade_contract(qapp):
+    """C4-债11：保存指示淡入契约保持（删 _saved_indicator_anim 只写句柄后）。
+
+    诚实声明：本测为契约保持而非红绿反证——只写句柄删除无可观察行为差异。
+    既有覆盖（test_ui_smoke 保存流程）只断言指示器文案；本测补 fade 行为
+    契约：set_saved_indicator 触发淡入（_fade_anim property 同步就位）→
+    排水后 effect/property 收敛 None、无崩溃（对齐 U-06 fade 契约）。
+    """
+    from PySide6.QtTest import QTest
+
+    from app import motion
+    from app.input_panel import InputPanel
+
+    prev = motion.animations_enabled()
+    motion.set_animations_enabled(True)
+    try:
+        ip = InputPanel()
+        ip.show()
+        QTest.qWait(30)
+        try:
+            ip.set_saved_indicator("已保存 ✓")
+            assert ip.saved_indicator.text() == "已保存 ✓"
+            # fade 触发：property 同步就位（180ms 在途，无时序断言）
+            assert ip.saved_indicator.property("_fade_anim") is not None
+            QTest.qWait(400)  # 排水：180ms 动画自然结束 + DWS 自删 + finished 清理
+            assert ip.saved_indicator.property("_fade_anim") is None
+            assert ip.saved_indicator.graphicsEffect() is None
+        finally:
+            ip.close()
+    finally:
+        motion.set_animations_enabled(prev)
