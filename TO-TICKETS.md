@@ -24,7 +24,9 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
-| C4-债5 | 图表动画生命周期后续观察（⚪ 条件性）：① 动画生命周期收敛模式（stop 旧 + finished→identity→deleteLater）第三份拷贝（fade_in_widget / kpi_presenter / chart_widget）——若出现第 4 实例（如 hover/export 类动画）应抽 motion.py 共享 helper（现在抽是 Speculative）；② `_clear_all` 不停止在途揭示动画（依赖 ≤200ms 自然回收 + 闭包 None 检查，F5 实证无残留无崩溃）——可选加固：stop + 句柄复位使语义即时 | C4-债4 批次期末四轴（Architecture 观察） | ⚪ Speculative | 📝 |
+| C4-债6 | fade_in_widget 悬空指针 + 强闭包环（motion.py:74-85）：DWS 下 `old.stop()` 自删不发 finished → `_fade_anim` dynamic property 残留已删 C++ 指针 → 下次 fade_in_widget 读 property isinstance 通过 → `old.stop()` 调用已释放内存（use-after-free，C4-债3 kpi 崩溃同族）；强闭包环（widget → property → anim → finished → lambda → widget）为第二通道；当前无测试踩中（fade 均作用于新建控件）——修复方向：finished 回调改 weakref 破环 + 读 property 前判空/移除悬空清理依赖 | C4-债5 批次期末四轴（Falsify F-5） | 🟡 Worth exploring | 📝 |
+| C4-债7 | `_shake` 并发触发缺 identity 检查 + 不 stop 旧动画（input_panel.py:106-111）：旧动画 finished 无条件清 `_shake_anim`（若并发可达会误清新动画句柄），与项目其他两实例（kpi_presenter/chart_widget）的 identity 检查不一致；当前不可达（隐式不变式：debounce=150ms==shake=150ms + `prev != "invalid"` 属性守卫使两次抖动间隔 ≥300ms）——修复方向：`_on_finished` 加 `if edit._shake_anim is anim` identity 检查 | C4-债5 批次期末四轴（Standards S-1/S-2 + Falsify F-3 + Architecture A-2 同源合并） | ⚪ Speculative | 📝 |
+| C4-债8 | `test_u06_clear_all_stops_running_draw_anim`（test_ui_smoke.py:509-529）依赖全局动效开关默认 True（未自持开关，同文件开关测试有 finally 恢复惯例）——动效关闭时 `_draw_anim` 为 None → `.state()` AttributeError；修复方向：测试内显式 `set_animations_enabled(True)`（try/finally） | C4-债5 批次期末四轴（Falsify F-4） | ⚪ Speculative | 📝 |
 
 ---
 
@@ -299,6 +301,12 @@
 ---
 
 ## 已完成归档
+
+### 技术债批次 C4-债5（2026-08-13，kickoff 轻量档，基线 641ab0c）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| C4-债5 | 图表动画生命周期加固——① 第 4 实例复核关闭（动画点全量盘点 5 处，hover/export 无动画，不抽 helper）；② `_clear_all` 停止在途绘制动画（stop+deleteLater+句柄复位，chart_widget 665→700 行）；复核发现 `_shake` 收敛遗漏点一并加固（DWS 自删 + finished 清句柄，weakref 破环——工单「不用 weakref」定案被 Falsify 实测推翻：DWS+强闭包环在「在途销毁」路径确定性 access violation，C4-债3 同款定案）；测试 575→576（反证锚点 2 测试先红后绿），期末四轴 0 阻断 | ✅ 2026-08-13 | `b04e07e` + `6bcac30`（merge `6001a4a`） |
 
 ### 技术债批次（2026-08-12，kickoff 轻量档，基线 8bc4e68）
 
