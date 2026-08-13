@@ -10,7 +10,7 @@ Windows 桌面收益追踪工具（PySide6）：每日记录现金/仓库价值�
 python -m venv venv && venv\Scripts\activate   # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 python main.py                                # 运行（运行态数据落在 ~/Delta Force Dashboard/）
-pytest                                        # 全量测试（614 项，Qt 用例自动 offscreen）
+pytest                                        # 全量测试（630 项，Qt 用例自动 offscreen）
 python scripts/doc_sync.py --check            # CODE_WIKI 机械标记防漂移（pre-commit 钩子自动跑）
 python scripts/doc_sync.py                    # 改代码后刷新 CODE_WIKI 的测试数/行数/签名标记
 ```
@@ -28,6 +28,6 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
 
 ## 当前状态与下一步（2026-08-13）
 
-- BD 批次（桌面端密码门第三模块）已合并 main（merge `16026e6`）：614/614 测试、覆盖率 94%、期末四轴 0 阻断；技术债区 3 条（BD-债1~3，见 TO-TICKETS）
-- main 领先 origin/main 21 个提交未推送（含 BD 批次）
-- 下一步：用户确认后清场（删除 `.worktrees/bd-bonus-door/` 与 `kickoff/bd-bonus-door` 分支、`.scratch/` 残留）；或消费 BD-债1~3
+- IC 批次（技术债消费 IC-债1/2，kickoff 全自动档）已合并 main（merge `03098d5` + 评审小修 `3bf3482`）：630/630 测试、doc_sync 双绿、期末四轴 0 阻断；技术债区净清零（BD-债1~3 + IC-债1/2 全部 ✅，见 TO-TICKETS）
+- main 领先 origin/main 8 个提交未推送（含 IC 批次）
+- 下一步：用户确认后清场（删除 `.worktrees/ic-debt/` 与 `kickoff/ic-debt` 分支、`.scratch/` 残留含 `icons_preview_ic_batch.png`）
