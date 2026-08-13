@@ -64,6 +64,7 @@ Delta Force Dashboard.exe
 
 # 架构评审陈旧产物（报告输出至 D:\Desktop\To-do，仓库内不入库）
 python-arch-review-*.html
+docs/*.html
 
 # Runtime log (O-01: delta_force_dashboard.log 文件日志)
 delta_force_dashboard.log
