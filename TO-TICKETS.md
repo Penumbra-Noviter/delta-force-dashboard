@@ -23,10 +23,13 @@
 
 > 期末/波次审核的非阻断发现落盘于此（带来源 + 强度 + 状态），供未来会话与下一轮 kickoff 可见（读取契约：kickoff 步骤 0 预检；强度消费：Strong 必入 / Worth exploring 拍板 / Speculative 可复核关闭）。修复时机自由，不影响当前交付。落盘前与既有条目去重（文件:行号为主键），重复仅追加复证标注。
 >
-> **技术债区（2026-08-13）：当前为空——C4-债1~12 批次已全部消费归档。**
+> **技术债区（2026-08-13）：3 条新录入（BD 批次期末四轴非阻断）。**
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
+| BD-债1 | kkrb 业务错误码未检查：`{"code": 0, "msg": "..."}`（无 data）→ 渲染「暂无数据」而非错误态——业务失败被吞为"没数据"；与既有 parse_ov_response 惯例一致（同样忽略 code），维持一致性不改；语义值得知悉 | 期末四轴 Falsify | ⚪ Speculative | 📝 待立项 |
+| BD-债2 | 未知地图键静默跳过：kkrb 新增地图（BONUS_DOOR_NAMES 映射外）→ 无日志无提示，用户少一张卡且无从得知；「需扩展映射」仅是 docstring 契约——建议 kkrb_parsing 对映射外键 `logger.warning` 一次（低成本可观测性） | 期末四轴 Falsify | 🟡 Worth exploring | 📝 待立项 |
+| BD-债3 | `_render_data` 收到 None 字段的 BonusDoorItem（仅 stub 手造可达，真实路径 parse 恒产 str）→ `QLabel(None)` 在 UI 线程崩溃——一行 `item.password or ""` 可消除（防御） | 期末四轴 Falsify | ⚪ Speculative | 📝 待立项 |
 
 ---
 
