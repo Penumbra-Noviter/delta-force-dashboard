@@ -665,6 +665,16 @@ class ChartWidget(QWidget):
 
     def _clear_all(self) -> None:
         """销毁图表及占位。"""
+        # C4-债5：先停在途揭示动画再销毁 plot widget——stop 零帧零 finished
+        # （on_finished 不被触发，不干扰句柄），deleteLater 回收动画对象防
+        # 无界累积，句柄手动复位（stop 不发 finished → 必须显式置 None）。
+        # 动画关闭路径下 _draw_anim 未初始化，getattr 兜底（C4-债4 事实）。
+        old = getattr(self, "_draw_anim", None)
+        if old is not None:
+            old.stop()
+            old.deleteLater()
+            self._draw_anim = None
+
         self._clear_placeholder()
 
         if self._plot_widget is not None:

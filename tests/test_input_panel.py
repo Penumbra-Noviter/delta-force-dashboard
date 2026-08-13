@@ -120,7 +120,13 @@ def test_validation_via_real_event_chain(qapp, type_and_settle):
 
 
 def test_w02_shake_on_invalid_input(qapp, type_and_settle):
-    """W-02：非法输入触发抖动动画（状态从 valid 变 invalid），防抖不重复。"""
+    """W-02：非法输入触发抖动动画（状态从 valid 变 invalid），防抖不重复。
+
+    C4-债5：动画结束 DWS 自删 + finished 清句柄——断言从「句柄仍持有
+    Stopped 动画」改为「句柄已清空 + 子对象零 QPropertyAnimation 残留」
+    （旧实现动画对象滞留为子对象直至父销毁，长期使用无界累积）。
+    """
+    from PySide6.QtCore import QPropertyAnimation
     from PySide6.QtTest import QTest
 
     ip = InputPanel()
@@ -130,11 +136,18 @@ def test_w02_shake_on_invalid_input(qapp, type_and_settle):
     type_and_settle(ip.cash_entry, "100")  # valid
     type_and_settle(ip.cash_entry, "abc")  # valid → invalid：抖动触发
     assert ip.cash_entry._shake_anim is not None
-    first = ip.cash_entry._shake_anim
-    QTest.qWait(200)  # 动画结束，pos 恢复原位
-    # 连续非法（已 invalid）→ 不重复抖动（防抖）
+    QTest.qWait(200)  # 动画结束（150ms），pos 恢复原位
+    # 动画结束后句柄随 finished 清空，DWS 自删不滞留子对象
+    assert ip.cash_entry._shake_anim is None
+    assert not any(
+        isinstance(c, QPropertyAnimation) for c in ip.cash_entry.children()
+    )
+    # 连续非法（已 invalid）→ 不重复抖动（防抖），也不新建动画
     type_and_settle(ip.cash_entry, "xyz")
-    assert ip.cash_entry._shake_anim is first
+    assert ip.cash_entry._shake_anim is None
+    assert not any(
+        isinstance(c, QPropertyAnimation) for c in ip.cash_entry.children()
+    )
     ip.close()
 
 

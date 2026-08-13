@@ -9,6 +9,8 @@ from __future__ import annotations
 
 __all__ = ["MoneyLineEdit", "InputPanel"]
 
+import weakref
+
 from PySide6.QtCore import QPoint, QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -81,6 +83,13 @@ class MoneyLineEdit(QLineEdit):
 
         仅用户输入触发的校验失败时调用（失焦立即校验同路径）；
         动画对象挂 self 防 GC；动效关闭时直接跳过。
+        C4-债5：DeleteWhenStopped 自删 + finished 清句柄——旧实现动画结束后
+        对象滞留为子对象直至父销毁（长期使用无界累积），且句柄残留 Stopped
+        引用；DWS 自删后句柄指针悬空，finished 时必须同步清 _shake_anim。
+        闭包以 weakref 持有 self 破引用环（动画 ← 信号连接 ← 闭包 ← self）：
+        强持有会让「控件在动画在途时被销毁」的路径依赖循环 GC 整链回收，
+        DWS 的延迟删除与循环回收互踩 → access violation（C4-债5 实测复现；
+        同 kpi_presenter C4-债3 的破环定案）。
         """
         if not animations_enabled():
             return
@@ -92,7 +101,16 @@ class MoneyLineEdit(QLineEdit):
         anim.setKeyValueAt(0.5, start + QPoint(6, 0))
         anim.setKeyValueAt(0.75, start + QPoint(-4, 0))
         anim.setKeyValueAt(1.0, start)
-        anim.start()
+
+        owner = weakref.ref(self)
+
+        def _on_finished() -> None:
+            edit = owner()
+            if edit is not None:
+                edit._shake_anim = None
+
+        anim.finished.connect(_on_finished)
+        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
         self._shake_anim = anim
 
     def set_value(self, text: str) -> None:

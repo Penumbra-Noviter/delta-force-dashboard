@@ -506,6 +506,32 @@ def test_u06_draw_anim_final_state_and_switch_off(sample_window):
         assert win.chart._warehouse_curve.opacity() == 1.0
 
 
+def test_u06_clear_all_stops_running_draw_anim(sample_window):
+    """C4-债5 AC-1：动画半程 _clear_all → 在途动画停止、句柄复位 None。
+
+    旧实现 _clear_all 不停止在途 _draw_anim（依赖 ≤200ms 自然回收 + 闭包
+    判空），清空后句柄仍指向 Running 动画（反证锚点）；加固后先 stop +
+    deleteLater + 句柄复位，清空立即收敛（stop 零帧零 finished——on_finished
+    不被触发，句柄必须手动复位）。
+    """
+    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtTest import QTest
+
+    from app.chart_widget import ChartWidget
+
+    win = sample_window
+    records = win.logic.recent_records(7)
+    chart = ChartWidget()  # 同 AC-1：全新 chart 复现锚点，不随构造时机漂移
+    chart.draw(records)
+    QTest.qWait(100)  # 动画半程（200ms 时长）；Running 断言自证半程成立
+    assert chart._draw_anim.state() == QAbstractAnimation.State.Running
+    chart._clear_all()
+    assert getattr(chart, "_draw_anim", None) is None  # 句柄复位
+    # 排水等待：stop 后无在途回调 + deleteLater 全部处理，避免 chart 随
+    # 测试结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
+    QTest.qWait(400)
+
+
 def test_u06_motion_global_switch(qapp):
     """U-06：全局动效开关关闭时 fade_in 不设 effect、属性动画直接落终态。"""
     from PySide6.QtWidgets import QFrame
