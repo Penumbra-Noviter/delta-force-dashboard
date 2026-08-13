@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次全部完成）  
 > 生成日期：2026-08-12  
-> 测试状态：<!--AUTO:tests_total:total-->594<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->607<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->594<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->607<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）全部完成 |
 
 ---
@@ -132,6 +132,7 @@ Delta Force Dashboard/
 │   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->26<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
+│   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->13<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -357,7 +358,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~671 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~686 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -604,7 +605,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->594<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->607<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -703,6 +704,7 @@ main.py
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
+| `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->13<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme 空操作/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`
 

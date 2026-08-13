@@ -641,6 +641,22 @@ QPushButton#queryBtn:disabled {{
 }}
 
 /* ═══════════════════════════════════════════
+   密码门页面卡片（BD-02）
+   ═══════════════════════════════════════════ */
+QFrame#bonusDoorCard {{
+    background-color: {card_bg};
+    border: 1px solid {card_border};
+    border-radius: 12px;
+}}
+QLabel#bonusDoorMap {{
+    color: {fg_muted};
+    font-size: 13px;
+}}
+QLabel#bonusDoorPassword {{
+    color: {t["TEXT_PRIMARY"]};
+}}
+
+/* ═══════════════════════════════════════════
    表格
    ═══════════════════════════════════════════ */
 QTableWidget {{

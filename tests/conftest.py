@@ -24,22 +24,27 @@ __all__ = []
 def make_stub_client(
     ov_impl: Callable[[], list] | None = None,
     ammo_impl: Callable[[], list] | None = None,
+    bonus_impl: Callable[[], list] | None = None,
 ) -> SimpleNamespace:
     """构造零网络 stub client（SimpleNamespace），供页面/窗口构造注入。
 
     C2-03：preload() 不再读 QT_QPA_PLATFORM 哨兵——测试改用本工厂注入
-    stub client 压制网络。fetch_ov_data / fetch_ammo_package_data 在
-    FetchWorker 线程内立即返回（默认 []），preload 仍走真实后台线程，
-    线程行为测试能力不丢失。注入后仍可对实例属性再赋值
-    （如以阻塞 stub 覆盖 fetch_ov_data，见 test_fetch_pages 的 T-01 用例）。
+    stub client 压制网络。fetch_ov_data / fetch_ammo_package_data /
+    fetch_bonus_door_data 在 FetchWorker 线程内立即返回（默认 []），
+    preload 仍走真实后台线程，线程行为测试能力不丢失。注入后仍可对实例
+    属性再赋值（如以阻塞 stub 覆盖 fetch_ov_data，见 test_fetch_pages 的
+    T-01 用例）。
 
     Args:
         ov_impl: fetch_ov_data 的可调用实现（默认返回 []）。
         ammo_impl: fetch_ammo_package_data 的可调用实现（默认返回 []）。
+        bonus_impl: fetch_bonus_door_data 的可调用实现（默认返回 []，
+            BD-02 新增；既有调用方零改动）。
     """
     return SimpleNamespace(
         fetch_ov_data=ov_impl or (lambda: []),
         fetch_ammo_package_data=ammo_impl or (lambda: []),
+        fetch_bonus_door_data=bonus_impl or (lambda: []),
     )
 
 
