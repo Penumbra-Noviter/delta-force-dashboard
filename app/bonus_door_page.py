@@ -132,3 +132,4 @@ class BonusDoorPage(FetchPageBase):
         QLabel#bonusDoorMap / QLabel#bonusDoorPassword 在 generate_qss
         中按当前主题生成），卡片内联样式仅字号/字重（无颜色），无需重解析。
         """
+        super().apply_theme()

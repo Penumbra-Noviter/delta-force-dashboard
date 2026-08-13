@@ -43,11 +43,11 @@ from app.theme import (
 )
 from app.dashboard_page import build_dashboard
 from app.bonus_door_page import BonusDoorPage
+from app.icons import render_icon
 from app.kpi_presenter import KpiPresenter
 from app.motion import set_animations_enabled
 from app.profit_page import ProfitPage
 from app.sidebar import Sidebar
-from app.ui_text import EMOJI
 from data_store import DataStore
 from formatting import format_money, format_short_date
 from calculator import DayRecord, ProfitCalculatorLogic
@@ -417,11 +417,17 @@ class MainWindow(QMainWindow):
         return card
 
     def _update_theme_btn_text(self) -> None:
-        self.sidebar.theme_btn.setText(
-            f"{EMOJI['theme_dark']} 暗色"
-            if self._theme == "light"
-            else f"{EMOJI['theme_light']} 亮色"
-        )
+        # IC-02：emoji → SVG 图标（light 主题显示 moon「暗色」目标，dark 反之）
+        if self._theme == "light":
+            self.sidebar.theme_btn.setText("暗色")
+            self.sidebar.theme_btn.setIcon(
+                render_icon("moon", get_color("FG_MUTED"))
+            )
+        else:
+            self.sidebar.theme_btn.setText("亮色")
+            self.sidebar.theme_btn.setIcon(
+                render_icon("sun", get_color("FG_MUTED"))
+            )
 
     # ═══════════════════════════════════════════════════════
     # 信号连接
@@ -533,19 +539,29 @@ class MainWindow(QMainWindow):
         self._update_pin_btn_style()
 
     def _update_pin_btn_style(self) -> None:
-        """更新置顶按钮外观（仅在状态变化时触发 style polish）。"""
+        """更新置顶按钮外观（仅在状态变化时触发 style polish）。
+
+        IC-02：置顶态切换同时换图标色（active=BTN_FG 白 / 常态=FG_LABEL），
+        pin 图标初始与主题重建由 sidebar.apply_theme 承担。
+        """
         if self._pinned:
-            self.sidebar.pin_btn.setText(f"{EMOJI['pin']} 已置顶")
+            self.sidebar.pin_btn.setText("已置顶")
             if self.sidebar.pin_btn.property("active") != "true":
                 self.sidebar.pin_btn.setProperty("active", "true")
                 self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)
                 self.sidebar.pin_btn.style().polish(self.sidebar.pin_btn)
+                self.sidebar.pin_btn.setIcon(
+                    render_icon("pin", get_color("BTN_FG"))
+                )
         else:
-            self.sidebar.pin_btn.setText(f"{EMOJI['pin']} 置顶")
+            self.sidebar.pin_btn.setText("置顶")
             if self.sidebar.pin_btn.property("active") == "true":
                 self.sidebar.pin_btn.setProperty("active", "false")
                 self.sidebar.pin_btn.style().unpolish(self.sidebar.pin_btn)
                 self.sidebar.pin_btn.style().polish(self.sidebar.pin_btn)
+                self.sidebar.pin_btn.setIcon(
+                    render_icon("pin", get_color("FG_LABEL"))
+                )
 
     # ═══════════════════════════════════════════════════════
     # 数据获取
@@ -724,7 +740,8 @@ class MainWindow(QMainWindow):
             )
             return
         logger.info("CSV 已导出：%s", path)
-        self.input_panel.set_saved_indicator(f"{EMOJI['ok']} CSV 已导出")
+        # ✓ 为 BMP 文本符号（非 emoji），presentation.py 同款，保留（ADR-0006）
+        self.input_panel.set_saved_indicator("✓ CSV 已导出")
 
     # ═══════════════════════════════════════════════════════
     # 刷新展示

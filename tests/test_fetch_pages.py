@@ -205,7 +205,7 @@ def test_preload_failure_logs_and_shows_retry(qapp, caplog) -> None:
         qapp.processEvents()
 
     assert any("制造产物数据获取失败" in r.message for r in caplog.records)
-    assert page._status_label.text() == "⚠️ 数据获取失败，点击重试"
+    assert page._status_label.text() == "⚠ 数据获取失败，点击重试"
     assert page._load_state.is_loading is False
     assert page._refresh_btn.isEnabled()
 
@@ -624,7 +624,7 @@ def test_crafting_generic_error_shows_network_message(qapp) -> None:
     assert worker.wait(5000)
     qapp.processEvents()
 
-    assert page._status_label.text() == "⚠️ 网络异常，请检查连接后重试"
+    assert page._status_label.text() == "⚠ 网络异常，请检查连接后重试"
     for card in page._cards:
         assert card._product_label.text() == "加载失败，点击重试"
     page.hide()

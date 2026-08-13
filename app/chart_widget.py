@@ -33,9 +33,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app.icons import render_icon
 from app.motion import animate_property
 from app.theme import get_color
-from app.ui_text import EMOJI
 from formatting import format_compact, format_short_date
 
 
@@ -137,6 +137,7 @@ class ChartWidget(QWidget):
 
         # 右键菜单
         self._menu: QMenu | None = None
+        self._export_action: QAction | None = None
 
     # ─── 公共接口 ────────────────────────────────────────
 
@@ -258,6 +259,12 @@ class ChartWidget(QWidget):
         # 图例文字色
         if self._plot_item is not None and self._plot_item.legend is not None:
             self._plot_item.legend.setLabelTextColor(label_color)
+
+        # IC-03：导出菜单图标色随主题（菜单未创建时跳过——创建时已用当时主题色）
+        if self._export_action is not None:
+            self._export_action.setIcon(
+                render_icon("save", get_color("FG_LABEL"))
+            )
 
         # 强制重绘
         self._plot_widget.update()
@@ -621,8 +628,10 @@ class ChartWidget(QWidget):
             return
         self._menu = QMenu(self)
 
-        export_action = QAction(f"{EMOJI['save']} 导出为 PNG", self)
+        export_action = QAction("导出为 PNG", self)
+        export_action.setIcon(render_icon("save", get_color("FG_LABEL")))
         export_action.triggered.connect(self.export_png)
+        self._export_action = export_action
         self._menu.addAction(export_action)
 
         self._plot_widget.setContextMenuPolicy(

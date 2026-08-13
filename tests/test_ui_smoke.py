@@ -349,35 +349,41 @@ def test_u04_sidebar_selection_pill(sample_window):
     assert "item:selected" in style
 
 
-def test_u05_emoji_single_source(sample_window):
-    """U-05：emoji 收敛到 ui_text.EMOJI 单一来源；全局字体族含 Segoe UI Emoji。"""
-    import re
+def test_ic_emoji_free_and_icon_single_source(sample_window):
+    """IC 系列（ADR-0006）：app/ 零彩色 emoji 字面量；图标收敛 icons.ICONS。
 
-    from app.theme import generate_qss
-    from app.ui_text import EMOJI
+    原 U-05 守卫（ui_text.EMOJI 单一来源 + 字体族）随 ui_text.py 退役迁移：
+    - 彩色 emoji / emoji 变体选择符（FE0F）禁止散落（图标已 SVG 化）；
+    - BMP 文本符号（✓ U+2713 / ⚠ U+26A0 / ⟳ U+27F3）允许（文案语义，
+      presentation.py 同款，ADR-0006 边界）；
+    - 图标装配断言：导航双态 icon + 按钮 icon 非空（apply_theme 已跑）。
+    """
+    import pathlib
+    import re
 
     win = sample_window
 
-    # 导航项/置顶按钮文案由 EMOJI 常量拼装
-    assert win.sidebar.NAV_ITEMS[0].startswith(EMOJI["nav_ledger"])
-    assert win.sidebar.NAV_ITEMS[1].startswith(EMOJI["nav_profit"])
-    assert win.sidebar.NAV_ITEMS[2].startswith(EMOJI["nav_bonus_door"])  # BD-03
-    assert win.sidebar.pin_btn.text().startswith(EMOJI["pin"])
+    # 文案层：导航/按钮为纯文本（图标走 QIcon，不拼进文案）
+    assert win.sidebar.NAV_ITEMS == ["记账", "利润", "密码门"]
+    assert win.sidebar.pin_btn.text() == "置顶"
+    assert win.sidebar.new_account_btn.text() == "新建账号"
+    assert win.sidebar.account_title.text() == "账号"
+    assert win.sidebar.theme_btn.text() in ("暗色", "亮色")
 
-    # 全局字体族统一（微软雅黑 + Segoe UI Emoji，消基线错位）
-    assert "Segoe UI Emoji" in generate_qss("light")
+    # 图标装配（sample_window 构造已触发 apply_theme，C1-08 启动期一次）
+    for item in win.sidebar._nav_items:
+        assert not item.icon().isNull()
+    assert not win.sidebar.pin_btn.icon().isNull()
+    assert not win.sidebar.new_account_btn.icon().isNull()
+    assert not win.sidebar.theme_btn.icon().isNull()
 
-    # app 源码（除 ui_text.py 外）无散落 emoji 字面量
-    # （含 ✓ U+2713——main_window CSV 导出提示曾绕过 EMOJI 收敛）
-    import pathlib
-
-    literal = re.compile(r"[📒🔧🌙☀️📌🔄⚠️💾✓]")
+    # app 源码零彩色 emoji / FE0F 变体字面量
+    # （BMP 文本符号 ✓⚠⟳ 不在范围——文案语义，保留）
+    literal = re.compile(r"[\U0001F000-\U0001FAFF\uFE0F]")
     app_dir = pathlib.Path(__file__).resolve().parent.parent / "app"
     for py in app_dir.glob("*.py"):
-        if py.name == "ui_text.py":
-            continue
         text = py.read_text(encoding="utf-8")
-        assert not literal.search(text), f"{py.name} 含散落 emoji 字面量"
+        assert not literal.search(text), f"{py.name} 含 emoji 字面量"
 
 
 def test_u06_motion_feedback(sample_window):
@@ -818,13 +824,54 @@ def test_theme_toggle(sample_window):
     win = sample_window
 
     initial_text = win.sidebar.theme_btn.text()
-    assert initial_text in ("🌙 暗色", "☀️ 亮色")
+    assert initial_text in ("暗色", "亮色")
 
     win.sidebar.theme_btn.click()  # 切到另一主题
     assert win.sidebar.theme_btn.text() != initial_text
 
     win.sidebar.theme_btn.click()  # 切回
     assert win.sidebar.theme_btn.text() == initial_text
+
+
+def _icon_rgb(icon) -> tuple:
+    """取 QIcon 渲染像素中 alpha 最高的 RGB（细线图标抗锯齿取主体色）。"""
+    img = icon.pixmap(16, 16).toImage()
+    best = None
+    for y in range(img.height()):
+        for x in range(img.width()):
+            c = img.pixelColor(x, y)
+            if c.alpha() > 0 and (best is None or c.alpha() > best.alpha()):
+                best = c
+    assert best is not None
+    return best.getRgb()[:3]
+
+
+def _hex_rgb(hex_color: str) -> tuple:
+    """"#a8adbd" → (168, 173, 189)。"""
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def test_icons_follow_theme_toggle(sample_window):
+    """IC-02：主题切换后导航图标颜色随主题刷新（Falsify：漏重建则颜色冻结）。
+
+    亮暗 FG_LABEL 双主题值不同（#3c4a43 vs #a8adbd）；refresh_theme 链路
+    经 sidebar.apply_theme 重建图标后，像素应等于新主题 FG_LABEL（±6 抗锯齿）。
+    """
+    from app.theme import get_color
+
+    win = sample_window
+    light_rgb = _icon_rgb(win.sidebar._nav_items[0].icon())
+
+    win.sidebar.theme_btn.click()  # light → dark（refresh_theme 全链路）
+    dark_rgb = _icon_rgb(win.sidebar._nav_items[0].icon())
+
+    assert light_rgb != dark_rgb, "主题切换后图标颜色未变化（apply_theme 漏重建）"
+    want = _hex_rgb(get_color("FG_LABEL"))
+    for actual, expected in zip(dark_rgb, want):
+        assert abs(actual - expected) <= 6, f"图标色 {dark_rgb} ≠ FG_LABEL {want}"
+
+    win.sidebar.theme_btn.click()  # 切回 light（theme._current_theme 全局态，防泄漏）
 
 
 def test_theme_toggle_updates_exchange_labels(sample_window):
@@ -2381,13 +2428,11 @@ def test_full_chain_theme_toggle_roundtrip(sample_window):
 
 
 def test_bonus_door_nav_item_is_third(sample_window):
-    """BD-03：侧边栏第三导航项「密码门」（emoji 走 EMOJI 单一来源）。"""
-    from app.ui_text import EMOJI
-
+    """BD-03：侧边栏第三导航项「密码门」（IC-02：图标走 QIcon 不拼文案）。"""
     win = sample_window
     assert len(win.sidebar.NAV_ITEMS) == 3
-    assert win.sidebar.NAV_ITEMS[2] == f"{EMOJI['nav_bonus_door']} 密码门"
-    assert win.sidebar.NAV_ITEMS[2].startswith(EMOJI["nav_bonus_door"])
+    assert win.sidebar.NAV_ITEMS[2] == "密码门"
+    assert win.sidebar._NAV_ICONS[2] == "key"
 
 
 def test_bonus_door_page_assembled_as_third_stack_page(sample_window):

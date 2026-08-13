@@ -16,6 +16,7 @@ from __future__ import annotations
 __all__ = ["Sidebar"]
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
@@ -26,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.ui_text import EMOJI
+from app.icons import render_icon
 
 
 class Sidebar(QWidget):
@@ -37,11 +38,14 @@ class Sidebar(QWidget):
     account_selected = Signal(str)
     # Y-04：点「新建账号」按钮（命名对话框由 MainWindow 弹出）
     create_account_requested = Signal()
+    # 导航项文本（IC-02：emoji 由 SVG 图标替代，双态色见 apply_theme）
     NAV_ITEMS = [
-        f"{EMOJI['nav_ledger']} 记账",
-        f"{EMOJI['nav_profit']} 利润",
-        f"{EMOJI['nav_bonus_door']} 密码门",
+        "记账",
+        "利润",
+        "密码门",
     ]
+    # 导航项图标键（顺序与 NAV_ITEMS 一一对应）
+    _NAV_ICONS = ["ledger", "wrench", "key"]
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -55,7 +59,8 @@ class Sidebar(QWidget):
         layout.setSpacing(0)
 
         # ── 顶部账号区（Y-04）──
-        self.account_title = QLabel(f"{EMOJI['account']} 账号")
+        # IC-02：标题去 emoji 化（纯文本；标题处图标属装饰，删即替代）
+        self.account_title = QLabel("账号")
         self.account_title.setObjectName("accountAreaTitle")
         self.account_title.setAlignment(
             Qt.AlignmentFlag.AlignCenter
@@ -75,7 +80,7 @@ class Sidebar(QWidget):
         layout.addWidget(self.account_combo)
         layout.addSpacing(4)
 
-        self.new_account_btn = QPushButton(f"{EMOJI['new_account']} 新建账号")
+        self.new_account_btn = QPushButton("新建账号")
         self.new_account_btn.setObjectName("newAccountBtn")
         self.new_account_btn.setToolTip("新建一个空数据账号（不会自动切换）")
         self.new_account_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -88,10 +93,12 @@ class Sidebar(QWidget):
         self._nav_list.setObjectName("sidebarNavList")
         self._nav_list.setCursor(Qt.CursorShape.PointingHandCursor)
         self._nav_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._nav_items: list[QListWidgetItem] = []
         for text in self.NAV_ITEMS:
             item = QListWidgetItem(text)
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._nav_list.addItem(item)
+            self._nav_items.append(item)
         self._nav_list.setCurrentRow(0)
         self._nav_list.currentRowChanged.connect(self.nav_changed.emit)
         layout.addWidget(self._nav_list)
@@ -104,7 +111,7 @@ class Sidebar(QWidget):
         self.theme_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.theme_btn)
 
-        self.pin_btn = QPushButton(f"{EMOJI['pin']} 置顶")
+        self.pin_btn = QPushButton("置顶")
         self.pin_btn.setObjectName("pinBtn")
         self.pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.pin_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -154,7 +161,12 @@ class Sidebar(QWidget):
         self.nav_changed.emit(index)
 
     def apply_theme(self) -> None:
-        """根据当前主题色更新侧边栏样式。"""
+        """根据当前主题色更新侧边栏样式与 SVG 图标（IC-02）。
+
+        图标随主题重建：导航项双态色（Normal=FG_LABEL / Selected=accent，
+        QIcon 多模式，选中行图标自动换色）；按钮单色（pin 按 active 态取
+        BTN_FG 白 / FG_LABEL）。C1 铁律：get_color 仅运行期局部 import。
+        """
         from app.theme import get_color  # noqa: PLC0415
 
         bg = get_color("MUTED_BG")
@@ -162,7 +174,20 @@ class Sidebar(QWidget):
         sel_pill = get_color("NAV_SELECT_BG")
         sel_fg = get_color("BTN_BG")  # 选中文字用 accent 色（U-04 浅底 pill）
         accent = get_color("BTN_BG")
+        btn_fg = get_color("BTN_FG")
         nav_hover_bg = get_color("NAV_HOVER_BG")
+
+        # IC-02：导航图标双态色（QIcon Selected 模式，选中行图标换 accent）
+        for item, icon_name in zip(self._nav_items, self._NAV_ICONS):
+            icon = render_icon(icon_name, fg)
+            icon.addPixmap(
+                render_icon(icon_name, accent).pixmap(16, 16),
+                QIcon.Mode.Selected,
+            )
+            item.setIcon(icon)
+        self.new_account_btn.setIcon(render_icon("plus", fg))
+        pin_active = self.pin_btn.property("active") == "true"
+        self.pin_btn.setIcon(render_icon("pin", btn_fg if pin_active else fg))
 
         # U-04：选中态从「整条实心色块」改「浅底 pill + 3px accent 指示条」——
         # border-left 选中/未选中同宽（transparent vs accent），文字零位移。

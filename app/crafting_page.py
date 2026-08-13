@@ -138,10 +138,11 @@ class CraftingPage(FetchPageBase):
             self._reset_card(card, "加载失败，点击重试")
 
     def apply_theme(self) -> None:
-        """主题切换钩子：空操作（C1-07）。
+        """主题切换钩子：仅刷新基类图标（IC-03）。
 
         制造卡颜色全部由 QSS 选择器驱动（QFrame#craftingCard /
         QLabel#craftStation 等在 generate_qss 中按当前主题生成），
         卡片内联样式仅字号/字重（无颜色），无需重解析。
         """
+        super().apply_theme()
 

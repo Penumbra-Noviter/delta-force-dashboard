@@ -155,8 +155,9 @@ class ExchangePage(FetchPageBase):
         包标签色与 SEPARATOR 分隔线均为内联样式，构建期解析会冻结在构建时主题；
         亮暗色板分离后残留即失效（U-03 评审修复包标签；Z-01 补齐分隔线）。
         由 main_window.refresh_theme 调用，模式同 chart_widget.apply_theme：
-        增量更新，不销毁重建。
+        增量更新，不销毁重建。IC-03：super() 刷新基类刷新按钮图标。
         """
+        super().apply_theme()
         for i, cfg in enumerate(_PACKAGE_CONFIG):
             if i >= len(self._cards):
                 break

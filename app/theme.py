@@ -320,7 +320,7 @@ def generate_qss(theme_name: str) -> str:
    - meta 10-11px：提示 / 状态 / 按钮次级
    按钮仅两级：primary 13px/600（saveBtn/queryBtn）、secondary 11px/500（其余） */
 QWidget {{
-    font-family: "Microsoft YaHei", "Segoe UI Emoji";
+    font-family: "Microsoft YaHei";
 }}
 QMainWindow {{
     background-color: {bg};

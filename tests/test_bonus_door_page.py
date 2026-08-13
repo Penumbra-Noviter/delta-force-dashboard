@@ -195,7 +195,7 @@ def test_bonus_door_error_renders_distinct_from_empty(qapp) -> None:
     assert worker.wait(5000)
     qapp.processEvents()
 
-    assert page._status_label.text() == "⚠️ 数据获取失败，点击重试"
+    assert page._status_label.text() == "⚠ 数据获取失败，点击重试"
     assert page._placeholder.isVisible()
     assert page._placeholder.text() == "加载失败，点击重试"
     assert page._placeholder.text() != "暂无数据"  # 与空态可区分
@@ -218,7 +218,7 @@ def test_bonus_door_generic_error_shows_network_message(qapp) -> None:
     assert worker.wait(5000)
     qapp.processEvents()
 
-    assert page._status_label.text() == "⚠️ 网络异常，请检查连接后重试"
+    assert page._status_label.text() == "⚠ 网络异常，请检查连接后重试"
     assert page._placeholder.text() == "加载失败，点击重试"
     page.hide()
 

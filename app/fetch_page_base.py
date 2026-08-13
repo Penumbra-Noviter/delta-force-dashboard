@@ -25,8 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 from app.fetch_worker import FetchWorker
+from app.icons import render_icon
 from app.load_state import LoadState
-from app.ui_text import EMOJI
 from kkrb_client import KkrbClient, KkrbError
 
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ class FetchPageBase(QWidget):
 
         title_layout.addStretch()
 
-        self._refresh_btn = QPushButton(f"{EMOJI['loading']} 刷新")
+        self._refresh_btn = QPushButton("刷新")
         self._refresh_btn.setObjectName("refreshBtn")
         self._refresh_btn.clicked.connect(self._load_data)
         title_layout.addWidget(self._refresh_btn)
@@ -143,7 +143,8 @@ class FetchPageBase(QWidget):
         if self._shut_down or not self._load_state.can_load():
             return
         self._load_state.start()
-        self._status_label.setText(f"{EMOJI['loading']} 加载中…")
+        # IC-03：⟳ 为 BMP 文本符号（去 emoji 变体），随文字色（ADR-0006）
+        self._status_label.setText("⟳ 加载中…")
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         self._refresh_btn.setEnabled(False)
@@ -164,10 +165,11 @@ class FetchPageBase(QWidget):
         self._load_state.fail()
         if isinstance(e, KkrbError):
             logger.warning("%s数据获取失败: %s", self._page_name, e)
-            self._status_label.setText(f"{EMOJI['warn']} 数据获取失败，点击重试")
+            # IC-03：⚠ 为 BMP 文本符号（去 FE0F 变体），随文字色（ADR-0006）
+            self._status_label.setText("⚠ 数据获取失败，点击重试")
         else:
             logger.error("%s数据获取异常: %s", self._page_name, e)
-            self._status_label.setText(f"{EMOJI['warn']} 网络异常，请检查连接后重试")
+            self._status_label.setText("⚠ 网络异常，请检查连接后重试")
         # 错误状态：label 可点击重试（U-07，文案与行为一致）
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -184,6 +186,19 @@ class FetchPageBase(QWidget):
         self._render_data([])
 
     # ── 公开接口 ────────────────────────────────────────
+
+    def apply_theme(self) -> None:
+        """根据当前主题重建刷新按钮图标（IC-03）。
+
+        自动纳入 _theme_refreshers 树遍历（C1-08 契约：实现 apply_theme
+        即被收集）；子类覆盖本方法时必须调用 super()，否则刷新按钮图标
+        在主题切换后颜色过时。
+        """
+        from app.theme import get_color  # noqa: PLC0415
+
+        self._refresh_btn.setIcon(
+            render_icon("refresh", get_color("FG_LABEL"))
+        )
 
     @property
     def is_loaded(self) -> bool:

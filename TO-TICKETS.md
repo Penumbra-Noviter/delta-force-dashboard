@@ -12,7 +12,10 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-13）：无进行中工单（BD-债1~3 已归档，技术债区清零）。
+> 活跃表（2026-08-13）：无进行中工单（IC 系列已归档，见下方）。
+
+| Ticket | 标题 | 依赖 | 状态 |
+|--------|------|------|------|
 
 ---
 
@@ -31,6 +34,70 @@
 ---
 
 ## 工单详情
+
+### IC 系列 — SVG 图标替换 emoji（2026-08-13，来源：用户拍板方案 C，ADR-0006）
+
+**背景**：UI 层 12 个 emoji 装饰图标（U-05 收敛于 `app/ui_text.py` EMOJI 表）存在
+彩色不随主题 / 依赖 Segoe UI Emoji 字体 / 无法换色与选中态三大缺陷；方案 B
+（字体图标）选中态换色无解被否。采用方案 C：内嵌 SVG 模板（`{color}` 占位）+
+`QSvgRenderer` → `QPixmap` → `QIcon`，零资源文件零打包改动（O-C4 先例规避）。
+边界：account_title 去 emoji 化纯文本；状态标签去 FE0F 变体（⚠️→⚠、🔄→⟳）
+保留 BMP 文本符号；✓ 保留（presentation.py 同款，文案非图标）。
+
+**IC-01 — `app/icons.py` 图标模块**：
+- `ICONS: dict[str, str]` 9 键（ledger/wrench/key/plus/pin/moon/sun/refresh/save）
+  24×24 viewBox 单色 SVG 模板，风格统一（Material 系填充路径）
+- `render_icon(name, color, size=16) -> QIcon`：QSvgRenderer 渲染
+  `size×2` pixmap + `setDevicePixelRatio(2)`（HiDPI），未知键 KeyError
+- 模块内零 `get_color` 调用（颜色调用方传入，C1 铁律）；`__all__ = ["ICONS", "render_icon"]`
+- 测试 `tests/test_icons.py`：9 键渲染有效（QSvgRenderer.isValid）、尺寸/DPR、
+  颜色替换生效、未知键 KeyError、offscreen 可渲染
+
+**IC-02 — sidebar + main_window 落点**：
+- `sidebar.py`：`NAV_ITEMS` 改纯文本（记账/利润/密码门），构造时
+  `item.setIcon(render_icon(..., FG_LABEL))` + Selected 模式 accent 色
+  （QIcon.addPixmap 双模式）；new_account_btn / pin_btn `setIcon`；
+  account_title 去 emoji 纯文本「账号」；`apply_theme` 扩展重建全部图标
+  （pin 按 active 态取色）
+- `main_window.py`：`_update_theme_btn_text` 扩展同时设 theme_btn icon
+  （light→moon / dark→sun）；CSV 提示保留 ✓
+- `theme.py`：`QWidget` font-family 移除 `"Segoe UI Emoji"`
+
+**IC-03 — fetch_page_base + chart_widget 落点**：
+- `fetch_page_base.py`：refresh_btn `setIcon(refresh)`；状态文本
+  `EMOJI['loading']`→`⟳`、`EMOJI['warn']`→`⚠`（去 emoji 变体）；新增
+  `apply_theme` 重建 refresh_btn icon（自动纳入 `_theme_refreshers`，C1-08）
+- `chart_widget.py`：export action `setIcon(save)`；`apply_theme` 扩展重建
+  action icon
+
+**IC-04 — ui_text.py 退役 + 守卫迁移 + 断言同步**：
+- 删除 `app/ui_text.py`，4 处 import 同步清（sidebar/fetch_page_base/
+  chart_widget/main_window）
+- `test_ui_smoke.py` `test_u05_emoji_single_source` 重写：app/ 内零 emoji
+  字面量正则（全集合）+ `ICONS` 键集断言 + render_icon 契约；BD-03 导航断言
+  改纯文本
+- 文本断言同步：状态 4 处（test_fetch_pages/test_bonus_door_page）、theme
+  按钮 2 处（test_ui_smoke:821）、pin_btn、NAV_ITEMS
+- Falsify：摘任一落点 setIcon → 对应守卫/断言实红
+
+**IC-05 — 文档收尾**：
+- CODE_WIKI §3 文件树（ui_text.py → icons.py）+ §4 新节 icons.py +
+  theme 4.6 字体族叙述；doc_sync --update 双绿
+- DEV_LOG 批次记录；本表归档
+
+**文件范围**：新增 `app/icons.py`、`tests/test_icons.py`；改动 `app/sidebar.py`、
+`app/main_window.py`、`app/fetch_page_base.py`、`app/chart_widget.py`、
+`app/theme.py`、`tests/test_ui_smoke.py`、`tests/test_fetch_pages.py`、
+`tests/test_bonus_door_page.py`；删除 `app/ui_text.py`
+**共享文件（申报改动）**：`CODE_WIKI.md`、`DEV_LOG.md`、`TO-TICKETS.md`（归档）、`docs/adr/ADR-0006.md`（本批次落档）
+
+**验收标准**：
+- [ ] 全量 pytest 全绿（icons.py 100% 覆盖）；doc_sync 双绿
+- [ ] app/ 内零 emoji 字面量（含 ui_text 删除后无引用）
+- [ ] 双主题切换后图标颜色随主题刷新（sidebar 导航双态色断言）
+- [ ] 目检：图标形状可辨认、与文字基线一致（辅助证据）
+
+---
 
 ### BD-债1~3 技术债消费批次（2026-08-13，轻量档，来源：BD 批次期末四轴非阻断）
 
@@ -393,6 +460,16 @@
 ---
 
 ## 已完成归档
+
+### IC 系列（2026-08-13，SVG 图标替换 emoji，来源：用户拍板方案 C，ADR-0006，主会话直改）
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| IC-01 | `app/icons.py` 图标模块——`ICONS` 表 9 键（ledger/wrench/key/plus/pin/moon/sun/refresh/save）内嵌 24×24 SVG 模板 + `render_icon(name, color, size=16)`（QSvgRenderer → 2x pixmap + DPR HiDPI；未知键 KeyError；模块内零 get_color C1 铁律）；`tests/test_icons.py` 6 用例（键集守卫/渲染有效/颜色注入/尺寸/未知键/占位符无残留） | ✅ 2026-08-13 | 本提交 |
+| IC-02 | sidebar + main_window 落点——`NAV_ITEMS` 纯文本 + QIcon 双模式（Normal=FG_LABEL/Selected=accent，apply_theme 重建）；new_account_btn/pin_btn setIcon（pin 按 active 态 BTN_FG/FG_LABEL，置顶切换即时换色）；theme_btn moon/sun 图标；account_title 去 emoji 纯文本；`theme.py` font-family 移除 Segoe UI Emoji | ✅ 2026-08-13 | 本提交 |
+| IC-03 | fetch_page_base + chart_widget 落点——refresh_btn setIcon + FetchPageBase 新增 apply_theme（C1-08 自动纳入；**三子类 Crafting/Exchange/BonusDoor 的 apply_theme 补 super() 契约**）；状态文本去 FE0F 变体（⚠️→⚠、🔄→⟳，BMP 文本符号）；chart 导出 action setIcon + apply_theme 重建 | ✅ 2026-08-13 | 本提交 |
+| IC-04 | ui_text.py 退役（4 处 import 清）+ U-05 守卫迁移——`test_u05_emoji_single_source` → `test_ic_emoji_free_and_icon_single_source`（彩色 emoji/FE0F 范围正则扫 app/ + 图标装配断言 + 文案纯文本断言；✓⚠⟳ BMP 文本符号不在范围）；新增 `test_icons_follow_theme_toggle`（主题切换图标像素跟随 FG_LABEL，Falsify）；全部文本断言同步（状态 4 处/theme 按钮/NAV_ITEMS/pin_btn/BD-03） | ✅ 2026-08-13 | 本提交 |
+| IC-05 | 文档收尾——CODE_WIKI §3 文件树（ui_text→icons）+ test_icons 行 + §4.23 icons.py 节 + 4.22 apply_theme 描述更新；README 同步（icons.py/测试数 630）；doc_sync 双绿；DEV_LOG 批次记录；本表归档 | ✅ 2026-08-13 | 本提交 |
 
 ### BD-债1~3 技术债消费批次（2026-08-13，kickoff 轻量档，基线 84ea3a8，分支 kickoff/bd-debt）
 
