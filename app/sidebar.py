@@ -29,6 +29,10 @@ from PySide6.QtWidgets import (
 
 from app.icons import render_icon
 
+# 导航图标渲染尺寸（IC-债2：与 app/icons.py render_icon 默认 size=16 解耦，
+# 图标默认尺寸变更时导航侧不会静默失效；沿用 _RENDER_DPR 私有常量先例）
+_NAV_ICON_SIZE: int = 16
+
 
 class Sidebar(QWidget):
     """左侧导航栏：顶部账号区 + 导航项列表 + 底部操作按钮。"""
@@ -179,9 +183,11 @@ class Sidebar(QWidget):
 
         # IC-02：导航图标双态色（QIcon Selected 模式，选中行图标换 accent）
         for item, icon_name in zip(self._nav_items, self._NAV_ICONS):
-            icon = render_icon(icon_name, fg)
+            icon = render_icon(icon_name, fg, size=_NAV_ICON_SIZE)
             icon.addPixmap(
-                render_icon(icon_name, accent).pixmap(16, 16),
+                render_icon(icon_name, accent, size=_NAV_ICON_SIZE).pixmap(
+                    _NAV_ICON_SIZE, _NAV_ICON_SIZE
+                ),
                 QIcon.Mode.Selected,
             )
             item.setIcon(icon)
