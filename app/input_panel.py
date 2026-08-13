@@ -400,7 +400,7 @@ class InputPanel(QWidget):
         # U-06：保存/提示出现时 180ms 淡入（feedback-only，动画对象挂 self）
         # C4-债11：不接返回值——原 _saved_indicator_anim 全文件只写不读（纯
         # 惰性创建、无 __init__ 初始化）；fade 防 GC 由 C++ parent（widget）+
-        # 债6 的 _fade_anim property 承担，删只写句柄。
+        # C4-债6 的 _fade_anim property 承担，删只写句柄。
         if text:
             fade_in_widget(self.saved_indicator, duration_ms=180)
 

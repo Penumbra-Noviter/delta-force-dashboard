@@ -56,10 +56,12 @@ def fade_in_widget(
 
     返回运行中的动画对象（调用方持有引用防 GC）；动效关闭时直接返回
     None 且不设置 effect（终态即时可达，功能不受影响）。
+    返回值仅用于在途期持有，动画完成后随 DWS 悬空（触碰即 RuntimeError）。
 
     Args:
         widget: 目标控件（动画期间短暂挂 QGraphicsOpacityEffect）
-        duration_ms: 淡入时长（毫秒）
+        duration_ms: 淡入时长（毫秒）；<=0 钳制为 1（C4-债9：duration=0
+            时 start 即 Stopped、finished 不触发 → property 残留悬空）
         easing: 缓动曲线
 
     C4-债6：finished 闭包 weakref 破环 + stop 后同步清 property（对齐
