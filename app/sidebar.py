@@ -45,8 +45,9 @@ class Sidebar(QWidget):
     # Y-04：点「新建账号」按钮（命名对话框由 MainWindow 弹出）
     create_account_requested = Signal()
     # 导航项「(文本, 图标键)」元组列表（IC-债1：替代文本/图标键平行列表，
-    # 消除 zip 按索引配对的数据团）。新增导航项必须带图标键——缺失即
-    # render_icon KeyError 快速失败，而非静默截断/无图标。
+    # 消除 zip 按索引配对的数据团）。新增导航项必须带图标键——缺失即构造/
+    # apply_theme 解包 ValueError 快速失败（比 render_icon 更早暴露）；
+    # 图标键非法则 render_icon KeyError（期末 code-review 口径核实）。
     NAV_ITEMS: ClassVar[list[tuple[str, str]]] = [("记账", "ledger"), ("利润", "wrench"), ("密码门", "key")]
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -180,7 +181,10 @@ class Sidebar(QWidget):
         nav_hover_bg = get_color("NAV_HOVER_BG")
 
         # IC-02：导航图标双态色（QIcon Selected 模式，选中行图标换 accent）
-        for item, (_text, icon_name) in zip(self._nav_items, self.NAV_ITEMS):
+        # IC-债1 评审：strict=True 防未来漂移（两侧同源当前不可错位，Python 3.10+）
+        for item, (_text, icon_name) in zip(
+            self._nav_items, self.NAV_ITEMS, strict=True
+        ):
             icon = render_icon(icon_name, fg, size=_NAV_ICON_SIZE)
             icon.addPixmap(
                 render_icon(icon_name, accent, size=_NAV_ICON_SIZE).pixmap(
