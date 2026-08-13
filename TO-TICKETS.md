@@ -12,10 +12,12 @@
 
 ## 活跃工单
 
-> 活跃表（2026-08-13）：无进行中工单（IC 系列已归档，见下方）。
+> 活跃表（2026-08-13）：**IC-债1/2 技术债消费批次进行中**（来源：IC 批次 code-review Standards 判断项，kickoff 全自动档，基线 06f31df，工单详情见 `.scratch/ic-debt/issues/`）。
 
 | Ticket | 标题 | 依赖 | 状态 |
 |--------|------|------|------|
+| IC-债1 | Data Clumps：`NAV_ITEMS` 捆元组、删除 `_NAV_ICONS` | 02（同文件串行） | 🔄 进行中 |
+| IC-债2 | Magic Number：提取 `_NAV_ICON_SIZE` 常量 | — | 🔄 进行中 |
 
 ---
 
@@ -36,6 +38,23 @@
 ---
 
 ## 工单详情
+
+### IC-债1/2 技术债消费批次（2026-08-13，kickoff 全自动档，基线 06f31df，来源：IC 批次 code-review Standards 判断项）
+
+**背景**：上一轮 code-review（固定点 07ecd55）Standards 轴两条 baseline smell 落盘技术债区，用户拍板做掉。Grilling 共识（D1 就地捆元组 / D2 本地私有常量 / D3 最小面）已确认，spec 与工单详情落盘 `.scratch/ic-debt/spec.md` + `.scratch/ic-debt/issues/01-magic-number-nav-icon-size.md`（IC-债2，无阻塞）+ `02-data-clumps-nav-items.md`（IC-债1，Blocked by 01，同文件串行）。
+
+- **IC-债2（01，先行）**：`app/sidebar.py` 模块级 `_NAV_ICON_SIZE: int = 16`（仿 icons.py `_RENDER_DPR` 先例），apply_theme 182/184 三处显式（render ×2 + pixmap ×1），与 icons.py 默认 size 解耦；行为零变化
+- **IC-债1（02，阻塞 01）**：`NAV_ITEMS` 就地捆元组 `[("记账","ledger"), ("利润","wrench"), ("密码门","key")]`（`ClassVar[list[tuple[str, str]]]` 注解，新增导航项缺图标键 → render_icon KeyError 快速失败）、删除 `_NAV_ICONS`、构造与 apply_theme 元组解包；`tests/test_ui_smoke.py` 367/2434/2435 三处断言同步（367 全量元组相等自带配对守卫）
+
+**文件范围**：`app/sidebar.py` + `tests/test_ui_smoke.py`；不动 icons.py/test_icons.py/其余 7 处调用点；不新增测试文件
+**共享文件（只读）**：`TO-TICKETS.md`（本批次完成后主会话统一更新状态）
+
+**验收标准**：
+- [ ] 基线 06f31df 全量 pytest 全绿；grep `_NAV_ICONS` 零命中；`pixmap(16` 零命中；grep `size=_NAV_ICON_SIZE` 恰 3 处
+- [ ] 每工单独立 commit，git diff 仅触碰声明文件范围
+- [ ] Falsify 证伪：_NAV_ICON_SIZE 改 8 → Selected pixmap 尺寸变化；缺图标键元组 → KeyError 快速失败；均还原后全绿
+
+---
 
 ### IC 系列 — SVG 图标替换 emoji（2026-08-13，来源：用户拍板方案 C，ADR-0006）
 
