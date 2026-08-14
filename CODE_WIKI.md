@@ -647,6 +647,51 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 
 ---
 
+### 4.24 `app/motion.py` — 反馈型动效（U-06，<!--AUTO:lines:app/motion.py-->~148 行<!--/AUTO-->）
+
+反馈型动效工具：QWidget 淡入 + 通用属性动画。Qt QSS 不支持 transition（hover 背景平滑过渡不可用，DEV_LOG U-06 取舍），动效集中在可动画处——页面切换淡入（QGraphicsOpacityEffect + QPropertyAnimation）、图表曲线绘制揭示（QVariantAnimation 驱动 QGraphicsItem.setOpacity）、保存指示淡入。
+
+**feedback-only motion 规则**：只做触发后 ≤200ms 的反馈动画，无装饰性循环；动画是纯视觉增强，终态即时可达——中断/关闭不影响功能；动画对象由调用方持有引用（防 GC 提前回收），结束后移除 QGraphicsEffect（防 effect 通道常驻渲染开销）；全局开关 settings `animations=false` 时全部动效失效但功能完整（MainWindow 启动经 `set_animations_enabled` 注入）。
+
+| 函数 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/motion.py:fade_in_widget-->`fade_in_widget(widget, duration_ms=150, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | widget 淡入到不透明，动画结束移除 effect 并清 `_fade_anim` property；返回运行中动画对象（调用方持有防 GC），动效关闭返回 None；duration≤0 钳为 1ms（C4-债9：duration=0 时 start 即 Stopped、finished 不触发 → property 残留悬空，Falsify 实测 abort） |
+| <!--AUTO:sig:app/motion.py:animate_property-->`animate_property(parent, setter, duration_ms=200, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 0.0→1.0 插值逐帧回调 setter(value)——用于非 QObject property 目标（pyqtgraph 曲线 QGraphicsItem opacity，QPropertyAnimation 无法驱动）；动效关闭直接 `setter(1.0)` 落终态 |
+| <!--AUTO:sig:app/motion.py:animate_value-->`animate_value(parent, old_value, new_value, setter, duration_ms=300, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 数值插值 old→new 逐帧回调 setter（KPI 数字 count-up，W-01）；动效关闭直接 `setter(new_value)` 落终态 |
+| <!--AUTO:sig:app/motion.py:set_animations_enabled-->`set_animations_enabled(enabled)`<!--/AUTO--> / `animations_enabled()` | 全局动效开关（默认开）；MainWindow 启动从 settings `animations` 键注入 |
+
+**生命周期收敛契约（C4-债6/债9）**：fade_in_widget 同 widget 连续触发先 `stop()` 旧动画并**同步清** `_fade_anim` property（DWS 自删不发 finished、清理回调不执行 → 不清则 property 残留已删对象指针，use-after-free 窗口）；finished 闭包以 weakref 持有 widget 破环（强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩 → access violation，C4-债3/5 同款定案）。
+
+### 4.25 `app/load_state.py` — 数据页状态机（V-02，<!--AUTO:lines:app/load_state.py-->~52 行<!--/AUTO-->）
+
+页面数据加载状态机（零依赖纯逻辑，供 FetchPageBase 复用）：四态 idle → loading → loaded / failed → loading（重试 / 刷新）。转移规则与守卫全部内聚于此，UI 层只调用公开方法，不直接感知内部相位。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/load_state.py:LoadState.can_load-->`can_load()`<!--/AUTO--> | 是否允许发起加载（仅 loading 中为 False——防重入，不挡手动刷新） |
+| <!--AUTO:sig:app/load_state.py:LoadState.start-->`start()`<!--/AUTO--> | 尝试进入 loading 态；loading 中返回 False，不抛异常 |
+| <!--AUTO:sig:app/load_state.py:LoadState.succeed-->`succeed()`<!--/AUTO--> | 标记加载成功：loading → loaded；非 loading 态静默忽略 |
+| <!--AUTO:sig:app/load_state.py:LoadState.fail-->`fail()`<!--/AUTO--> | 标记加载失败：loading → failed；非 loading 态静默忽略 |
+| `is_loaded` / `is_loading` | 只读状态查询（property） |
+
+**「已加载是否自动重新加载」由调用方守卫区分**（can_load 只挡重入）：showEvent / preload 用 `is_loaded` 判「已加载不自动刷」；用户点刷新走 `_load_data`，loaded 态经 `can_load()` 放行强制重载。
+
+### 4.26 `app/fetch_worker.py` — 后台取数 worker（T-01，<!--AUTO:lines:app/fetch_worker.py-->~95 行<!--/AUTO-->）
+
+后台请求 worker：将同步网络调用移出 UI 线程——QThread 子类，run() 执行传入的可调用对象，done/error 信号回传结果，UI 线程无阻塞。
+
+| 信号/方法 | 说明 |
+|-----------|------|
+| `done(object)` / `error(object)` | 成功结果 / 异常对象（调用方按类型区分处理） |
+| <!--AUTO:sig:app/fetch_worker.py:FetchWorker.__init__-->`__init__(fn, parent=None)`<!--/AUTO--> | 包装可调用对象；finished 信号接 `_on_finished` |
+| `run()` | 执行 `fn()`：成功 emit done / 异常 emit error；interruption 请求时直接返回 |
+| <!--AUTO:sig:app/fetch_worker.py:FetchWorker.shutdown-->`shutdown(timeout_ms=300)`<!--/AUTO--> | 安全关闭（必须 GUI 线程）：requestInterruption + wait(timeout)；True=已结束，False=超时转入逃生舱托管 |
+| `_on_finished()` | 线程结束后从逃生舱移除（信号在 GUI 线程投递） |
+
+**逃生舱机制（T-01，2026-08-11 打包残留根因修复）**：阻塞中的 urllib 请求无法强制中断（urllib timeout 不覆盖 Windows DNS getaddrinfo，可无限挂起）——shutdown wait() 超时后 worker 脱离父对象（`setParent(None)`）并进入模块级强引用 `_detached_workers`（运行中的线程绝不销毁，不触发 "QThread: Destroyed while thread is still running" abort）；`_drain_detached_workers`（atexit 注册）有界等待 `_DRAIN_TIMEOUT_S=5s` 预算，超时 `os._exit(0)` 强杀进程——无界等待会让窗口关闭后进程残留 → 占单实例锁 → 新启动静默退出（「窗口未出现但后台有进程」）。回归测试 `test_process_exits_when_fetch_hangs_on_shutdown`；调用方需持有 worker 引用（如 `self._worker`），否则 GC 会在线程仍在运行时回收 QThread 并触发警告。
+
+---
+
 ## 五、依赖关系
 
 ### 5.1 外部依赖
