@@ -84,13 +84,13 @@ Delta Force Dashboard/
 ├── app/
 │   ├── __init__.py          ← app 包标记
 │   ├── main_window.py       ← [UI 骨架] QMainWindow，组件协调与数据流（含账号区 Y-03/Y-04/Y-05）
-│   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮 + 顶部账号区 Y-04，L-01，~98 行）
-│   ├── dashboard_page.py    ← [C4] 仪表盘装配直构（DashboardBundle + build_dashboard，~170 行）
+│   ├── sidebar.py           ← 左侧导航栏（记账 / 利润 + 底部操作按钮 + 顶部账号区 Y-04，L-01，~186 行）
+│   ├── dashboard_page.py    ← [C4] 仪表盘装配直构（DashboardBundle + build_dashboard，~178 行）
 │   ├── kpi_presenter.py     ← [C4] KPI 双磁贴渲染（update/apply_theme_styles/reset 三出口）
 │   ├── crafting_page.py     ← 制造产物推荐页面（4 台位卡片，L-03）
 │   ├── exchange_page.py     ← 兑换利润页面（7 种子弹自选包，X 系列）
 │   ├── fetch_page_base.py   ← 数据页公共基类（懒加载状态机 + 后台取数，T-03/V-02/C2）
-│   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~41 行）
+│   ├── fetch_worker.py      ← 后台请求 worker（QThread，网络调用移出 UI 线程，~95 行）
 │   ├── load_state.py        ← 数据页四态状态机（idle/loading/loaded/failed，V-02）
 │   ├── motion.py            ← 反馈型动效（fade_in_widget/animate_property，U-06/W 系列）
 │   ├── icons.py             ← SVG 矢量图标（IC 系列/ADR-0006：内嵌模板 + render_icon 主题色渲染，替代 U-05 emoji）

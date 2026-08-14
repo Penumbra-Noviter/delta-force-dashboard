@@ -10,7 +10,7 @@ Windows 桌面收益追踪工具（PySide6）：每日记录现金/仓库价值�
 python -m venv venv && venv\Scripts\activate   # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 python main.py                                # 运行（运行态数据落在 ~/Delta Force Dashboard/）
-pytest                                        # 全量测试（630 项，Qt 用例自动 offscreen）
+pytest                                        # 全量测试（631 项，Qt 用例自动 offscreen）
 python scripts/doc_sync.py --check            # CODE_WIKI 机械标记防漂移（pre-commit 钩子自动跑）
 python scripts/doc_sync.py                    # 改代码后刷新 CODE_WIKI 的测试数/行数/签名标记
 ```
@@ -26,8 +26,9 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
 - **契约红线**（详见 CODE_WIKI §10 与 status 记忆）：绝不在模块顶层调 `get_color()`；测试构造注入 stub client 即断网（`tests/conftest.make_stub_client`）；kkrb 解析纯函数畸形输入不抛；`az3r6` 排除策略单点（client 层剔除，两端硬排除）；`BONUS_DOOR_NAMES` 定义顺序即解析输出顺序；新增测试文件或 §4 模块标题需在 CODE_WIKI 补对应标记（否则 doc_sync --check 拦截提交）
 - **入库边界**：运行态 data.json/settings.json、`.scratch/`、`.worktrees/`、`.pytest_cache/`、`build/`、`dist/` 均已 gitignore
 
-## 当前状态与下一步（2026-08-13）
+## 当前状态与下一步（2026-08-15）
 
-- IC 批次（技术债消费 IC-债1/2，kickoff 全自动档）已合并 main（merge `03098d5` + 评审小修 `3bf3482`）：630/630 测试、doc_sync 双绿、期末四轴 0 阻断；技术债区净清零（BD-债1~3 + IC-债1/2 全部 ✅，见 TO-TICKETS）
-- main 领先 origin/main 8 个提交未推送（含 IC 批次）
-- 下一步：用户确认后清场（删除 `.worktrees/ic-debt/` 与 `kickoff/ic-debt` 分支、`.scratch/` 残留含 `icons_preview_ic_batch.png`）
+- F-01 增强（doc_sync files 文件级引用校验，`122dea9`）+ CODE_WIKI 补 motion/load_state/fetch_worker 小节（`2274f9b`）+ 浅色主题柔和化（`78ca2e1`，暖白卡面 + 主/语义色降饱和）已完成：**631/631 测试**、doc_sync 双绿
+- main 与 origin/main 已同步（最近三提交已推送）
+- 清场已完成：`.worktrees/` 与 `.scratch/` 均已清空，分支仅保留 main
+- 下一步：无遗留待办（技术债区净清零，见 TO-TICKETS）

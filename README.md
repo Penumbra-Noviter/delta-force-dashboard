@@ -54,13 +54,13 @@
 
 | 组件 | 技术 |
 |------|------|
-| 语言 | Python 3.12+ |
+| 语言 | Python 3.10+（部分特性 3.12+，如 `pathlib.Path.walk`） |
 | UI 框架 | PySide6 (Qt for Python) |
 | 图表库 | pyqtgraph |
 | 图标 | 内嵌 SVG 矢量（Material 系，24×24 单色路径 + 主题色注入，HiDPI 2x 渲染） |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller（onedir） |
-| 测试框架 | pytest（630 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
+| 测试框架 | pytest（631 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -144,7 +144,7 @@ delta-force-dashboard/
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（630 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（631 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）

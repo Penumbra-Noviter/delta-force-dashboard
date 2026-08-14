@@ -6,6 +6,15 @@
 
 ---
 
+## 滚动摘要（2026-08-14/15 — 文档闭环补记：doc_sync files 校验 + CODE_WIKI 补节 + 浅色主题柔和化）
+
+- **`122dea9`（2026-08-14）feat: doc_sync 新增 files 文件级引用校验**：doc_sync 边界扩为「机械标记 + 文件级引用双向覆盖」——文档引用的 .py 全部存在、仓库全部 .py 均被文档引用（叙述防漂移兜底）；CODE_WIKI 同步 631/631；tests/test_doc_sync.py +34 行（文件引用校验用例）；此提交起 `test_doc_sync` 增测，pytest 计数 630 → 631
+- **`2274f9b`（2026-08-14）docs: CODE_WIKI 补 motion/load_state/fetch_worker 类级小节**：§4.24~4.26 补节（motion/load_state/fetch_worker），AUTO 标记（lines/tests/sig）入 doc_sync 体系，CODE_WIKI +45 行
+- **`78ca2e1`（2026-08-15）style: 浅色主题柔和化**：暖白卡面 + 主色/语义色降饱和（theme.py ±140 行，73+/71-），保持 Sage Ledger 角色与 WCAG AA；README/CODE_WIKI 同步
+- **文档闭环注记**：上述三提交为审查发现的文档闭环缺口补录——已做记录随 commit 归档，后续新增功能/文档改动须同步 DEV_LOG
+
+---
+
 ## 滚动摘要（2026-08-13）
 
 - **打包验证（2026-08-14，IC 批次后重建）**：PyInstaller 6.21.0 `delta_force_dashboard.spec --noconfirm` 重建 onedir（`dist/Delta Force Dashboard/` 67M，exe 6.8MB，UPX 压缩）；**QtSvg 打包覆盖核验**——spec 白名单已含 `QtSvg.pyd`（54 行），产物 `_internal/PySide6/` 含 Qt6Svg.dll + QtSvg.pyd（SVG 图标渲染依赖，IC 批次新增依赖确认无缺）；启动冒烟——真实启动 12s 进程存活（PID 36356，180MB 内存，单实例锁正常、预加载正常、无新崩溃记录）后 taskkill /F /T 回收，进程清理复核通过；release 资产 `dist/default.zip` 重建 43.5MB（覆盖 08-13 旧版）；**crash.log 注记**：`~/Delta Force Dashboard/crash.log` 含 2026-08-13 22:00 历史记录（`Windows fatal exception: 0x8001010d` RPC_E_DISCONNECTED，main.py:176 app.exec 事件循环期，多线程同时崩溃——退出期 COM 断开，历史遗留非本次引入，本次冒烟 mtime 未更新）；build/ 中间产物已生成（可随时清）
