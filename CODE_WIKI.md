@@ -1,8 +1,8 @@
 # Delta Force Dashboard — Code Wiki
 
-> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）全部完成）  
-> 生成日期：2026-08-13  
-> 测试状态：<!--AUTO:tests_total:total-->630<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）+ F-01 增强（2026-08-14）全部完成）  
+> 生成日期：2026-08-14  
+> 测试状态：<!--AUTO:tests_total:total-->631<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->630<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->631<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -117,6 +117,7 @@ Delta Force Dashboard/
 │   └── install-hooks.bat    ← 把 pre-commit.sh 复制到 `.git/hooks/pre-commit`
 ├── tests/
 │   ├── __init__.py
+│   ├── conftest.py          ← pytest 共享夹具（make_stub_client 构造注入断网，C2）
 │   ├── test_calculator.py
 │   ├── test_presentation.py ← <!--AUTO:tests:tests/test_presentation.py-->23<!--/AUTO--> 个测试（展示文本生成：format_rate / format_signed_money / format_window_text / format_saved_indicator / get_pnl_label）
 │   ├── test_calculator.py   ← <!--AUTO:tests:tests/test_calculator.py-->81<!--/AUTO--> 个测试（DayRecord + 业务逻辑 + CSV 导出 + serialize/加载时过滤 D-03 + 不变式/汇总/窗口变化量 D-05/06 + 跳过记录 warning）
@@ -141,7 +142,7 @@ Delta Force Dashboard/
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 │   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   ├── test_icons.py       ← <!--AUTO:tests:tests/test_icons.py-->6<!--/AUTO--> 个测试（IC-01 SVG 图标：键集守卫/渲染有效/颜色注入/尺寸/未知键/占位符无残留）
-│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
+│   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
 ├── data.json                ← 运行态数据（日期 → {cash, warehouse}，已 gitignore）
@@ -655,7 +656,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->630<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->631<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -752,7 +753,7 @@ main.py
 | `tests/test_settings_store.py` | <!--AUTO:tests:tests/test_settings_store.py-->34<!--/AUTO--> | json_file seam（原子写/容错读/失败清理）+ SettingsStore（缺失静默/损坏告警/非 dict 兜底/原子落盘/失败不抛，D-02）+ on_error 回调/读取失败异常详情回归 |
 | `tests/test_json_file.py` | <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> | json_file seam（D-02）：原子写（失败清理临时文件）/ 容错读（缺失/解析失败返回 None）/ on_error 回调异常详情 |
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
-| `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->1<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
+| `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
 | `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme super() 刷新基类图标（IC-03）/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
@@ -851,6 +852,8 @@ python scripts/install-hooks.bat         # 安装 pre-commit 钩子到 .git/hook
 ---
 
 ## 十、常见注意事项
+
+> **技术唯一来源**（F-01）：本文档为技术细节权威源；Serena memory 的「关键避坑」为快速摘要，细节以本文档为准（单向权威，勿双源维护）。
 
 1. **主题切换**：运行时必须用 `get_color(key)` 而非模块级常量，因为常量在 `import` 时固定为 light 主题
 2. **现金⊆仓库不变式**：判定收敛于 `ProfitCalculatorLogic.is_cash_under_warehouse()`（告警/拦截/红框三处共用，D-05）；总收益 = 仓库价值（已含现金），非 `warehouse + cash`

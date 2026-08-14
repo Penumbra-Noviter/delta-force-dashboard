@@ -23,6 +23,8 @@
   - lines：每个 §4 模块标题必须有标记；每个标记必须对应一个 §4 标题
   - sig：每个标记引用的符号必须存在于模块（删除/改名会被拦截）
   - tests_total：文档中 tests_total 标记内容 = pytest 收集用例总数（防手工叙述测试数漂移）
+  - files：叙述中反引号引用的 .py 必须存在于仓库，且仓库全部 .py 必须被引用
+    （双向覆盖——删/改名文件与新增文件漏图都会被拦截；退役文件走白名单）
 """
 
 from __future__ import annotations
@@ -36,6 +38,8 @@ from pathlib import Path
 
 __all__ = [
     "MARKER_RE",
+    "collect_doc_file_refs",
+    "collect_source_files",
     "collect_test_counts",
     "compute_content",
     "count_nonblank_lines",
@@ -58,6 +62,22 @@ MARKER_RE = re.compile(
 HEADING_RE = re.compile(
     r"^### 4\.\d+ .*?`([A-Za-z0-9_./-]+\.py)`", re.MULTILINE
 )
+
+# 叙述中反引号引用的 .py 文件路径，如 `app/main_window.py`、`tests/test_x.py`
+FILE_REF_RE = re.compile(r"`([A-Za-z0-9_./\\-]+\.py)`")
+
+# §3 文件树行中的 .py 文件名（树行惯用裸名且无反引号），如 `│   ├── crafting_page.py`
+TREE_FILE_RE = re.compile(r"^[│ ]*[├└]── ([A-Za-z0-9_./-]+\.py)", re.MULTILINE)
+
+# 已知历史提及的已退役文件（叙述保留历史事实，白名单防误报；手动维护）
+_KNOWN_RETIRED = frozenset({"app/ui_text.py", "verify_all.py"})
+
+# 扫描仓库 .py 源文件时排除的目录（运行时/生成物/工具目录）
+_EXCLUDED_DIRS = frozenset({
+    ".claude", ".git", ".mypy_cache", ".playwright-mcp", ".pytest_cache",
+    ".scratch", ".serena", ".venv", ".worktrees", "__pycache__",
+    "build", "dist", "node_modules", "venv",
+})
 
 # pytest --collect-only -q 输出的测试项：`tests/test_x.py::nodeid`
 TEST_ITEM_RE = re.compile(r"^([A-Za-z0-9_./\\-]+\.py)::")
@@ -96,6 +116,32 @@ def collect_test_counts(root: Path) -> dict[str, int]:
             path = m.group(1).replace("\\", "/")
             counts[path] = counts.get(path, 0) + 1
     return counts
+
+
+def collect_source_files(root: Path) -> set[str]:
+    """扫描仓库全部 .py 源文件，返回相对路径集合（正斜杠，排除生成物目录）。
+
+    与 CODE_WIKI 的文档引用做双向覆盖：新增 .py 文件漏进 §3 树、删除/改名
+    文件残留引用都会被拦截（叙述部分无机械标记，文件级引用是唯一兜底）。
+    """
+    files: set[str] = set()
+    for p in root.rglob("*.py"):
+        parts = p.relative_to(root).parts
+        if any(part in _EXCLUDED_DIRS for part in parts):
+            continue
+        files.add("/".join(parts))
+    return files
+
+
+def collect_doc_file_refs(text: str) -> set[str]:
+    """收集文档引用的全部 .py 路径（相对项目根，正斜杠）。
+
+    两类来源：反引号引用（`app/main_window.py`）与 §3 文件树行
+    （`│   ├── crafting_page.py`，树行惯用裸名且无反引号）。
+    """
+    refs = {m.group(1).replace("\\", "/") for m in FILE_REF_RE.finditer(text)}
+    refs |= {m.group(1).replace("\\", "/") for m in TREE_FILE_RE.finditer(text)}
+    return refs
 
 
 def count_nonblank_lines(path: Path) -> int:
@@ -341,6 +387,27 @@ def _gather_issues(
     for key in sorted(lines_marked):
         if key not in headings:
             issues.append(f"[lines] 行数标记无对应 §4 标题: {key}")
+
+    # files：叙述反引号 .py 引用存在性 + 仓库源文件 ↔ 文档引用双向覆盖。
+    # 引用分两形态：带路径（app/main_window.py）→ 相对路径精确存在；
+    # 裸文件名（theme.py/__init__.py，§3 文件树与历史叙述惯用）→ 仓库同名即可。
+    # 双向覆盖按「路径或裸名任一出现」判定，保 §3 树「文件名列表」语义。
+    # 叙述部分无机械标记保护（F-01 规模悖论），文件级引用校验是唯一兜底：
+    # 删/改名文件、新增文件漏进 §3 树都会被拦截；已退役文件走白名单。
+    source_files = collect_source_files(root)
+    source_names = {p.rsplit("/", 1)[-1] for p in source_files}
+    refs = collect_doc_file_refs(text)
+    ref_paths = {r for r in refs if "/" in r}
+    ref_names = {r for r in refs if "/" not in r}
+    for ref in sorted(refs):
+        if ref in _KNOWN_RETIRED:
+            continue
+        exists = (root / ref).exists() if "/" in ref else ref in source_names
+        if not exists:
+            issues.append(f"[files] 文档引用不存在的文件: {ref}（删除/改名？或补入退役名单）")
+    for path in sorted(source_files):
+        if path not in ref_paths and path.rsplit("/", 1)[-1] not in ref_names:
+            issues.append(f"[files] 源文件未出现在文档引用中: {path}")
 
     return issues
 
