@@ -29,94 +29,96 @@ THEMES = {
     "light": {
         # ── Sage Ledger（Set 1：forest green on sage paper）──
         # 亮色基调：暖灰绿纸底 + 森林绿主色，语义色脱离绿色域
-        "BG": "#eef0ec",             # sage 暖纸，替代纯白
-        "FG_LABEL": "#3c4a43",       # ink-2 正文
-        "FG_MUTED": "#6d7d74",       # ink-3 次级（WCAG AA 4.5:1）
-        "FG_POS": "#2C7A8C",         # 蓝绿涨（迁移语义色，避免与森林绿 accent 冲突）
-        "FG_NEG": "#C0453C",         # 深红跌
-        "FG_TODAY": "#2F6B4F",       # 森林绿主色（今日高亮）
-        "BTN_BG": "#2F6B4F",         # 森林绿主按钮
-        "BTN_BG_HOVER": "#3C8A63",   # 悬停提亮
+        # 柔和化（2026-08-15）：卡面由纯白改为暖白、主色与语义色降饱和提亮，
+        # 全角色保持 WCAG AA 与 U-03 明度带契约（对 CARD_BG 均 ≥4.5:1）。
+        "BG": "#eef1ec",             # sage 暖纸，替代纯白（微暖）
+        "FG_LABEL": "#4a5a51",       # ink-2 正文（对比 →7.2:1，柔和）
+        "FG_MUTED": "#75837b",       # ink-3 次级（WCAG AA 4.5:1）
+        "FG_POS": "#307888",         # 蓝绿涨（降饱和保亮度，S 0.52→0.48）
+        "FG_NEG": "#b54e46",         # 深红跌（降饱和，S 0.52→0.44）
+        "FG_TODAY": "#3d8063",       # 森林绿主色（今日高亮，提亮）
+        "BTN_BG": "#3d8063",         # 森林绿主按钮（提亮，白字 4.7:1）
+        "BTN_BG_HOVER": "#4a8f6f",   # 悬停提亮
         "BTN_FG": "#ffffff",         # 按钮文字
         "BTN_HOVER_FG": "#ffffff",   # 按钮 hover 前景（操作列/危险按钮，双主题同值）
-        "BORDER_DEFAULT": "rgba(20,32,26,.07)",  # 半透明 hairline
-        "BORDER_VALID": "#2C7A8C",
-        "BORDER_INVALID": "#C0453C",
-        "BORDER_WARNING": "#B77A16",  # amber 警告
-        "SEPARATOR": "#d6d3cc",       # 暖灰分隔线
-        "PLACEHOLDER": "#6d7d74",
-        "MUTED_BG": "#f3f5f1",        # panel-2 次级底
-        "PIN_OFF_BG": "#f3f5f1",
-        "PIN_ON_BG": "#2F6B4F",
-        "CHART_CASH": "#C08A3E",      # 金色（accent-2 现金线）
-        "CHART_WAREHOUSE": "#2F6B4F", # 森林绿（accent 仓库线）
-        "CHART_TOTAL": "#2C7A8C",
-        "CHART_GRID": "#e2e4df",
-        "CHART_BG": "#f5f4f0",
+        "BORDER_DEFAULT": "rgba(20,32,26,.08)",  # 半透明 hairline
+        "BORDER_VALID": "#307888",
+        "BORDER_INVALID": "#b54e46",
+        "BORDER_WARNING": "#b07d2a",  # amber 警告（降饱和）
+        "SEPARATOR": "#d8d8d0",       # 暖灰分隔线
+        "PLACEHOLDER": "#75837b",
+        "MUTED_BG": "#f1f3f0",        # panel-2 次级底
+        "PIN_OFF_BG": "#f1f3f0",
+        "PIN_ON_BG": "#3d8063",
+        "CHART_CASH": "#c99a4e",      # 金色（accent-2 现金线，提亮降饱和）
+        "CHART_WAREHOUSE": "#3d8063", # 森林绿（accent 仓库线）
+        "CHART_TOTAL": "#307888",
+        "CHART_GRID": "#e4e6e1",
+        "CHART_BG": "#f5f6f2",
         "OVERLAY_BG": "rgba(0, 0, 0, 35)",    # 图表稀疏提示遮罩（双主题同值）
-        "CHART_AXIS": "#6d7d74",
-        "CHART_TEXT": "#3c4a43",
-        "TABLE_TEXT": "#3c4a43",
-        "TABLE_TEXT_BOLD": "#14201a",   # ink-1 强调
-        "TABLE_ROW_EVEN_BG": "#ffffff",
+        "CHART_AXIS": "#75837b",
+        "CHART_TEXT": "#4a5a51",
+        "TABLE_TEXT": "#4a5a51",
+        "TABLE_TEXT_BOLD": "#1e2b24",   # ink-1 强调
+        "TABLE_ROW_EVEN_BG": "#fcfdfb",
         "TABLE_ROW_ODD_BG": "#f3f5f1",
-        "TABLE_ROW_HOVER_BG": "#e8ece4",
-        "TABLE_ROW_TODAY_BG": "#e6f0e8",  # 今日行浅青绿底
-        "TABLE_HEADER_BG": "#f3f5f1",
-        "TABLE_HEADER_FG": "#6d7d74",
-        "CARD_BG": "#ffffff",
-        "CARD_BORDER": "rgba(20,32,26,.07)",
-        "INPUT_BG": "#ffffff",
-        "INPUT_FG": "#14201a",
-        "PANEL_2": "#f3f5f1",
+        "TABLE_ROW_HOVER_BG": "#e9ede6",
+        "TABLE_ROW_TODAY_BG": "#e4efe7",  # 今日行浅青绿底
+        "TABLE_HEADER_BG": "#f1f3f0",
+        "TABLE_HEADER_FG": "#75837b",
+        "CARD_BG": "#fcfdfb",         # 暖白卡片（对装饰色 min 4.67:1）
+        "CARD_BORDER": "rgba(20,32,26,.08)",
+        "INPUT_BG": "#fdfefc",
+        "INPUT_FG": "#1e2b24",
+        "PANEL_2": "#f1f3f0",
         # 新增：交互态
-        "FOCUS_RING": "#4A8B6A",
-        "SELECTION_BG": "#2F6B4F",
+        "FOCUS_RING": "#5a9a78",
+        "SELECTION_BG": "#3d8063",
         "SELECTION_FG": "#ffffff",
         "NAV_HOVER_BG": "rgba(128, 128, 128, 0.1)",  # 侧边栏导航 hover（浅色：中性灰 overlay）
-        "NAV_SELECT_BG": "rgba(47, 107, 79, 0.12)",  # 导航选中浅底 pill（森林绿 12% 透明）
+        "NAV_SELECT_BG": "rgba(61, 128, 99, 0.13)",  # 导航选中浅底 pill（森林绿 13% 透明）
         # 新增：表面层级
-        "SURFACE_0": "#eef0ec",
-        "SURFACE_1": "#ffffff",
-        "SURFACE_2": "#ffffff",
+        "SURFACE_0": "#eef1ec",
+        "SURFACE_1": "#fcfdfb",
+        "SURFACE_2": "#fcfdfb",
         # 新增：文字层级
-        "TEXT_PRIMARY": "#14201a",
-        "TEXT_SECONDARY": "#3c4a43",
-        "TEXT_DISABLED": "#b0b8b2",
-        "TEXT_LINK": "#2C7A8C",
+        "TEXT_PRIMARY": "#1e2b24",
+        "TEXT_SECONDARY": "#4a5a51",
+        "TEXT_DISABLED": "#aab4ad",
+        "TEXT_LINK": "#307888",
         # 新增：边框
-        "BORDER_LIGHT": "rgba(20,32,26,.04)",
-        "BORDER_HEAVY": "rgba(20,32,26,.14)",
+        "BORDER_LIGHT": "rgba(20,32,26,.05)",
+        "BORDER_HEAVY": "rgba(20,32,26,.15)",
         # 新增：语义扩展
-        "INFO_BG": "#e8f0f4",
-        "INFO_FG": "#2C7A8C",
-        "SUCCESS_BG": "#e8f4ec",
-        "SUCCESS_FG": "#2F6B4F",
-        "WARNING_BG": "#F1D9A0",   # 琥珀中调底（今日未录入 pill；与 sage 底亮度差 ≈0.11 可辨）
-        "WARNING_FG": "#6E4A08",   # 深琥珀文字（10px 小字对 #F1D9A0 对比 ≈7:1，AA）
-        "ERROR_BG": "#fef2f2",
-        "ERROR_FG": "#C0453C",
+        "INFO_BG": "#e8f2f5",
+        "INFO_FG": "#307888",
+        "SUCCESS_BG": "#e7f4ec",
+        "SUCCESS_FG": "#3d8063",
+        "WARNING_BG": "#f3ddab",   # 琥珀中调底（今日未录入 pill；与 sage 底亮度差 ≈0.11 可辨）
+        "WARNING_FG": "#6e580a",   # 深琥珀文字（10px 小字对 #F1D9A0 对比 ≈7:1，AA）
+        "ERROR_BG": "#fbeaea",
+        "ERROR_FG": "#b54e46",
         "BADGE_FG": "#ffffff",         # 盈亏标签文字（双主题同值，保持既有白字）
         # 新增：装饰色（兑换页 7 包标签，U-03 色彩角色系统化）
         # 角色规则：装饰色与语义色（FG_POS/FG_NEG）显式分离——包标签只做分类标识，
         # 涨跌色只做数值语义，二者不共用取值（dark 下曾与语义色完全同值，已修）。
         # 明度带：light 深墨带 L∈[0.20,0.32]（对白卡片 AA 4.5:1 的深字底线）；
         # 固定键清单 PACKAGE_COLOR_0~6，双主题各自定义取值（不抽常亮色，防 Locality 坑）。
-        "PACKAGE_COLOR_0": "#10048F",   # 蓝紫（通行证基础）
-        "PACKAGE_COLOR_1": "#8A700A",   # 暗金（4 级）
-        "PACKAGE_COLOR_2": "#0A715C",   # 青绿（3 级）
-        "PACKAGE_COLOR_3": "#960803",   # 深红（5 级）
-        "PACKAGE_COLOR_4": "#630A71",   # 深紫（通行证高级）
-        "PACKAGE_COLOR_5": "#5C3C14",   # 橙褐（进阶物流）
-        "PACKAGE_COLOR_6": "#6A0C38",   # 莓红（特级物流）
+        "PACKAGE_COLOR_0": "#1f167d",   # 蓝紫（通行证基础，降饱和）
+        "PACKAGE_COLOR_1": "#78651c",   # 暗金（4 级）
+        "PACKAGE_COLOR_2": "#176454",   # 青绿（3 级）
+        "PACKAGE_COLOR_3": "#7c201d",   # 深红（5 级）
+        "PACKAGE_COLOR_4": "#591764",   # 深紫（通行证高级）
+        "PACKAGE_COLOR_5": "#573319",   # 橙褐（进阶物流，偏红橙）
+        "PACKAGE_COLOR_6": "#601639",   # 莓红（特级物流）
         # 新增：滚动条
-        "SCROLLBAR_BG": "#f3f5f1",
-        "SCROLLBAR_HANDLE": "#d6d3cc",
+        "SCROLLBAR_BG": "#f1f3f0",
+        "SCROLLBAR_HANDLE": "#d8d8d0",
         # 操作按钮语义色
-        "DANGER_BG": "#fef2f2",
-        "DANGER_FG": "#C0453C",
-        "DANGER_BORDER": "#fecaca",
-        "DANGER_HOVER_BG": "#C0453C",
+        "DANGER_BG": "#fbeaea",
+        "DANGER_FG": "#b54e46",
+        "DANGER_BORDER": "#f2c2c0",
+        "DANGER_HOVER_BG": "#b54e46",
     },
     "dark": {
         # ── Midnight & Amber（Set 11：amber on midnight）──
