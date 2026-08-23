@@ -106,7 +106,7 @@
 - **性能优化（08-07 `ded4a5d` + 08-08 `762ef27`）**：crafting/exchange 页同步 HTTP 请求改 `FetchWorker`（QThread）后台执行，UI 不再阻塞（最坏 30s 冻结→0）；`_DaySubTable.draw` 改 get-or-create 复用 widget（30 天视图每次刷新从创建 ~300 个 Qt 对象降为 0）；calculator `_sorted_dates` 缓存（recent_records/summary/export_csv O(n log n)→O(1)）；`refresh_theme()` 解耦主题切换与数据刷新；kkrb_client 60s TTL 缓存；ProfitPage 制造产物预加载
 - **测试**：pytest **305/305** ✅
 
-- **项目更名（2026-08-07）**：正式更名为 **Delta Force Dashboard**（原「收益计算器 / Profit Calculator」）——窗口标题、应用名、`DATA_DIR`（`~/收益计算器` → `~/Delta Force Dashboard`，`_LEGACY_DATA_DIR` 一次性迁移旧数据）、spec 改名 `delta_force_dashboard.spec`（exe `Delta Force Dashboard.exe`）、README/PROJECT_REFERENCE/CODE_WIKI/CONSENSUS/CONTEXT/TO-TICKETS/ADR 文档、GitHub 仓库 `profit-calculator` → `delta-force-dashboard`；按「仅改身份标识」决策，`ProfitCalculatorLogic` 类名、日志文件名、单实例锁、user-agent 等内部标识保留
+- **项目更名（2026-08-07）**：正式更名为 **Delta Force Dashboard**（原「收益计算器 / Profit Calculator」）——窗口标题、应用名、`DATA_DIR`（`~/收益计算器` → `~/Delta Force Dashboard`，`_LEGACY_DATA_DIR` 一次性迁移旧数据）、spec 改名 `delta_force_dashboard.spec`（exe `Delta Force Dashboard.exe`）、README/PROJECT_REFERENCE/CODE_WIKI/CONTEXT/TO-TICKETS/ADR 文档（`docs/archive/CONSENSUS.md` 已归档）、GitHub 仓库 `profit-calculator` → `delta-force-dashboard`；按「仅改身份标识」决策，`ProfitCalculatorLogic` 类名、日志文件名、单实例锁、user-agent 等内部标识保留
 
 - **X 系列完成**：子弹自选包兑换利润模块 — X-01 兑换利润页面（`app/exchange_page.py`，7 种包类型网格展示，kkrb_client 新增 `AmmoPackageItem`/`fetch_ammo_package_data()`）+ X-02 特殊子弹自选包扩展（4 种新增包：通行证基础/高级、进阶物流、特级物流）+ X-03 代码气味消除（NamedTuple `_PackageConfig`、`exchangeGradeAndCount` 重命名）
 - **ProfitPage 重构**：QTabWidget 标签页 → QScrollArea 纵向堆叠，制造产物与兑换利润无需切换直接可见
@@ -401,7 +401,7 @@
 - **未烟测**：用户指示本次不启动 exe 验证；源码态 pytest 237/237 ✅ + 打包 exit 0（如需冒烟，启动 `dist/Delta Force Dashboard/Delta Force Dashboard.exe` 观察进程存活与日志）
 
 ### 2026-08-03 | 实现 | J-01 保留上限 7→30 + J-02 视图 7/30 切换（ADR-0003，存储/视图解耦）
-- 需求：用户「记录天数上限 7→30 + 多视图切换」（Grilling Q1–Q11 收敛，`CONSENSUS.md` §7）。核心=把**保留 Retention**与**视图 View**解耦
+- 需求：用户「记录天数上限 7→30 + 多视图切换」（Grilling Q1–Q11 收敛，`docs/archive/CONSENSUS.md` §7）。核心=把**保留 Retention**与**视图 View**解耦
 - **J-01（数据模型）**：`config.py` 新增 `RETENTION_LIMIT=30`（保留上限），`rotate_weekly()`/`format_saved_indicator()` 默认改引用它——`rotate_weekly` 保留边界「满 30 不删、第 31 条才删最旧」（Q11）；清理文案「已保留最近 30 条记录」
 - **J-02（UI）**：`TableWidget` 加 7/30 按钮组（`QButtonGroup` + `QRadioButton`）+ `view_changed(int)` 信号 + 持有 `_view_days`（Q6/Q8 深模块——表格是视图窗口主人，MainWindow 只订阅）；分栏均分 `mid=ceil(n/2)`（Q7：7→4+3、30→15+15）；`MainWindow` 持 `_view_n`（启动默认 7，会话内存不持久化 §7.5）、`_get_records`/`_update_summary` 去硬编码 `WEEK_DAYS` 改走 `_view_n`；切视图 `_on_view_changed → refresh_display`，表格+曲线图+汇总同源联动（Q9/Q10）
 - 测试：`test_ui_smoke.py` +3（默认视图 7+按钮组状态 / 切 30 信号+15+15+汇总「最近30条」 / 切回 7 不丢存储 Q5）、`test_calculator.py` +2（`format_summary(days=30)` 前缀 / `summary(7)` vs `summary(30)` 窗口参数化）；rotate_weekly 既有用例改 30 上限
@@ -680,7 +680,7 @@
 ## Phase 3 — 架构深度优化 P0-P5 ✅（2026-07-28~29）
 
 - P0 删 Tkinter 迁移残留（5 文件/52KB）；P1 config 穿透合并；P2 删孤立模块级颜色常量（24 导出）；P3 `__all__` 补齐；P4 图表性能（FillBetweenItem 去重建/输入去抖/主题增量更新）；P5 单实例（QLocalServer 防多开）
-- 验证：pytest 103 ✅ + verify_all ✅；详情见 CONSENSUS.md
+- 验证：pytest 103 ✅ + verify_all ✅；详情见 `docs/archive/CONSENSUS.md`
 
 ## Phase 2 — PySide6 迁移 ✅（~2026-07-28）
 

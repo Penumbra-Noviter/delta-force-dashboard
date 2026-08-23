@@ -4,7 +4,7 @@
 用户需求「记录天数上限从 7 扩到 30」：现状 `rotate_weekly(days=7)` 只保留最近 7 条录入，
 超出即删最旧。用户想积累更长的账目，但**不想牺牲 7 天视图的沉浸感**——一次看 30 条太密。
 需求背后是两种口径：**存储保留上限**（最多留多少条账）与**视图展示窗口**（一次看几条）。
-先经 Grilling Q1–Q11 收敛（记录在 `CONSENSUS.md` §7，原型 `MultiViewModel` 分支
+先经 Grilling Q1–Q11 收敛（记录在 `docs/archive/CONSENSUS.md` §7，原型 `MultiViewModel` 分支
 `prototype/multiview` commit `f39c66f` 验证数据流不断裂），再落实现。本 ADR 记录方向性选择。
 
 ## 可选方案
@@ -49,6 +49,6 @@
 ## 原型与验证
 - 原型：`MultiViewModel`（分支 `prototype/multiview`，commit `f39c66f`）——
   验证 RETENTION_LIMIT / view_days 解耦形态下数据流不断裂（切视图、保存、裁剪互不干扰）。
-- 规格：Grilling Q1–Q11 收敛记录于 `CONSENSUS.md` §7；数据模型/UI 变更设计见 §7.3/§7.4。
+- 规格：Grilling Q1–Q11 收敛记录于 `docs/archive/CONSENSUS.md` §7；数据模型/UI 变更设计见 §7.3/§7.4。
 - 测试：视图切换 UI 用例（默认 7 + 按钮组状态、切 30 信号/15+15/汇总联动、
   切回 7 不丢存储）+ `format_summary(days)`/`summary(days)` 参数化纯函数用例。

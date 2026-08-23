@@ -62,7 +62,7 @@ rate = (today.warehouse - prev_day.warehouse) / prev_day.warehouse * 100
 |------|------|
 | **数据格式** | JSON 本地文件，无数据库依赖 |
 | **持久化策略** | 原子写入（先 tmp 再 replace）+ 3 份滚动备份 + 兼容旧单文件备份 |
-| **数据保留** | 最多保留最近 30 条实际录入记录，超出删除最旧；视图 7/30 可切换（产品决策，见 CONSENSUS §7 / ADR-0003） |
+| **数据保留** | 最多保留最近 30 条实际录入记录，超出删除最旧；视图 7/30 可切换（产品决策，见 `docs/archive/CONSENSUS.md` §7 / ADR-0003） |
 | **金额模型** | cash 和 warehouse 均为 float，warehouse 已含 cash |
 | **输入解析** | 兼容 ¥/￥/$、千分位、K/M/B 后缀、负号、首尾空格 |
 | **主题系统** | 两套完整色板（light/dark），约 30 个语义化 token，运行时 `get_color()` 解析 |

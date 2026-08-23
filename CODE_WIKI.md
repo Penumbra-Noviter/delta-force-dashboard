@@ -150,7 +150,7 @@ Delta Force Dashboard/
 ├── requirements.txt         ← PySide6==6.11.1, pyqtgraph==0.14.0（O-12 版本锁定）
 ├── requirements-dev.txt     ← -r requirements.txt + pytest==9.1.1
 ├── .gitignore
-├── CONSENSUS.md             ← 开发共识文档（三阶段任务记录）
+├── docs/archive/CONSENSUS.md← 开发共识文档（已归档，历史）
 └── PROJECT_REFERENCE.md     ← 项目介绍书（架构说明）
 ```
 
