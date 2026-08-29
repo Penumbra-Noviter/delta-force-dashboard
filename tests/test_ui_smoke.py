@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, timedelta
 
 # offscreen 平台必须在 QApplication 创建前设置
@@ -29,11 +30,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 from calculator import ProfitCalculatorLogic
 from config import DATE_FORMAT
-from data_store import DataStore
+from tests.conftest import make_store
 
 __all__ = []
 
@@ -66,6 +68,20 @@ def make_sample_data() -> dict:
     }
 
 
+def wait_loaded(page, qapp, timeout_ms: int = 5000) -> bool:
+    """轮询等待页面后台预加载完成（固定 qWait 时长与线程调度存在竞态）。
+
+    原两处测试内联副本收敛至此（C5）；qapp 显式传入以驱动事件循环。
+    """
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        QTest.qWait(50)
+        qapp.processEvents()
+        if page.is_loaded:
+            return True
+    return False
+
+
 # ── fixtures（qapp / settings_guard 见 tests/conftest.py）──
 
 
@@ -80,7 +96,7 @@ def sample_window(qapp, settings_guard, tmp_path):
     from tests.conftest import make_stub_client
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=make_stub_client(),
     )
@@ -196,18 +212,13 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path):
     C2-03：构造注入带数据的 stub client——预加载走真实后台线程，
     线程内立即返回伪造数据，零真实网络。
     """
-    import time
-
-    from PySide6.QtTest import QTest
-
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
-    from data_store import DataStore
     from kkrb_client import AmmoPackageItem, CraftingProduct
     from tests.conftest import make_stub_client
 
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=make_stub_client(
             ov_impl=lambda: [CraftingProduct("技术中心", "复合弓", 100, 200, "晚上8点")],
@@ -218,18 +229,8 @@ def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path):
     )
     win.show()
 
-    # 轮询等待两个页面预加载完成（固定 qWait 时长与后台线程调度存在竞态）
-    def wait_loaded(page, timeout_ms: int = 5000) -> bool:
-        deadline = time.monotonic() + timeout_ms / 1000
-        while time.monotonic() < deadline:
-            QTest.qWait(50)
-            qapp.processEvents()
-            if page.is_loaded:
-                return True
-        return False
-
-    assert wait_loaded(win.profit_page.crafting_page)
-    assert wait_loaded(win.profit_page.exchange_page)
+    assert wait_loaded(win.profit_page.crafting_page, qapp)
+    assert wait_loaded(win.profit_page.exchange_page, qapp)
     win.close()
 
 
@@ -763,7 +764,7 @@ def test_save_triggers_rotation_hint(qapp, settings_guard, tmp_path):
         data[d] = {"cash": 100.0, "warehouse": 200.0 + off}
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(data),
         client=make_stub_client(),
     )
@@ -918,7 +919,7 @@ def test_main_window_shares_single_injected_client(qapp, settings_guard, tmp_pat
 
     fake = SimpleNamespace()
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=fake,
     )
@@ -962,7 +963,7 @@ def test_shared_client_concurrent_preload_no_errors(
     )
 
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=client,
     )
@@ -996,7 +997,7 @@ def test_startup_preload_fans_out_via_profit_page(qapp, settings_guard, tmp_path
     from app.main_window import MainWindow
 
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=SimpleNamespace(),
     )
@@ -1082,7 +1083,6 @@ def test_animations_false_persists_through_close(qapp, tmp_path):
     偏好首次落盘即丢；update 流程必须保留（可证伪回归）。
     """
     from app.main_window import MainWindow
-    from data_store import DataStore
     from settings_store import SettingsStore
     from tests.conftest import make_stub_client
 
@@ -1090,7 +1090,7 @@ def test_animations_false_persists_through_close(qapp, tmp_path):
     settings_file.write_text(json.dumps({"animations": False}), encoding="utf-8")
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         settings_store=SettingsStore(settings_file),
         client=make_stub_client(),
     )
@@ -1105,7 +1105,6 @@ def test_animations_false_persists_through_close(qapp, tmp_path):
 def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
     """C3-11：预置 custom 未知键 → 主题切换 + 关窗 → 落盘仍含 custom（端到端保留）。"""
     from app.main_window import MainWindow
-    from data_store import DataStore
     from settings_store import SettingsStore
     from tests.conftest import make_stub_client
 
@@ -1113,7 +1112,7 @@ def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
     settings_file.write_text(json.dumps({"custom": 1}), encoding="utf-8")
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         settings_store=SettingsStore(settings_file),
         client=make_stub_client(),
     )
@@ -1142,7 +1141,7 @@ def test_geometry_restore_old_format(qapp, tmp_path, monkeypatch):
     )
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         client=make_stub_client(),
     )
     win.close()
@@ -1162,7 +1161,7 @@ def test_geometry_restore_new_format(qapp, tmp_path, monkeypatch):
     )
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         client=make_stub_client(),
     )
     win.close()
@@ -1305,7 +1304,7 @@ def window_without_today(qapp, settings_guard, tmp_path):
     today_str = datetime.now().strftime(DATE_FORMAT)
     data.pop(today_str, None)
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(data),
         client=make_stub_client(),
     )
@@ -1422,7 +1421,6 @@ def view_switch_window(qapp, settings_guard, tmp_path):
     「切回 7 不丢存储」（Q5 视图/存储解耦）。
     """
     from app.main_window import MainWindow
-    from data_store import DataStore
     from tests.conftest import make_stub_client
 
     today = datetime.now()
@@ -1431,7 +1429,7 @@ def view_switch_window(qapp, settings_guard, tmp_path):
         d = (today - timedelta(days=off)).strftime(DATE_FORMAT)
         data[d] = {"cash": 100.0 + off, "warehouse": 200.0 + off * 1000}
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(data),
         client=make_stub_client(),
     )
@@ -1664,7 +1662,6 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
     """注入 store（既有模式）→ 跳过账号解析：resolve 不被调用、无账号概念、标题不变。"""
     from account_store import AccountStore
     from app.main_window import MainWindow
-    from data_store import DataStore
     from settings_store import SettingsStore
     from tests.conftest import make_stub_client
 
@@ -1680,7 +1677,7 @@ def test_injected_store_skips_account_resolution(qapp, settings_guard, tmp_path)
             return super().new_store(name)
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         account_store=SpyStore(tmp_path / "accounts"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
         client=make_stub_client(),
@@ -1903,12 +1900,11 @@ def test_create_account_cancel_is_noop(account_window_factory, monkeypatch):
 def test_account_area_hidden_when_store_injected(qapp, settings_guard, tmp_path):
     """注入 store（既有模式）→ 账号区隐藏（无账号概念，零破坏）。"""
     from app.main_window import MainWindow
-    from data_store import DataStore
     from settings_store import SettingsStore
     from tests.conftest import make_stub_client
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         settings_store=SettingsStore(tmp_path / "settings.json"),
         client=make_stub_client(),
     )
@@ -2460,18 +2456,13 @@ def test_bonus_door_nav_switch_shows_page2(sample_window):
 
 def test_bonus_door_page_preloaded_on_startup(qapp, settings_guard, tmp_path):
     """BD-03：启动预加载走 _preload_data_pages（利润页 + 密码门页，C2-02 单出口）。"""
-    import time
-
-    from PySide6.QtTest import QTest
-
     from app.main_window import MainWindow
     from calculator import ProfitCalculatorLogic
-    from data_store import DataStore
     from kkrb_client import BonusDoorItem
     from tests.conftest import make_stub_client
 
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=make_stub_client(
             bonus_impl=lambda: [
@@ -2481,16 +2472,7 @@ def test_bonus_door_page_preloaded_on_startup(qapp, settings_guard, tmp_path):
     )
     win.show()
 
-    def wait_loaded(page, timeout_ms: int = 5000) -> bool:
-        deadline = time.monotonic() + timeout_ms / 1000
-        while time.monotonic() < deadline:
-            QTest.qWait(50)
-            qapp.processEvents()
-            if page.is_loaded:
-                return True
-        return False
-
-    assert wait_loaded(win.bonus_door_page)
+    assert wait_loaded(win.bonus_door_page, qapp)
     assert win.bonus_door_page._cards[0]._map_label.text() == "零号大坝"
     win.close()
 
@@ -2502,7 +2484,7 @@ def test_bonus_door_preload_single_exit_via_main_window(qapp, settings_guard, tm
     from app.main_window import MainWindow
 
     win = MainWindow(
-        store=DataStore(tmp_path / "d.json", tmp_path / "d.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(make_sample_data()),
         client=SimpleNamespace(),
     )

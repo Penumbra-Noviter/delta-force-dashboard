@@ -172,7 +172,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~665 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~660 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -260,7 +260,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~507 行<!--/AUTO-->
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~506 行<!--/AUTO-->
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -367,14 +367,14 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~688 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~650 行<!--/AUTO-->）
 
-主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`get_theme`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
+主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
 | 函数 | 说明 |
 |------|------|
 | <!--AUTO:sig:app/theme.py:generate_qss-->`generate_qss(theme_name)`<!--/AUTO--> | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
-| <!--AUTO:sig:app/theme.py:get_theme-->`get_theme()`<!--/AUTO--> / <!--AUTO:sig:app/theme.py:set_theme-->`set_theme(name)`<!--/AUTO--> | 读取 / 切换当前主题（"light" \| "dark"） |
+| <!--AUTO:sig:app/theme.py:set_theme-->`set_theme(name)`<!--/AUTO--> | 切换当前主题（"light" \| "dark"） |
 | <!--AUTO:sig:app/theme.py:get_color-->`get_color(key)`<!--/AUTO--> | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**）；未知键 `logger.warning`（含键名）后返回 `""`，不 raise（C1-06，`generate_qss` 的 `t[...]` 直接索引语义不变） |
 | <!--AUTO:sig:app/theme.py:signal_color-->`signal_color(signal)`<!--/AUTO--> | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
 
@@ -451,7 +451,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | `WEEK_DAYS` | `7` | 视图默认窗口（启动默认 7，录入条数语义；J 系列与保留上限解耦） |
 | `RETENTION_LIMIT` | `30` | 存储保留上限（`rotate_weekly` 默认值；满 30 不删、第 31 条才删最旧，J 系列） |
 
-> 主题色板（`THEMES` / `get_theme` / `set_theme` / `get_color`）已于 T-02 迁至 `app/theme.py`（见 §4.6），config.py 不再包含主题数据。
+> 主题色板（`THEMES` / `set_theme` / `get_color`）已于 T-02 迁至 `app/theme.py`（见 §4.6），config.py 不再包含主题数据。
 
 ---
 

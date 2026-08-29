@@ -22,12 +22,6 @@ from account_store import (
 __all__ = []
 
 
-@pytest.fixture
-def store(tmp_path) -> AccountStore:
-    """tmp_path 隔离的 AccountStore（零真实用户目录触碰）。"""
-    return AccountStore(tmp_path / "accounts")
-
-
 def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 

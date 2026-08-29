@@ -321,19 +321,23 @@ def scan_markers(text: str) -> list[tuple[str, str, str, int, int]]:
     ]
 
 
-def _sig_content_ok(content: str, symbol: str, rendered: str) -> bool:
-    """判断 sig 标记内容是否可接受。
+def _is_full_sig(content: str) -> bool:
+    """sig 标记内容是否为完整签名写法（含括号）——校验与更新共用同一判定。
 
-    - ``name(params)``（含反引号）→ 必须等于 AST 渲染签名（严格校验）；
-    - 仅 ``name``（如 §4.7「方法|参数|返回」表的名称列）→ 只校验存在性。
+    两种可接受写法：
+    - ``name(params)``（完整签名）→ 与 AST 渲染结果严格/对等比较；
+    - 仅 ``name``（名称列）→ 只校验存在性。
     property 的渲染本就是 ``name``，两种写法等价。
     """
+    return "(" in content.strip().strip("`")
+
+
+def _sig_content_ok(content: str, symbol: str, rendered: str) -> bool:
+    """判断 sig 标记内容是否可接受。"""
     stripped = content.strip().strip("`")
-    if stripped == rendered:
-        return True
-    if stripped == symbol.split(".")[-1]:
-        return True  # 名称列：仅存在性校验
-    return False
+    if _is_full_sig(content):
+        return stripped == rendered
+    return stripped == symbol.split(".")[-1]  # 名称列：仅存在性校验
 
 
 # ── 校验 / 更新 ───────────────────────────────────────────
@@ -418,7 +422,7 @@ def _sig_update_text(key: str, content: str, root: Path) -> str | None:
     rendered = resolve_signature(root / module, symbol)
     if rendered is None:
         return None
-    if "(" in content.strip().strip("`"):
+    if _is_full_sig(content):
         return f"`{rendered}`"
     return f"`{symbol.split('.')[-1]}`"
 

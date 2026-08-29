@@ -14,7 +14,6 @@ from app.table_widget import PnLBadge, TableWidget
 from app.theme import (
     generate_qss,
     get_color,
-    get_theme,
     set_theme,
     signal_color,
     summary_style,
@@ -31,7 +30,6 @@ __all__ = [
     "ExchangePage",
     "generate_qss",
     "get_color",
-    "get_theme",
     "InputPanel",
     "MainWindow",
     "MoneyLineEdit",

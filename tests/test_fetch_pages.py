@@ -20,8 +20,7 @@ from datetime import datetime
 import pytest
 
 from config import DATE_FORMAT
-from data_store import DataStore
-from tests.conftest import make_stub_client
+from tests.conftest import make_stub_client, make_store
 
 __all__ = []
 
@@ -121,7 +120,7 @@ def test_close_window_with_inflight_worker_no_crash(
     today = datetime.now().strftime(DATE_FORMAT)
     data = {today: {"cash": 100.0, "warehouse": 200.0}}
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         logic=ProfitCalculatorLogic(data),
         client=make_stub_client(),
     )

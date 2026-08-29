@@ -48,6 +48,22 @@ def make_stub_client(
     )
 
 
+def make_store(tmp_path, max_backups: int = 3):
+    """tmp_path 隔离的 DataStore（data.json + data.json.bak + 滚动备份上限）。
+
+    C7 收敛：原 test_data_store 模块级 make_store 与 MainWindow 测试内联
+    `DataStore(tmp_path/...，tmp_path/...)` 双参构造共 19 处复制，统一收容
+    （文件名双形态 data.json/d.json 的上游测试无文件名依赖，语义等价）。
+    """
+    from data_store import DataStore
+
+    return DataStore(
+        data_file=tmp_path / "data.json",
+        backup_file=tmp_path / "data.json.bak",
+        max_backups=max_backups,
+    )
+
+
 @pytest.fixture(scope="module")
 def qapp():
     """进程级 QApplication（offscreen），供主窗口/表格/图表控件创建。"""
@@ -86,3 +102,27 @@ def type_and_settle(qapp):
         QTest.qWait(settle_ms)
 
     return _type_and_settle
+
+
+@pytest.fixture
+def theme_guard():
+    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值（C3 收敛，防状态泄漏）。"""
+    import app.theme as theme_mod
+
+    saved = theme_mod._current_theme
+    theme_mod.set_theme("light")
+    yield
+    theme_mod._current_theme = saved
+
+
+@pytest.fixture(autouse=True)
+def cleanup_encryption():
+    """每个测试后清理 json_file 全局加密密钥（C2 从两测试文件收敛而来）。
+
+    set_encryption_key(None) 幂等，对不涉及加密的测试无副作用——统一收容
+    可防止「新加密测试忘记清理 → 全局密钥泄漏给后续用例」。
+    """
+    from json_file import set_encryption_key
+
+    yield
+    set_encryption_key(None)

@@ -3,20 +3,9 @@
 from __future__ import annotations
 
 import json
-import pytest
 from cryptography.fernet import Fernet, InvalidToken
 
 from json_file import atomic_write_json, set_encryption_key, try_load_json
-
-
-# ── fixtures ────────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True)
-def cleanup_encryption():
-    """每个测试后清理加密密钥，避免全局状态影响其他测试。"""
-    yield
-    set_encryption_key(None)
 
 
 # ── 加密解密 ────────────────────────────────────────────

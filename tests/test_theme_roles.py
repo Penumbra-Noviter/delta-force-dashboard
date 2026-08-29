@@ -18,21 +18,12 @@ from __future__ import annotations
 
 import colorsys
 
-import pytest
-
 from app import theme as theme_mod
 
 __all__ = []
 
 
-@pytest.fixture
-def theme_guard():
-    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值（防状态泄漏）。"""
-    saved = theme_mod._current_theme
-    theme_mod.set_theme("light")
-    yield
-    theme_mod._current_theme = saved
-
+# theme_guard：收敛至 tests/conftest.py（C3）
 
 # ── 角色规则阈值（U-03 验收标准量化） ─────────────────────
 

@@ -52,6 +52,26 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文由 git 历史承担）。
 
+### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
+
+> 来源：simplify-codebase 审计（生产/测试两域只读 Explore）+ 用户拍板 A+C。叙述见 DEV_LOG〈滚动摘要 2026-08-29〉；本表只承载工单事实。
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| S-01 | 删 16 个死主题 token ×light/dark（BORDER_LIGHT/CHART_TEXT/ERROR_*/INFO_*/PANEL_2/PIN_OFF_BG/PIN_ON_BG/SUCCESS_*/SURFACE_0/1/2/TEXT_DISABLED/TEXT_LINK）——逐键 grep 全仓（含 QSS 消费）零引用，删字典定义 + 空注释组 | ✅ 2026-08-29 | 本提交 |
+| S-02 | 删 `theme.get_theme()`（全仓含测试零调用）+ `__all__` + `app/__init__.py` 导出 + CODE_WIKI 3 处引用 | ✅ 2026-08-29 | 本提交 |
+| S-03 | 删 `MainWindow.view_n` property（测试全用 `_view_n`） | ✅ 2026-08-29 | 本提交 |
+| S-04 | 删 3 个死 import：main_window 的 signal_color/format_short_date、table_widget 的 QRadioButton（视图切换实际是 QPushButton） | ✅ 2026-08-29 | 本提交 |
+| S-05 | 删死 fixture `store`（test_account_store，文件内 25+ 测试零消费） | ✅ 2026-08-29 | 本提交 |
+| S-06 | `cleanup_encryption` autouse fixture 两文件逐行副本 → conftest 单源 | ✅ 2026-08-29 | 本提交 |
+| S-07 | `theme_guard` fixture 两文件 4 行副本 → conftest 单源 | ✅ 2026-08-29 | 本提交 |
+| S-08 | `tmp_dir` 自造 fixture（tempfile 重复 pytest 内建 tmp_path）→ 60 处机械替换 + 删 tempfile import | ✅ 2026-08-29 | 本提交 |
+| S-09 | `wait_loaded` 8 行轮询双内联 → 模块级 helper（qapp 显式参数化） | ✅ 2026-08-29 | 本提交 |
+| S-10 | doc_sync sig 标记「完整签名 vs 裸名」双谓词分裂 → `_is_full_sig` 单一谓词（`_sig_content_ok`/`_sig_update_text` 共用） | ✅ 2026-08-29 | 本提交 |
+| S-11 | `make_store` 工厂收敛 19 处 `DataStore(tmp_path...)` 双参构造（含 test_data_store 本地同款 + 文件名双形态 data.json/d.json 统一） | ✅ 2026-08-29 | 本提交 |
+
+期末验证：**631/631 全绿**、doc_sync 双绿（先 update 3 标记再 check）；diff 15 文件 ±163/−244 净 −81 行；行为零变化（死键零 QSS 消费、删除符号全仓零残留、测试数不变）。B 类（summary_by_period/import_csv 删可达能力）用户未拍板，保留；C7 完整 make_window 工厂因构造参数异构降级为 make_store；chart.state 观测面/`_kpi_signal` 中继/两套迁移双实现保留（净收益为负或红线）。
+
 ### IC-债1/2 技术债消费批次（2026-08-13，kickoff 全自动档，基线 06f31df，分支 kickoff/ic-debt）
 
 | Ticket | 标题 | 完成 | 提交 |

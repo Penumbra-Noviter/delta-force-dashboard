@@ -39,7 +39,6 @@ from app.theme import (
     generate_qss,
     get_color,
     set_theme,
-    signal_color,
 )
 from app.dashboard_page import build_dashboard
 from app.bonus_door_page import BonusDoorPage
@@ -49,7 +48,7 @@ from app.motion import set_animations_enabled
 from app.profit_page import ProfitPage
 from app.sidebar import Sidebar
 from data_store import DataStore
-from formatting import format_money, format_short_date
+from formatting import format_money
 from calculator import DayRecord, ProfitCalculatorLogic
 from kkrb_client import KkrbClient
 from presentation import (
@@ -584,11 +583,6 @@ class MainWindow(QMainWindow):
             return
         self._view_n = n
         self.refresh_display()
-
-    @property
-    def view_n(self) -> int:
-        """当前视图条数（只读）。"""
-        return self._view_n
 
     # ═══════════════════════════════════════════════════════
     # 保存

@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QMessageBox
 
 from app.input_panel import InputPanel
 from calculator import DayRecord
-from data_store import DataStore
+from tests.conftest import make_store
 
 __all__ = []
 
@@ -41,7 +41,7 @@ def main_window(qapp, settings_guard, tmp_path):
     from tests.conftest import make_stub_client
 
     win = MainWindow(
-        store=DataStore(tmp_path / "data.json", tmp_path / "data.json.bak"),
+        store=make_store(tmp_path),
         client=make_stub_client(),
     )
     yield win

@@ -14,7 +14,6 @@ __all__ = [
     "THEMES",
     "generate_qss",
     "get_color",
-    "get_theme",
     "set_theme",
     "signal_color",
     "summary_style",
@@ -48,8 +47,6 @@ THEMES = {
         "SEPARATOR": "#d8d8d0",       # 暖灰分隔线
         "PLACEHOLDER": "#75837b",
         "MUTED_BG": "#f1f3f0",        # panel-2 次级底
-        "PIN_OFF_BG": "#f1f3f0",
-        "PIN_ON_BG": "#3d8063",
         "CHART_CASH": "#c99a4e",      # 金色（accent-2 现金线，提亮降饱和）
         "CHART_WAREHOUSE": "#3d8063", # 森林绿（accent 仓库线）
         "CHART_TOTAL": "#307888",
@@ -57,7 +54,6 @@ THEMES = {
         "CHART_BG": "#f5f6f2",
         "OVERLAY_BG": "rgba(0, 0, 0, 35)",    # 图表稀疏提示遮罩（双主题同值）
         "CHART_AXIS": "#75837b",
-        "CHART_TEXT": "#4a5a51",
         "TABLE_TEXT": "#4a5a51",
         "TABLE_TEXT_BOLD": "#1e2b24",   # ink-1 强调
         "TABLE_ROW_EVEN_BG": "#fcfdfb",
@@ -70,34 +66,20 @@ THEMES = {
         "CARD_BORDER": "rgba(20,32,26,.08)",
         "INPUT_BG": "#fdfefc",
         "INPUT_FG": "#1e2b24",
-        "PANEL_2": "#f1f3f0",
         # 新增：交互态
         "FOCUS_RING": "#5a9a78",
         "SELECTION_BG": "#3d8063",
         "SELECTION_FG": "#ffffff",
         "NAV_HOVER_BG": "rgba(128, 128, 128, 0.1)",  # 侧边栏导航 hover（浅色：中性灰 overlay）
         "NAV_SELECT_BG": "rgba(61, 128, 99, 0.13)",  # 导航选中浅底 pill（森林绿 13% 透明）
-        # 新增：表面层级
-        "SURFACE_0": "#eef1ec",
-        "SURFACE_1": "#fcfdfb",
-        "SURFACE_2": "#fcfdfb",
         # 新增：文字层级
         "TEXT_PRIMARY": "#1e2b24",
         "TEXT_SECONDARY": "#4a5a51",
-        "TEXT_DISABLED": "#aab4ad",
-        "TEXT_LINK": "#307888",
         # 新增：边框
-        "BORDER_LIGHT": "rgba(20,32,26,.05)",
         "BORDER_HEAVY": "rgba(20,32,26,.15)",
         # 新增：语义扩展
-        "INFO_BG": "#e8f2f5",
-        "INFO_FG": "#307888",
-        "SUCCESS_BG": "#e7f4ec",
-        "SUCCESS_FG": "#3d8063",
         "WARNING_BG": "#f3ddab",   # 琥珀中调底（今日未录入 pill；与 sage 底亮度差 ≈0.11 可辨）
         "WARNING_FG": "#6e580a",   # 深琥珀文字（10px 小字对 #F1D9A0 对比 ≈7:1，AA）
-        "ERROR_BG": "#fbeaea",
-        "ERROR_FG": "#b54e46",
         "BADGE_FG": "#ffffff",         # 盈亏标签文字（双主题同值，保持既有白字）
         # 新增：装饰色（兑换页 7 包标签，U-03 色彩角色系统化）
         # 角色规则：装饰色与语义色（FG_POS/FG_NEG）显式分离——包标签只做分类标识，
@@ -140,8 +122,6 @@ THEMES = {
         "SEPARATOR": "rgba(255,255,255,.06)",
         "PLACEHOLDER": "#848aa0",
         "MUTED_BG": "#1a1d27",       # panel-2
-        "PIN_OFF_BG": "#1a1d27",
-        "PIN_ON_BG": "#E8A33D",
         "CHART_CASH": "#7B8CFF",     # 紫蓝色（accent-2 现金线）
         "CHART_WAREHOUSE": "#E8A33D",# 琥珀橙（accent 仓库线）
         "CHART_TOTAL": "#3FCB86",
@@ -149,7 +129,6 @@ THEMES = {
         "CHART_BG": "#0c0e16",
         "OVERLAY_BG": "rgba(0, 0, 0, 35)",
         "CHART_AXIS": "#848aa0",
-        "CHART_TEXT": "#a8adbd",
         "TABLE_TEXT": "#a8adbd",
         "TABLE_TEXT_BOLD": "#eceef5",  # ink-1
         "TABLE_ROW_EVEN_BG": "#12141c",
@@ -162,34 +141,20 @@ THEMES = {
         "CARD_BORDER": "rgba(255,255,255,.07)",
         "INPUT_BG": "#1a1d27",
         "INPUT_FG": "#eceef5",
-        "PANEL_2": "#1a1d27",
         # 新增：交互态
         "FOCUS_RING": "#F0B555",
         "SELECTION_BG": "#E8A33D",
         "SELECTION_FG": "#141008",
         "NAV_HOVER_BG": "rgba(255, 255, 255, 0.1)",  # 侧边栏导航 hover（暗色：半透明白 overlay）
         "NAV_SELECT_BG": "rgba(232, 163, 61, 0.14)",  # 导航选中浅底 pill（琥珀 14% 透明）
-        # 新增：表面层级
-        "SURFACE_0": "#08090f",
-        "SURFACE_1": "#12141c",
-        "SURFACE_2": "#1a1d27",
         # 新增：文字层级
         "TEXT_PRIMARY": "#eceef5",
         "TEXT_SECONDARY": "#a8adbd",
-        "TEXT_DISABLED": "#5a5f72",
-        "TEXT_LINK": "#7B8CFF",
         # 新增：边框
-        "BORDER_LIGHT": "rgba(255,255,255,.03)",
         "BORDER_HEAVY": "rgba(255,255,255,.12)",
         # 新增：语义扩展
-        "INFO_BG": "#1a2433",
-        "INFO_FG": "#7B8CFF",
-        "SUCCESS_BG": "#14261e",
-        "SUCCESS_FG": "#3FCB86",
         "WARNING_BG": "#3A2E1A",   # 琥珀淡底（今日未录入 pill；原 #261e14 在午夜底上过暗）
         "WARNING_FG": "#E8A33D",
-        "ERROR_BG": "#1f1418",
-        "ERROR_FG": "#FF5F56",
         "BADGE_FG": "#ffffff",
         # 新增：装饰色（兑换页 7 包标签，U-03；角色规则同 light 主题注释）
         # 明度带：dark 亮彩带 L∈[0.72,0.84]（与涨跌语义色 FG_POS L≈0.52 / FG_NEG L≈0.67 拉开 ≥0.05）
@@ -214,11 +179,6 @@ THEMES = {
 
 # ── 当前主题名称（运行时由 UI 切换） ─────────────────
 _current_theme = "light"
-
-
-def get_theme() -> dict:
-    """返回当前主题的配色字典。"""
-    return THEMES[_current_theme]
 
 
 def set_theme(name: str) -> None:

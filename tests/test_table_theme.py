@@ -18,24 +18,14 @@ import os
 # offscreen 平台必须在 QApplication 创建前设置
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-import pytest
-
 from app import theme as theme_mod
 from calculator import DayRecord
 
 __all__ = []
 
 
-# ── fixtures（qapp 见 tests/conftest.py）──────────────────
-
-
-@pytest.fixture
-def theme_guard():
-    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值。"""
-    saved = theme_mod._current_theme
-    theme_mod.set_theme("light")
-    yield
-    theme_mod._current_theme = saved
+# ── fixtures ──────────────────────────────────────────────
+# theme_guard：收敛至 tests/conftest.py（C3）
 
 
 # ── 工具 ──────────────────────────────────────────────────

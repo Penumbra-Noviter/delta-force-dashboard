@@ -6,6 +6,16 @@
 
 ---
 
+## 滚动摘要（2026-08-29 — simplify-codebase A+C 批次）
+
+- **简化审计 + 变更（simplify-codebase skill，Survey→Change，全绿 631/631、doc_sync 双绿）**：
+  - **A 类（生产零消费者删除）**：`app/theme.py` 删 16 个死主题 token ×light/dark（BORDER_LIGHT/CHART_TEXT/ERROR_*/INFO_*/PANEL_2/PIN_OFF_BG/PIN_ON_BG/SUCCESS_*/SURFACE_0/1/2/TEXT_DISABLED/TEXT_LINK，逐键 grep 全仓零引用含 QSS 消费）；删 `theme.get_theme()`（全仓零调用）+ `__all__`/`app/__init__.py` 导出 + CODE_WIKI 3 处引用；删 `MainWindow.view_n` property（测试全用 `_view_n`）；删 3 个死 import（main_window 的 signal_color/format_short_date、table_widget 的 QRadioButton）
+  - **C 类（测试基建收敛，测试数不变 631）**：删死 fixture `store`（test_account_store）；`cleanup_encryption`/`theme_guard` 两文件副本收敛 conftest 单源；`tmp_dir` 自造 fixture → pytest 内建 tmp_path（60 处）；`wait_loaded` 双内联提模块级 helper；doc_sync `_is_full_sig` 单一谓词统一校验/更新双判定；`make_store` 工厂收敛 19 处 DataStore 双参构造（含文件名双形态 data.json/d.json 统一）
+  - **决策**：B 类（summary_by_period/import_csv 删可达能力）用户未选，保留；C7 完整 make_window 工厂因 18 处构造参数异构降级为 make_store 收敛（避免参数透传门面=迁移复杂性）；chart.state 观测面/`_kpi_signal` 中继/两套迁移双实现保留（净收益为负或红线）
+  - **验收**：631/631 全绿（37s→42s），doc_sync 先 update（3 标记）再 check 双绿；diff 审计 15 文件 ±163/−244 净 −81 行；C5 批量删除残留的 6 处 import 缩进错位已修复
+
+---
+
 ## 滚动摘要（2026-08-14/15 — 文档闭环补记：doc_sync files 校验 + CODE_WIKI 补节 + 浅色主题柔和化）
 
 - **`122dea9`（2026-08-14）feat: doc_sync 新增 files 文件级引用校验**：doc_sync 边界扩为「机械标记 + 文件级引用双向覆盖」——文档引用的 .py 全部存在、仓库全部 .py 均被文档引用（叙述防漂移兜底）；CODE_WIKI 同步 631/631；tests/test_doc_sync.py +34 行（文件引用校验用例）；此提交起 `test_doc_sync` 增测，pytest 计数 630 → 631
