@@ -13,12 +13,10 @@ import platform
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QColor, QKeySequence
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
-    QFrame,
-    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QInputDialog,
     QMainWindow,
@@ -40,7 +38,7 @@ from app.theme import (
     get_color,
     set_theme,
 )
-from app.dashboard_page import build_dashboard
+from app.dashboard_page import DashboardPage
 from app.bonus_door_page import BonusDoorPage
 from app.icons import render_icon
 from app.kpi_presenter import KpiPresenter
@@ -352,8 +350,10 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
         root_layout.addWidget(self._stack, 1)
 
-        # ── Page 0：记账仪表盘（C4 块 1：build_dashboard 直构装配）──
-        bundle = build_dashboard(self)
+        # ── Page 0：记账仪表盘（C5：DashboardPage 页族同构，构造参数即接口）──
+        dashboard = DashboardPage(self.today, self._chart_min_h, self._chart_max_h)
+        self._dashboard_page = dashboard
+        bundle = dashboard.bundle
         self.input_panel = bundle.input_panel
         self.table = bundle.table
         self.chart = bundle.chart
@@ -369,10 +369,9 @@ class MainWindow(QMainWindow):
             cash_summary_label=bundle.cash_summary_label,
             cash_summary_caption=bundle.cash_summary_caption,
         )
-        dashboard = self._dashboard_page
-        self._title_label = dashboard._title_label
-        self._today_status_label = dashboard._today_status_label
-        self._date_label = dashboard._date_label
+        self._title_label = dashboard.title_label
+        self._today_status_label = dashboard.today_status_label
+        self._date_label = dashboard.date_label
         self._stack.addWidget(dashboard)
 
         # ── Page 1：利润（制造产物 + 兑换利润，共享同一 client）──
@@ -387,21 +386,6 @@ class MainWindow(QMainWindow):
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
 
         self._update_theme_btn_text()
-
-    def _build_card(self) -> QFrame:
-        """构建带阴影的卡片 QFrame（12px 圆角 + 微阴影）。"""
-        card = QFrame()
-        card.setObjectName("cardFrame")
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-
-        # 微阴影（QGraphicsDropShadowEffect，QSS 不支持 box-shadow）
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(12)
-        shadow.setOffset(0, 2)
-        shadow.setColor(QColor(0, 0, 0, 20))
-        card.setGraphicsEffect(shadow)
-
-        return card
 
     def _update_theme_btn_text(self) -> None:
         # IC-02：emoji → SVG 图标（light 主题显示 moon「暗色」目标，dark 反之）
@@ -421,7 +405,14 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _connect_signals(self) -> None:
-        # 仪表盘组件信号已由 build_dashboard 显式连接（C4 块 1 直构）
+        # 仪表盘组件信号（C5：接线归此处，DashboardPage 装配不再接触 MainWindow）
+        self.input_panel.save_requested.connect(self.save_today)
+        self.input_panel.cancel_requested.connect(self._cancel_edit)
+        self.input_panel.reuse_requested.connect(self._reuse_last_record)
+        self.input_panel.reuse_cancel_requested.connect(self._cancel_reuse)
+        self.table.edit_requested.connect(self._start_edit)
+        self.table.delete_requested.connect(self._delete_record)
+        self.table.view_changed.connect(self._on_view_changed)
 
         # 侧边栏按钮
         self.sidebar.theme_btn.clicked.connect(self._toggle_theme)

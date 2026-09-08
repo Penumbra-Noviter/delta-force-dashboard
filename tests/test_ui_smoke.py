@@ -206,6 +206,27 @@ def test_u02_type_scale(sample_window):
     assert win.table._left_table.rowHeight(0) == 26
 
 
+def test_main_window_wires_dashboard_signals(sample_window):
+    """C5：仪表盘 7 组信号接线归 MainWindow._connect_signals（装配不再接线）。
+
+    观测面：Qt 元对象接收者计数（`receivers('2name(args)')`，签名串用实际类型名
+    QString/PyObject/int）——每信号恰 1 个接收者（MainWindow 的槽）；
+    DashboardPage 装配侧零接收者见 `tests/test_dashboard_page.py`。
+    """
+    win = sample_window
+    ip, tw = win.input_panel, win.table
+    for widget, sig in (
+        (ip, "2save_requested()"),
+        (ip, "2cancel_requested()"),
+        (ip, "2reuse_requested()"),
+        (ip, "2reuse_cancel_requested()"),
+        (tw, "2edit_requested(QString,PyObject)"),
+        (tw, "2delete_requested(QString)"),
+        (tw, "2view_changed(int)"),
+    ):
+        assert widget.receivers(sig) == 1, f"{sig} 未被 MainWindow 接线（或重复接线）"
+
+
 def test_startup_preloads_both_profit_pages(qapp, settings_guard, tmp_path):
     """U-10：启动 500ms 定时器后制造产物 + 兑换利润均后台预加载（点击零卡顿）。
 

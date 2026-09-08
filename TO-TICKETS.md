@@ -61,9 +61,10 @@
 | C1 | 动画句柄生命周期回归 `app/motion.py`：在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 关键帧内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）；六条 u06 契约换观测点 + `tests/test_motion.py` 11 例 | ✅ 2026-09-08 | `1508728` |
 | C2 | 删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 调用期延迟导入：判定归位 presenter 私有 `_window_signal`（AA-01 单一来源不漂移），跨模块 import 与循环依赖消失；守卫测试改扫描目标；顺带修正 CODE_WIKI §4.19 的 C1 后残留叙述 | ✅ 2026-09-08 | `266faaf` |
 | C3 | FetchPageBase 删只写不读的 `_data` 僵尸成员；空/错态占位文案单源为类常量 `_EMPTY_TEXT`/`_ERROR_TEXT`（三页引用）；ExchangePage 补 `_render_error` 覆盖（错误态此前与空态同形）；+2 测试（基类默认钩子最小子类验证、`_data` 缺席守卫） | ✅ 2026-09-08 | `327c07b` |
-| C4 | KPI count-up 判据改纯语义（删 `value != "数据不足"` 展示文案判据——`new is None` 已覆盖）；加载中文案单源为 `_LOADING_TEXT`（状态标签 ⟳ 前缀 + exchange 卡片初始占位）；+2 测试（源码守卫「本模块无展示文案字面量」、加载中文案单源） | ✅ 2026-09-08 | 本提交 |
+| C4 | KPI count-up 判据改纯语义（删 `value != "数据不足"` 展示文案判据——`new is None` 已覆盖）；加载中文案单源为 `_LOADING_TEXT`（状态标签 ⟳ 前缀 + exchange 卡片初始占位）；+2 测试（源码守卫「本模块无展示文案字面量」、加载中文案单源） | ✅ 2026-09-08 | `c8514b0` |
+| C5 | 仪表盘页族同构：`DashboardPage(QWidget)` 取代 `build_dashboard(mw)`（构造参数即接口、标签公开、删工厂转发）；7 组信号接线归 `MainWindow._connect_signals`；`_build_card` 内迁 `_card_frame()`；MainWindow 私读与副作用写回全消 | ✅ 2026-09-08 | 本提交 |
 
-期末验证：**645/645 全绿**（54.9s）、doc_sync 双绿（先 update 8 标记再 check）；diff 逐批次 8/6/8/5 文件；行为变化仅 C3 一处（兑换页错误态文案由「暂无数据」改为「加载失败，点击重试」，与制造/密码门两页对齐）；另记一处测试基建发现（`test_fetch_pages.py` 单独运行解释器退出 heap corruption，与生产代码无关，见 TECH_DEBT DFD-7）。
+期末验证：**642/642 全绿**（55.4s）、doc_sync 双绿（先 update 7 标记再 check）；diff 逐批次 8/6/8/5/7 文件；测试净减 3（C5 删 4 条面向旧接口的 Falsify、加 1 条 MainWindow 接线断言）。行为变化仅 C3 一处（兑换页错误态文案）；另记测试基建发现 DFD-7（`test_fetch_pages.py` 单独运行 heap corruption，与生产代码无关）。
 
 ### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
 

@@ -1,8 +1,11 @@
-"""C4 块 1：build_dashboard 直构装配的独立单测。
+"""C5：`DashboardPage` 装配单测（页族同构后）。
 
-验证装配产物（bundle 8 成员类型）、页面布局层级（输入卡限宽 520 / KPI 卡 /
-表格卡 stretch 1 / 图表卡 min/max 高 / 提示栏在底部）与信号显式连接
-（注入 stub MainWindow + 信号 spy，构造零网络、零数据窗口）。
+验证装配产物（bundle 8 成员类型 / objectName 契约）、布局层级（输入卡限宽
+520 / KPI 双磁贴卡 / 表格卡 stretch 1 / 图表卡 min-max 高 / 提示栏在底部）、
+公开标签属性（`title_label` / `today_status_label` / `date_label`），以及
+「装配不接线」——7 组信号接线归 `MainWindow._connect_signals`（C5 深化）。
+
+信号接线用例在 `tests/test_ui_smoke.py`（MainWindow 级：`receivers` 计数）。
 """
 
 from __future__ import annotations
@@ -13,65 +16,27 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from dataclasses import fields
-from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from app.chart_widget import ChartWidget
-from app.dashboard_page import DashboardBundle, build_dashboard
+from app.dashboard_page import DashboardBundle, DashboardPage
 from app.input_panel import InputPanel
 from app.table_widget import TableWidget
 
 __all__ = []
 
-
-class StubMainWindow:
-    """build_dashboard 依赖的最小替身：辅助方法 + 信号槽记录。
-
-    _build_card 返回真实 QFrame（qapp 下可创建）；_chart_min_h / _chart_max_h /
-    today 为固定值；7 个槽方法把调用追加到 calls（保序），供信号 spy 断言。
-    """
-
-    _chart_min_h = 160
-    _chart_max_h = 240
-    today = "2026-08-12"
-
-    def __init__(self) -> None:
-        self.calls: list = []
-
-    def _build_card(self) -> QFrame:
-        card = QFrame()
-        card.setObjectName("cardFrame")  # 与 MainWindow._build_card 契约一致
-        return card
-
-    def save_today(self) -> None:
-        self.calls.append("save_today")
-
-    def _cancel_edit(self) -> None:
-        self.calls.append("_cancel_edit")
-
-    def _reuse_last_record(self) -> None:
-        self.calls.append("_reuse_last_record")
-
-    def _cancel_reuse(self) -> None:
-        self.calls.append("_cancel_reuse")
-
-    def _start_edit(self, date_str: str, record: object) -> None:
-        self.calls.append(("_start_edit", date_str, record))
-
-    def _delete_record(self, date_str: str) -> None:
-        self.calls.append(("_delete_record", date_str))
-
-    def _on_view_changed(self, n: int) -> None:
-        self.calls.append(("_on_view_changed", n))
+TODAY = "2026-08-12"
+CHART_MIN_H = 160
+CHART_MAX_H = 240
 
 
 @pytest.fixture
-def stub_mw(qapp) -> StubMainWindow:
-    """带 qapp 的 stub MainWindow（build_dashboard 装配出真实 Qt 控件）。"""
-    return StubMainWindow()
+def page(qapp) -> DashboardPage:
+    """真实仪表盘页（构造参数 = 值接口：today + 图表高度区间）。"""
+    return DashboardPage(TODAY, CHART_MIN_H, CHART_MAX_H)
 
 
 def _widget_items(layout):
@@ -83,9 +48,9 @@ def _widget_items(layout):
     ]
 
 
-def test_bundle_contract_and_types(stub_mw):
+def test_bundle_contract_and_types(page):
     """bundle 8 成员类型正确，dataclass 字段契约不漂移。"""
-    bundle = build_dashboard(stub_mw)
+    bundle = page.bundle
 
     assert [f.name for f in fields(DashboardBundle)] == [
         "input_panel",
@@ -118,11 +83,10 @@ def test_bundle_contract_and_types(stub_mw):
     assert "Enter 保存" in bundle.hint_label.text()
 
 
-def test_layout_hierarchy(stub_mw):
+def test_layout_hierarchy(page):
     """布局层级：标题栏/日期/顶部条（输入卡 520 + KPI 卡）/表格卡 stretch1/
     图表卡 min-max 高/提示栏在底部。"""
-    bundle = build_dashboard(stub_mw)
-    page = stub_mw._dashboard_page
+    bundle = page.bundle
     assert page.objectName() == "dashboardPage"
 
     layout = page.layout()
@@ -147,20 +111,20 @@ def test_layout_hierarchy(stub_mw):
         it[1] for it in items
     )
 
-    # 标题栏：标题 + 今日未录入提醒（页面标签引用与布局内标签同一）
+    # 标题栏：标题 + 今日未录入提醒（公开属性与布局内标签同一）
     title_layout = title_bar.layout()
     assert isinstance(title_layout, QHBoxLayout)
     title_widgets = [w for _, w in _widget_items(title_layout)]
     assert [w.text() for w in title_widgets] == ["Delta Force Dashboard", "今日未录入"]
-    assert page._title_label is title_widgets[0]
-    assert page._today_status_label is title_widgets[1]
+    assert page.title_label is title_widgets[0]
+    assert page.today_status_label is title_widgets[1]
     # objectName 契约（theme.py QSS 选择器依赖）
     assert title_widgets[0].objectName() == "titleLabel"
     assert title_widgets[1].objectName() == "todayStatusLabel"
 
     # 日期标签：与标题同侧左对齐（U-07）
-    assert date_label is page._date_label
-    assert date_label.text() == stub_mw.today
+    assert date_label is page.date_label
+    assert date_label.text() == TODAY
     assert date_label.alignment() == (
         Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
     )
@@ -194,89 +158,34 @@ def test_layout_hierarchy(stub_mw):
     assert table_card.layout().itemAt(0).widget() is bundle.table
     assert layout.stretch(items[4][0]) == 0
     assert chart_card.layout().itemAt(0).widget() is bundle.chart
-    assert bundle.chart.minimumHeight() == stub_mw._chart_min_h
-    assert bundle.chart.maximumHeight() == stub_mw._chart_max_h
+    assert bundle.chart.minimumHeight() == CHART_MIN_H
+    assert bundle.chart.maximumHeight() == CHART_MAX_H
 
 
-def test_signals_connected_explicitly(stub_mw):
-    """7 组信号→槽显式连接生效：逐一 emit，槽按序收到（一对一，非扇出）。"""
-    bundle = build_dashboard(stub_mw)
-    record = SimpleNamespace(cash=1.0, warehouse=2.0)
-
-    bundle.input_panel.save_requested.emit()
-    bundle.input_panel.cancel_requested.emit()
-    bundle.input_panel.reuse_requested.emit()
-    bundle.input_panel.reuse_cancel_requested.emit()
-    bundle.table.edit_requested.emit("2026-08-01", record)
-    bundle.table.delete_requested.emit("2026-08-01")
-    bundle.table.view_changed.emit(30)
-
-    assert stub_mw.calls == [
-        "save_today",
-        "_cancel_edit",
-        "_reuse_last_record",
-        "_cancel_reuse",
-        ("_start_edit", "2026-08-01", record),
-        ("_delete_record", "2026-08-01"),
-        ("_on_view_changed", 30),
-    ]
+def test_public_label_attributes(page):
+    """C5：三个页面标签是公开属性（MainWindow 不再私读 `_title_label` 等）。"""
+    assert isinstance(page.title_label, QLabel)
+    assert isinstance(page.today_status_label, QLabel)
+    assert isinstance(page.date_label, QLabel)
+    assert not hasattr(page, "_title_label")
+    assert not hasattr(page, "_today_status_label")
+    assert not hasattr(page, "_date_label")
 
 
-# ── Falsify：使 build_dashboard 崩溃的输入，错误信息须指明缺失成员 ──
+def test_page_assembly_does_not_wire_signals(page):
+    """C5：装配不接线——7 组信号零接收者（接线归 MainWindow._connect_signals）。
 
-
-def test_build_dashboard_none_mw_raises(qapp):
-    """None 参数 → AttributeError 指明缺失槽（不静默、不模糊）。"""
-    with pytest.raises(AttributeError, match="save_today"):
-        build_dashboard(None)
-
-
-def test_build_dashboard_missing_slots_raises(qapp):
-    """mw 缺槽方法 → AttributeError 指明缺失成员。"""
-    with pytest.raises(AttributeError, match="save_today"):
-        build_dashboard(object())
-
-
-def test_build_dashboard_missing_today_raises(qapp):
-    """mw 缺 today 属性 → AttributeError 指明缺失成员。"""
-    mw = SimpleNamespace(
-        _chart_min_h=160,
-        _chart_max_h=240,
-        save_today=lambda: None,
-        _cancel_edit=lambda: None,
-        _reuse_last_record=lambda: None,
-        _cancel_reuse=lambda: None,
-        _start_edit=lambda *args: None,
-        _delete_record=lambda *args: None,
-        _on_view_changed=lambda *args: None,
-    )
-    with pytest.raises(AttributeError, match="today"):
-        build_dashboard(mw)
-
-
-def test_build_dashboard_missing_card_helper_raises(qapp):
-    """mw 缺 _build_card 辅助 → AttributeError 指明辅助名。"""
-    mw = SimpleNamespace(
-        today="2026-08-12",
-        _chart_min_h=160,
-        _chart_max_h=240,
-        save_today=lambda: None,
-        _cancel_edit=lambda: None,
-        _reuse_last_record=lambda: None,
-        _cancel_reuse=lambda: None,
-        _start_edit=lambda *args: None,
-        _delete_record=lambda *args: None,
-        _on_view_changed=lambda *args: None,
-    )
-    with pytest.raises(AttributeError, match="_build_card"):
-        build_dashboard(mw)
-
-
-def test_signals_single_connection_no_spurious(qapp):
-    """Falsify（信号接线错误场景）：重复 emit 恰触发一次（无重复接线）。"""
-    mw = StubMainWindow()
-    bundle = build_dashboard(mw)
-
-    bundle.input_panel.save_requested.emit()
-    bundle.input_panel.save_requested.emit()
-    assert mw.calls == ["save_today", "save_today"]  # 单次连接：一次 emit 一次触发
+    签名串取 Qt 元对象格式（`2name(args)`）；参数less 信号 `()`，带参信号用
+    实际类型名（QString/PyObject/int）。
+    """
+    ip, tw = page.bundle.input_panel, page.bundle.table
+    for widget, sig in (
+        (ip, "2save_requested()"),
+        (ip, "2cancel_requested()"),
+        (ip, "2reuse_requested()"),
+        (ip, "2reuse_cancel_requested()"),
+        (tw, "2edit_requested(QString,PyObject)"),
+        (tw, "2delete_requested(QString)"),
+        (tw, "2view_changed(int)"),
+    ):
+        assert widget.receivers(sig) == 0, f"{sig} 在装配期被接线了"

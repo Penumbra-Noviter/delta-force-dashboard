@@ -10,7 +10,7 @@ Windows 桌面收益追踪工具（PySide6）：每日记录现金/仓库价值�
 python -m venv venv && venv\Scripts\activate   # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 python main.py                                # 运行（运行态数据落在 ~/Delta Force Dashboard/）
-pytest                                        # 全量测试（645 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
+pytest                                        # 全量测试（642 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
 python scripts/doc_sync.py --check            # CODE_WIKI 机械标记防漂移（pre-commit 钩子自动跑）
 python scripts/doc_sync.py                    # 改代码后刷新 CODE_WIKI 的测试数/行数/签名标记
 ```
@@ -33,6 +33,7 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
   - **C2 ✅**：删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 绕环延迟导入，判定归位私有 `_window_signal`
   - **C3 ✅**：FetchPageBase 删只写不读的 `_data`；空/错态占位文案单源为类常量 `_EMPTY_TEXT`/`_ERROR_TEXT`；ExchangePage 补 `_render_error`（错误态不再与空态同形）
   - **C4 ✅**：KPI count-up 判据改纯语义（删展示文案判据）+ 源码守卫；加载中文案单源 `_LOADING_TEXT`
-  - 状态：**645/645 测试**、doc_sync 双绿；候选 C5/C6（Strong）与 C7（Worth exploring）在 TECH_DEBT 候选池（另有 C4 验收发现的 DFD-7 测试基建项）
-- 下一步：C5（`build_dashboard` 还回自包含产物，MainWindow 停止私读 dashboard 私有属性）
+  - **C5 ✅**：仪表盘页族同构 `DashboardPage(QWidget)`（构造参数即接口、标签公开）；7 组信号接线归 `MainWindow._connect_signals`；`_build_card` 内迁 `_card_frame()`
+  - 状态：**642/642 测试**、doc_sync 双绿；候选 C6（Worth exploring）与 C7（Worth exploring）在 TECH_DEBT 候选池（另有 C4 验收发现的 DFD-7 测试基建项）
+- 下一步：C6（视图窗口 `_view_n`/`_view_days` 收敛到单 Owner）
 - 清场保持：`.worktrees/` 与 `.scratch/` 空，分支仅 main

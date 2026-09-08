@@ -52,7 +52,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-4 | `build_dashboard(mw)` 经副作用写回 `mw._dashboard_page`，MainWindow 随后私读 dashboard 私有属性（`_title_label` 等）；测试需伪造「长得像 MainWindow」的整对象 | 架构评审 C5 | Strong | 📝 待立项 | GUI |
 | DFD-5 | 视图窗口同一事实两份（`TableWidget._view_days` 与 `MainWindow._view_n`），仅靠 `view_changed` 信号维持相等；非按钮路径的程序化改动会漂移（测试双断言钉住） | 架构评审 C6 | Worth exploring | 📝 待立项 | GUI |
 | DFD-6 | 主题刷新是约定制：`hasattr` 树遍历收集 + 六组件各自私藏「换色记忆」；同一 `apply_theme` 下 TableWidget 实为整表重绘、ChartWidget 才是真增量（隐藏代价差异） | 架构评审 C7 | Worth exploring | 📝 待立项 | GUI |
 | DFD-7 | `pytest tests/test_fetch_pages.py` **单独运行**时全部用例通过但解释器退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION）；与任一其它测试文件同跑则 exit 0——疑为 Qt/QThread 析构顺序（页面/FetchWorker 未走 show/wait/hide 或 worker 在途时宿主先亡）。生产代码无关联（C4 验收时发现，C3 基线同样复现） | C4 验收发现 | Worth exploring | 📝 待立项 | 测试基建 |
@@ -71,7 +70,8 @@
 | C1 | 动画生命周期知识复制 4 处（`motion.fade_in_widget` / `_shake` / `_countup_anims` / `_draw_anim`），C4-债 同族 bug 反复修 ≥5 次 | ✅ 已修（立项 → TO-TICKETS C1 → 在途注册表深化 + 落点迁移） | `1508728` |
 | C2 | `_kpi_signal` 1 行转发 + main_window ↔ kpi_presenter 循环依赖（调用期延迟导入） | ✅ 已修（立项 → TO-TICKETS C2 → 判定归位 presenter 私有 `_window_signal`） | `266faaf` |
 | C3 | `fetch_page_base._data` 只写不读 + 基类空/错态不可分 + 占位文案字面量散落 | ✅ 已修（立项 → TO-TICKETS C3 → 删 `_data` + 文案单源类常量 + exchange 补错误态） | `327c07b` |
-| C4 | `kpi_presenter` 按展示文案字面量决定动画分支（改文案即静默改变行为）+ 加载中文案两处各写 | ✅ 已修（立项 → TO-TICKETS C4 → 纯语义判据 + `_LOADING_TEXT` 单源 + 源码守卫） | 本提交 |
+| C4 | `kpi_presenter` 按展示文案字面量决定动画分支（改文案即静默改变行为）+ 加载中文案两处各写 | ✅ 已修（立项 → TO-TICKETS C4 → 纯语义判据 + `_LOADING_TEXT` 单源 + 源码守卫） | `c8514b0` |
+| C5 | `build_dashboard(mw)` 反向依赖宿主（7 私有槽 + `_build_card` + 高度 + today）+ 副作用写回 + MainWindow 私读页面标签 | ✅ 已修（立项 → TO-TICKETS C5 → `DashboardPage` 页族同构 + 接线归 MainWindow） | 本提交 |
 
 ---
 

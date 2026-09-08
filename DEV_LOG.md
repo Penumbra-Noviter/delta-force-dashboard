@@ -37,6 +37,14 @@
   - **变更**：`kpi_presenter` 条件收敛为 `old/new` 纯语义 + docstring 记录「为何不需要文案判据」；`fetch_page_base` 新增 `_LOADING_TEXT`（状态标签 `f"⟳ {…}"`）；`exchange_page` 卡片初始占位引用同源。
   - **测试**：`test_countup_skipped_when_value_data_insufficient` → `test_countup_skipped_when_new_is_none`（锁定语义）；新增 `test_set_kpi_value_branches_on_semantics_not_display_text`（正则扫 `value == "..."` + 本模块零文案字面量，同 test_no_registry 风格）、`test_loading_text_single_source`。
   - **验收**：全量 645/645、doc_sync 双绿（先 update 8 标记）。
+
+- **C5 落地（同批次，Strong）——仪表盘页族同构 `DashboardPage`**：
+  - **问题**：`build_dashboard(mw)` 反向依赖宿主——连 7 个私有槽（`save_today`/`_cancel_edit`/`_reuse_last_record`/`_cancel_reuse`/`_start_edit`/`_delete_record`/`_on_view_changed`）、调 `mw._build_card()`×4、读 `mw._chart_min_h/_chart_max_h/mw.today`；经副作用把页面写回 `mw._dashboard_page`，MainWindow 再私读页面的 `_title_label` 等三个私有标签。仪表盘也是页族里唯一的「函数 + 挂宿主属性」异类（其余四页都是 QWidget 子类）。
+  - **决策（grilling）**：Q13 (A) 页对象化 + 删 `build_dashboard` 工厂（否则只剩一行转发，删除测试不通过）；Q14 (A) 7 组信号接线归 `MainWindow._connect_signals`；Q15 (A) `_build_card` 内迁 `_card_frame()` + 图表高度作构造参数。
+  - **变更**：`dashboard_page.py` 重写为 `DashboardPage(QWidget)`（构造参数 `today/chart_min_h/chart_max_h`，公开 `bundle`/`title_label`/`today_status_label`/`date_label`，模块私有 `_card_frame()`）；`main_window` 改为 `DashboardPage(...)` 直构 + `_connect_signals` 补 7 组接线 + 删 `_build_card` 与 3 个死 import（QColor/QFrame/QGraphicsDropShadowEffect）。
+  - **测试**：`test_dashboard_page.py` 重写为 4 例（bundle 契约 / 布局层级 / 公开标签属性 / **装配不接线**——`receivers('2name(args)')` 零接收者）；删 4 条面向旧接口的 Falsify（None mw / 缺槽 / 缺 today / 缺 `_build_card`——接口已无宿主可缺）；`test_ui_smoke` 新增 `test_main_window_wires_dashboard_signals`（7 信号各恰 1 接收者）。
+  - **观测面技巧**：PySide6 的 `SignalInstance` 无 `receivers`，用 `widget.receivers('2name(args)')`（Qt 元对象签名串，类型名 QString/PyObject/int）计数。
+  - **验收**：全量 642/642（净减 3 例：删 4 加 1）、doc_sync 双绿（先 update 7 标记）。
   - **发现（未修，记 TECH_DEBT DFD-7）**：`pytest tests/test_fetch_pages.py` 单独运行时 36 项全通过但解释器退出码 `0xC0000374`（heap corruption）；与任一其它文件同跑即 exit 0。**经 `git stash` 回到 C3 基线复现**——与 C4 无关的既有测试基建问题（疑 Qt/QThread 析构顺序），本轮不扩范围修。
 
 ---
