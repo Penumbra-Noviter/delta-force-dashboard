@@ -31,6 +31,14 @@
   - **测试**：`test_default_render_error_delegates_to_empty_render` 改用最小子类验证基类默认（三页均已覆盖钩子）；`test_exchange_error_path_renders_empty_state` → `test_exchange_error_renders_distinct_from_empty`（断言可区分）；新增 `test_base_has_no_write_only_data_member`（`_data` 缺席守卫）。
   - **验收**：相关 160 项（fetch_pages/bonus_door/ui_smoke）重跑通过；全量 643/643、doc_sync 双绿。
 
+- **C4 落地（同批次，Strong）——KPI 判据读语义不读展示文案 + 加载中文案单源**：
+  - **问题**：`kpi_presenter._set_kpi_value` 以 `value != "数据不足"` 决定是否播 count-up——该文案由 `presentation.format_window_text` 产出，改文案即静默改变动画行为；「加载中…」在状态标签与 exchange 卡片初始占位各写一遍。
+  - **决策（grilling）**：(A) 删文案判据（`value == 文案` ⟺ `total is None` ⟺ `new is None`，条件里已有 `new is not None`）+ 源码守卫；(A) `_LOADING_TEXT` 单源（与 C3 的 `_EMPTY_TEXT`/`_ERROR_TEXT` 同惯例），账本域 chart/table 的「暂无数据」文案各写（语义不同）。
+  - **变更**：`kpi_presenter` 条件收敛为 `old/new` 纯语义 + docstring 记录「为何不需要文案判据」；`fetch_page_base` 新增 `_LOADING_TEXT`（状态标签 `f"⟳ {…}"`）；`exchange_page` 卡片初始占位引用同源。
+  - **测试**：`test_countup_skipped_when_value_data_insufficient` → `test_countup_skipped_when_new_is_none`（锁定语义）；新增 `test_set_kpi_value_branches_on_semantics_not_display_text`（正则扫 `value == "..."` + 本模块零文案字面量，同 test_no_registry 风格）、`test_loading_text_single_source`。
+  - **验收**：全量 645/645、doc_sync 双绿（先 update 8 标记）。
+  - **发现（未修，记 TECH_DEBT DFD-7）**：`pytest tests/test_fetch_pages.py` 单独运行时 36 项全通过但解释器退出码 `0xC0000374`（heap corruption）；与任一其它文件同跑即 exit 0。**经 `git stash` 回到 C3 基线复现**——与 C4 无关的既有测试基建问题（疑 Qt/QThread 析构顺序），本轮不扩范围修。
+
 ---
 
 - **简化审计 + 变更（simplify-codebase skill，Survey→Change，全绿 631/631、doc_sync 双绿）**：

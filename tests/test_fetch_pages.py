@@ -556,6 +556,25 @@ def test_base_has_no_write_only_data_member(qapp) -> None:
     assert not hasattr(page, "_data")
 
 
+def test_loading_text_single_source(qapp) -> None:
+    """C4：加载中文案单源 `_LOADING_TEXT`——状态标签加 ⟳ 前缀，卡片初始占位引用之。"""
+    from app.exchange_page import ExchangePage
+
+    page = ExchangePage(client=make_stub_client())
+    # 卡片构建期初始占位引用同一常量（首帧渲染前可见）
+    for card in page._cards:
+        assert card._item_name.text() == page._LOADING_TEXT
+
+    page.show()
+    worker = page._worker
+    assert worker is not None
+    assert worker.wait(5000)
+    qapp.processEvents()
+    # 状态标签 = ⟳ + 同一常量（加载完成后文案保留，仅隐藏）
+    assert page._status_label.text() == f"⟳ {page._LOADING_TEXT}"
+    page.hide()
+
+
 def test_crafting_error_invokes_render_error_hook(qapp, monkeypatch) -> None:
     """C2-05：制造页真实错误链路走 _render_error 钩子（spy），不再直调 _render_data。"""
     from app.crafting_page import CraftingPage

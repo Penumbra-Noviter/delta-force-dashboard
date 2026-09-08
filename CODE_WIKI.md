@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）+ F-01 增强（2026-08-14）全部完成）  
 > 生成日期：2026-08-14  
-> 测试状态：<!--AUTO:tests_total:total-->643<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->645<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->645<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -134,10 +134,10 @@ Delta Force Dashboard/
 │   ├── test_load_state.py   ← <!--AUTO:tests:tests/test_load_state.py-->8<!--/AUTO--> 个测试（LoadState 四态转移矩阵：防重入/失败重试/loaded 手动刷新）
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
 │   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
-│   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->35<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
+│   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->36<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
 │   ├── test_dashboard_page.py ← <!--AUTO:tests:tests/test_dashboard_page.py-->8<!--/AUTO--> 个测试（C4 build_dashboard 直构：bundle 契约/布局层级/信号接线）
 │   ├── test_no_registry.py    ← <!--AUTO:tests:tests/test_no_registry.py-->2<!--/AUTO--> 个测试（C6 守卫：全库零 WidgetRegistry/AppWidget 引用 + registry.py 已删）
-│   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->26<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
+│   ├── test_kpi_presenter.py ← <!--AUTO:tests:tests/test_kpi_presenter.py-->27<!--/AUTO--> 个测试（C4 KPI 渲染：文本拆分/count-up/主题只换色/账号切换归零）
 │   ├── test_chart_geometry.py ← <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> 个测试（adaptive_range 纯函数）
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 │   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
@@ -594,21 +594,21 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 
 ---
 
-### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~193 行<!--/AUTO-->）
+### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~196 行<!--/AUTO-->）
 ### 4.18 `app/dashboard_page.py` — 仪表盘装配（C4-01，<!--AUTO:lines:app/dashboard_page.py-->~178 行<!--/AUTO-->）
 
 **核心**：`build_dashboard(mw) -> DashboardBundle` 模块函数直构仪表盘页——组件创建、布局、信号显式连接一次完成（替代旧 registry 回调间接层）；`DashboardBundle` dataclass 持 8 成员（input_panel/table/chart/summary_label/summary_caption/cash_summary_label/cash_summary_caption/hint_label），MainWindow 解包保留同名属性。信号连接（save/cancel/reuse/edit/delete/view_changed）在 bundle 内显式接线，零 registry。
 
-### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~178 行<!--/AUTO-->）
+### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~177 行<!--/AUTO-->）
 
-**核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换归零 + 丢弃在途动画，Y-05）。signal 计算走本模块私有 `_window_signal`（C2 深化：AA-01 单一来源落回真正的消费者内部，`update` 与 `apply_theme_styles` 共用；原先寄居 `app.main_window._kpi_signal` 并经调用期延迟导入绕循环依赖的转发已删除）。count-up 动画按磁贴独立（C4-债2 → C1 深化）：在途以磁贴 label 为注册表键（`app/motion._running`，宿主弱键），同磁贴重触发 = 丢弃旧的 + 登记新的（同目标恒单在途），跨磁贴零触碰；落值入口先 `motion.finish(label)` 优雅落终，再按三条件（old≠new 且均非 None 且 value≠「数据不足」）决定是否播新 count-up。动画生命周期（weakref 破环 / identity 检查 / 回收）全归 motion（C1），本类不持有动画对象；`reset()` 只调 `motion.stop(label)`。
+**核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换归零 + 丢弃在途动画，Y-05）。signal 计算走本模块私有 `_window_signal`（C2 深化：AA-01 单一来源落回真正的消费者内部，`update` 与 `apply_theme_styles` 共用；原先寄居 `app.main_window._kpi_signal` 并经调用期延迟导入绕循环依赖的转发已删除）。count-up 动画按磁贴独立（C4-债2 → C1 深化）：在途以磁贴 label 为注册表键（`app/motion._running`，宿主弱键），同磁贴重触发 = 丢弃旧的 + 登记新的（同目标恒单在途），跨磁贴零触碰；落值入口先 `motion.finish(label)` 优雅落终，再按**语义**条件（old≠new 且两者均非 None——C4 深化：删掉原先的「文案不等于无数据文案」判据，该文案由 presentation 产出，改文案曾可静默改变动画行为；语义上「无数据」等价于 `new is None`，已被覆盖）决定是否播新 count-up。动画生命周期（weakref 破环 / identity 检查 / 回收）全归 motion（C1），本类不持有动画对象；`reset()` 只调 `motion.stop(label)`。源码守卫：`tests/test_kpi_presenter.py::test_set_kpi_value_branches_on_semantics_not_display_text` 断言本模块不出现展示文案字面量。
 
 CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：showEvent 懒加载、LoadState 四态状态机（V-02）、FetchWorker 后台取数（T-01）、refresh / preload / shutdown 生命周期。
 
 **C2 契约**：
 - **C2-02 注入 seam**：`__init__(parent=None, client=None)`——`client` 为 None → 自建 `KkrbClient()`（生产唯一创建点在 MainWindow），测试经构造注入 stub client 即「断网」；
 - **C2-03 删哨兵**：`preload()` 不再读取 `QT_QPA_PLATFORM` 环境变量——测试模式靠构造注入压制网络（`tests/conftest.make_stub_client`），offscreen 哨兵已删除；
-- **C2-05 错误/空态分离 + C3 文案单源**：三态由调用路径表达——加载中/失败写 `_status_label`，成功与空态走 `_render_data(data)`，错误态走 `_render_error()`（默认实现 = 空态渲染，与既有 `_on_fetch_error` 行为逐字节等价——状态标签已承载错误提示）；空/错态占位文案单源为类常量 `_EMPTY_TEXT`（「暂无数据」）/ `_ERROR_TEXT`（「加载失败，点击重试」），子类渲染引用之；CraftingPage 覆盖 `_render_error` 为错误卡片（AA-02 经 `_reset_card` 共用清空逻辑），ExchangePage 亦覆盖（C3 补齐——此前错误与空态同形，卡片显示「暂无数据」）；基类无只写不读的 `_data` 成员（C3 删除：渲染经参数传递，不靠自持状态）；
+- **C2-05 错误/空态分离 + C3 文案单源**：三态由调用路径表达——加载中/失败写 `_status_label`，成功与空态走 `_render_data(data)`，错误态走 `_render_error()`（默认实现 = 空态渲染，与既有 `_on_fetch_error` 行为逐字节等价——状态标签已承载错误提示）；占位/加载文案单源为类常量 `_EMPTY_TEXT`（「暂无数据」）/ `_ERROR_TEXT`（「加载失败，点击重试」）/ `_LOADING_TEXT`（「加载中…」，C4：状态标签加 ⟳ 前缀、ExchangePage 卡片初始占位引用同源），子类渲染引用之；CraftingPage 覆盖 `_render_error` 为错误卡片（AA-02 经 `_reset_card` 共用清空逻辑），ExchangePage 亦覆盖（C3 补齐——此前错误与空态同形，卡片显示「暂无数据」）；基类无只写不读的 `_data` 成员（C3 删除：渲染经参数传递，不靠自持状态）；
 - **单出口**：`ProfitPage` 在父层扇出 `preload()` / `apply_theme()`（C2-02 / C1-07），页面外部不再直插子页方法。
 
 ### 4.20 `kkrb_models.py` — kkrb.net 数据模型（零依赖叶子，BD-01，<!--AUTO:lines:kkrb_models.py-->~55 行<!--/AUTO-->）
@@ -714,7 +714,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->645<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -827,7 +827,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 |----------|--------|----------|
 | `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->110<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> | 数据模型 + OV 响应解析 |
-| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->35<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
+| `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->36<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->24<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |
 | `tests/test_table_theme.py` | <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> | 表格主题色实时解析（非 import 期冻结）+ AST 防复发 + D-01 零差值 |
 

@@ -3,7 +3,7 @@
 覆盖三个对外出口：update（文本 + count-up 动画 + 样式全量渲染）、
 apply_theme_styles（仅重算 signal 换色，不动文本/动画——C1-08 语义）、
 reset（账号切换归零后直落终态，Y-05）；count-up 触发条件
-（old≠new 且非 None 且 value≠「数据不足」）与重复触发替换。
+（old≠new 且两者均非 None——C4 后为纯语义判据，不再读展示文案）与重复触发替换。
 
 C1 深化后观测面：动画句柄不再外泄，在途以 `motion.is_running(label)` 观测，
 Qt 子对象计数以磁贴 label 为宿主（动画 parent = target）。
@@ -203,8 +203,12 @@ def test_countup_replaces_previous_animation(presenter):
     assert t["summary_label"].text() == format_signed_money(300.0)[0]
 
 
-def test_countup_skipped_when_value_data_insufficient(presenter):
-    """value ==「数据不足」时不触发动画（防御分支）：旧动画落终、出表。"""
+def test_countup_skipped_when_new_is_none(presenter):
+    """new 为 None（无数据）时不触发动画（语义判据）：旧动画落终、出表。
+
+    C4 前该分支靠 `value != "数据不足"` 的展示文案字面量把关；现在判据是
+    `new is not None`（presentation 改文案不再影响动画行为），本测锁定语义。
+    """
     p, labels = presenter
     t = _tiles(labels)
     logic = FakeLogic(summary={7: (2, 100.0)}, cash_summary={7: (2, 50.0)})
@@ -673,3 +677,29 @@ def test_c4debt3_reset_recycles_inflight_anims(presenter):
     QTest.qWait(100)  # 冲刷 pending deleteLater
     assert _anim_children(t["summary_label"]) == 0
     assert not motion.is_running(t["summary_label"])
+
+
+# ── C4：判据只读语义、不读展示文案（源码守卫，防复发）──
+
+
+def test_set_kpi_value_branches_on_semantics_not_display_text():
+    """C4 守卫：`_set_kpi_value` 不得按展示文案字面量分支（同 test_no_registry 风格）。
+
+    旧实现以「文案不等于无数据文案」作为 count-up 触发条件之一——该文案由
+    presentation 产出，改文案即静默改变动画行为。本守卫锁定两条：函数体内
+    不得出现 `value == "..."` / `value != "..."` 式比较；本模块不得出现该
+    文案字面量（文案所有者是 presentation）。
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(KpiPresenter._set_kpi_value)
+    assert not re.search(r"value\s*[!=]=\s*[\"']", src), (
+        f"_set_kpi_value 又按展示文案分支了：\n{src}"
+    )
+
+    module = inspect.getmodule(KpiPresenter)
+    assert module is not None
+    assert "数据不足" not in inspect.getsource(module), (
+        "kpi_presenter 不得持有展示文案字面量（文案归 presentation）"
+    )

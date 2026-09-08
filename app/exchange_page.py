@@ -101,8 +101,8 @@ class ExchangePage(FetchPageBase):
         pkg_label.setStyleSheet(f"color: {color};")
         cl.addWidget(pkg_label)
 
-        # 子弹名
-        item_name = QLabel("加载中…")
+        # 子弹名（初始占位：C4 与基类加载中文案单源）
+        item_name = QLabel(self._LOADING_TEXT)
         item_name.setObjectName("exchangeItemName")
         item_name.setStyleSheet("font-size: 15px; font-weight: bold;")
         cl.addWidget(item_name)

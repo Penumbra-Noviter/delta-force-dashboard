@@ -71,6 +71,8 @@ class FetchPageBase(QWidget):
     _EMPTY_TEXT = "暂无数据"
     #: 错误态占位文案（C3：单源，与空态可区分）
     _ERROR_TEXT = "加载失败，点击重试"
+    #: 加载中文案（C4：单源——状态标签加 ⟳ 前缀，卡片初始占位直接引用）
+    _LOADING_TEXT = "加载中…"
 
     def __init__(self, parent: QWidget | None = None,
                  client: KkrbClient | None = None) -> None:
@@ -156,8 +158,9 @@ class FetchPageBase(QWidget):
         if self._shut_down or not self._load_state.can_load():
             return
         self._load_state.start()
-        # IC-03：⟳ 为 BMP 文本符号（去 emoji 变体），随文字色（ADR-0006）
-        self._status_label.setText("⟳ 加载中…")
+        # IC-03：⟳ 为 BMP 文本符号（去 emoji 变体），随文字色（ADR-0006）；
+        # C4：文案本体单源为 _LOADING_TEXT（卡片初始占位同源）
+        self._status_label.setText(f"⟳ {self._LOADING_TEXT}")
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.ArrowCursor))
         self._refresh_btn.setEnabled(False)

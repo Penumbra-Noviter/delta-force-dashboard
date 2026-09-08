@@ -73,7 +73,7 @@ class KpiPresenter(QObject):
         self._summary_caption = summary_caption
         self._cash_summary_label = cash_summary_label
         self._cash_summary_caption = cash_summary_caption
-        # W-01：count-up 上一帧数值（None = 尚未渲染过/数据不足）
+        # W-01：count-up 上一帧数值（None = 尚未渲染过 / 无数据）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
 
@@ -184,10 +184,15 @@ class KpiPresenter(QObject):
         注册表键（motion 侧），跨磁贴零触碰（双磁贴同帧动画互不截断）。
 
         C4-债2 落终路径 + C1 深化：任何落值入口先对本次磁贴 label 调
-        ``motion.finish`` 优雅落终（旧动画终值先写到位），再按三条件
-        （old != new 且均非 None 且 value != "数据不足"）决定是否播新
-        count-up；不播则直落 setText（同调用内覆盖落终终帧，F1 终态不被
-        残留帧改写）。
+        ``motion.finish`` 优雅落终（旧动画终值先写到位），再按**语义**三条件
+        （old / new 均非 None 且 old != new）决定是否播新 count-up；不播则
+        直落 setText（同调用内覆盖落终终帧，F1 终态不被残留帧改写）。
+
+        C4 深化——判据只读语义、不读展示文案：旧实现多一条「文案不等于无数据
+        文案」的判据，而该文案是 presentation 的产出（改文案即静默改变动画
+        行为）。语义上「无数据」等价于 ``new is None``（format_window_text
+        仅在 total 为 None 时产出该文案），已被 ``new is not None`` 覆盖，
+        故删除该判据——`value` 只用于直落终态。
 
         C4-债3/5 的引用环雷区（finished 闭包捕获宿主 → 窗口销毁后迟到
         valueChanged 帧写已销毁 label → access violation）由 motion 统一
@@ -195,12 +200,7 @@ class KpiPresenter(QObject):
         处理器 weakref 取宿主 + identity 检查。本类不再持有动画对象。
         """
         finish(label)
-        if (
-            old is not None
-            and new is not None
-            and old != new
-            and value != "数据不足"
-        ):
+        if old is not None and new is not None and old != new:
             if not animate_value(
                 label,
                 old,
