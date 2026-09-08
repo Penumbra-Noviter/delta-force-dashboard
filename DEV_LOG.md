@@ -45,6 +45,14 @@
   - **测试**：`test_dashboard_page.py` 重写为 4 例（bundle 契约 / 布局层级 / 公开标签属性 / **装配不接线**——`receivers('2name(args)')` 零接收者）；删 4 条面向旧接口的 Falsify（None mw / 缺槽 / 缺 today / 缺 `_build_card`——接口已无宿主可缺）；`test_ui_smoke` 新增 `test_main_window_wires_dashboard_signals`（7 信号各恰 1 接收者）。
   - **观测面技巧**：PySide6 的 `SignalInstance` 无 `receivers`，用 `widget.receivers('2name(args)')`（Qt 元对象签名串，类型名 QString/PyObject/int）计数。
   - **验收**：全量 642/642（净减 3 例：删 4 加 1）、doc_sync 双绿（先 update 7 标记）。
+
+- **C6 落地（同批次，Worth exploring）——视图窗口单 Owner（删 `_view_n` 镜像）**：
+  - **问题**：视图条数同一事实两份——`TableWidget._view_days`（主人）与 `MainWindow._view_n`（镜像），仅靠 `view_changed(int)` 一条信号维持相等；测试同时断言两份（`test_ui_smoke` 双断言）。
+  - **ADR 关系**：ADR-0003 Q8 已定案「表格是视图窗口主人，MainWindow 只订阅信号」——镜像不是 ADR 要求的，而是遗留的重复事实，故本项与 ADR 同向、无需重开。
+  - **决策（grilling）**：Q16 (A) 表格继续当主人、删镜像（非把状态上移）；Q17 (A) 保留 `view_changed(int)` 载荷（事件信息对不持有表格的观察者有用），`_on_view_changed` 不再比对/存状态。
+  - **变更**：删 `MainWindow._view_n`（init/`_on_view_changed`/`_get_records`/`_update_summary`/`_apply_kpi_styles` 五处）→ 统一查询 `self.table.current_view()`；`_on_view_changed(n)` 仅 `refresh_display()`（早退比对一并删除——表格只在实际变化时发信号）；删 `VIEW_DAYS` 死 import；`TableWidget` 类 docstring 同步（C6：MainWindow 不持镜像）。
+  - **测试**：三处双断言改为单一来源断言（`table.current_view()`），`test_view_default_is_7` 加 `not hasattr(win, "_view_n")` 缺席守卫。
+  - **验收**：全量 642/642（测试数不变）、doc_sync 双绿；行为零变化（净删除）。
   - **发现（未修，记 TECH_DEBT DFD-7）**：`pytest tests/test_fetch_pages.py` 单独运行时 36 项全通过但解释器退出码 `0xC0000374`（heap corruption）；与任一其它文件同跑即 exit 0。**经 `git stash` 回到 C3 基线复现**——与 C4 无关的既有测试基建问题（疑 Qt/QThread 析构顺序），本轮不扩范围修。
 
 ---

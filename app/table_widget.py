@@ -389,9 +389,10 @@ class _DaySubTable(QTableWidget):
 class TableWidget(QWidget):
     """双栏布局表格：视图 7/30 可切换（按钮组），按 mid=ceil(n/2) 均分栏位。
 
-    表格是「视图窗口」的主人（Consensus §7 Q8）：持有当前视图条数
-    self._view_days 与按钮组，切换时 emit view_changed(int)；MainWindow
-    只订阅、据此改 _view_n 重新拉取 records —— 深模块，分割逻辑留在表内。
+    表格是「视图窗口」的主人（ADR-0003 Q8）：持有当前视图条数
+    self._view_days 与按钮组，切换时 emit view_changed(int)，并对外暴露
+    ``current_view()`` 供查询；MainWindow 只订阅信号、按查询结果重新拉取
+    records（C6：不再持 `_view_n` 镜像）—— 深模块，分割逻辑留在表内。
     """
 
     edit_requested = Signal(str, object)  # date_str, DayRecord

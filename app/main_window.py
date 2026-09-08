@@ -31,7 +31,6 @@ from config import (
     DATE_FORMAT,
     RETENTION_LIMIT,
     SETTINGS_FILE,
-    VIEW_DAYS,
 )
 from app.theme import (
     generate_qss,
@@ -113,8 +112,8 @@ class MainWindow(QMainWindow):
             self.logic = logic or ProfitCalculatorLogic(self.store.load())
 
         self.today = datetime.now().strftime(DATE_FORMAT)
-        # J 系列：当前视图条数，启动默认 7（会话内存生效，不持久化，Consensus §7.5）
-        self._view_n = VIEW_DAYS[0]
+        # C6：视图条数唯一主人是 TableWidget（ADR-0003 Q8），此处不再持镜像；
+        # 需要时查询 self.table.current_view()。
         self._pinned = False
 
         # C2-02：kkrb API 客户端注入 seam——None → 自建（生产唯一创建点）；
@@ -502,7 +501,7 @@ class MainWindow(QMainWindow):
         纯内存读（logic.summary / cash_summary，零 I/O）；不动数值文本、
         不触发 count-up 动画——主题切换只换色（presenter.apply_theme_styles）。
         """
-        self._kpi_presenter.apply_theme_styles(self.logic, self._view_n)
+        self._kpi_presenter.apply_theme_styles(self.logic, self.table.current_view())
 
     # ═══════════════════════════════════════════════════════
     # 置顶
@@ -546,21 +545,23 @@ class MainWindow(QMainWindow):
     # ═══════════════════════════════════════════════════════
 
     def _get_records(self) -> list:
-        """返回最近 self._view_n 条实际录入的 (date_str, DayRecord) 列表。
+        """返回最近「当前视图条数」条实际录入的 (date_str, DayRecord) 列表。
 
         J 系列：视图条数由按钮组驱动（默认 VIEW_DAYS[0]=7），取代硬编码 7；
         存储保留上限（RETENTION_LIMIT=30）与视图解耦，这里只筛窗口。
+        C6：条数唯一来源是 `TableWidget.current_view()`（ADR-0003 Q8 的主人），
+        本窗口不再持镜像。
         """
-        return self.logic.recent_records(self._view_n)
+        return self.logic.recent_records(self.table.current_view())
 
     def _on_view_changed(self, n: int) -> None:
-        """视图按钮组切换：更新当前视图条数并重绘（表格+曲线图+汇总联动）。
+        """视图按钮组切换：重绘（表格+曲线图+汇总联动）。
 
-        Q9/Q10：单一开关驱动三处同变，数据流一致（同源自 recent_records(_view_n)）。
+        Q9/Q10：单一开关驱动三处同变，数据流一致（同源自
+        `recent_records(self.table.current_view())`）。C6：本槽不再比对/存
+        状态——表格只在实际变化时发信号，条数从表格查询；`n` 仅保留为信号
+        载荷（不持有表格的观察者可用）。
         """
-        if n == self._view_n:
-            return
-        self._view_n = n
         self.refresh_display()
 
     # ═══════════════════════════════════════════════════════
@@ -755,6 +756,6 @@ class MainWindow(QMainWindow):
 
         D-07 / W-01 语义归 presenter：文本与信号由 format_summary 纯函数生成、
         数值变化时 count-up 滚动、数据不足直落终态；随视图 7/30 联动
-        （同源 recent_records(_view_n)）。
+        （同源 `recent_records(self.table.current_view())`，C6）。
         """
-        self._kpi_presenter.update(self.logic, self._view_n)
+        self._kpi_presenter.update(self.logic, self.table.current_view())

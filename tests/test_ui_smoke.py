@@ -1459,10 +1459,10 @@ def view_switch_window(qapp, settings_guard, tmp_path):
 
 
 def test_view_default_is_7(sample_window):
-    """启动默认视图 7：_view_n=7、7天按钮选中、双栏均分 ceil(n/2)。"""
+    """启动默认视图 7：7天按钮选中、双栏均分 ceil(n/2)；C6 无 `_view_n` 镜像。"""
     win = sample_window
-    assert win._view_n == 7
     assert win.table.current_view() == 7
+    assert not hasattr(win, "_view_n")  # C6：条数唯一主人是 TableWidget
     checked = [b.property("days") for b in win.table._view_buttons if b.isChecked()]
     assert checked == [7]
 
@@ -1473,9 +1473,9 @@ def test_view_default_is_7(sample_window):
 
 
 def test_view_switch_to_30_refreshes_all(view_switch_window):
-    """切到 30：view_changed(30) 信号 → _view_n=30 → 表格 15+15 + 汇总最近30条 全联动。"""
+    """切到 30：view_changed(30) → 表格 15+15 + 汇总最近30条 全联动（单一来源）。"""
     win = view_switch_window
-    assert win._view_n == 7
+    assert win.table.current_view() == 7
     win.refresh_display()
     assert win.table._left_table.rowCount() + win.table._right_table.rowCount() == 7
 
@@ -1485,8 +1485,7 @@ def test_view_switch_to_30_refreshes_all(view_switch_window):
     btn30.click()
 
     assert received == [30]           # 信号契约（Q8：emit 当前视图条数）
-    assert win._view_n == 30          # MainWindow 视角同步（Q10 单一开关）
-    assert win.table.current_view() == 30
+    assert win.table.current_view() == 30   # 唯一来源（C6：MainWindow 查询表格）
     assert win.table._left_table.rowCount() == 15   # 30 → 15+15 均分（Q7）
     assert win.table._right_table.rowCount() == 15
     assert "最近30条" in win._summary_caption.text()   # 汇总联动（Q9）
@@ -1503,7 +1502,6 @@ def test_view_switch_back_to_7_keeps_storage(view_switch_window):
     btn7.click()
 
     assert win.table.current_view() == 7
-    assert win._view_n == 7
     rows = win.table._left_table.rowCount() + win.table._right_table.rowCount()
     assert rows == 7
     assert len(win.logic.data) == 30      # 存储不丢

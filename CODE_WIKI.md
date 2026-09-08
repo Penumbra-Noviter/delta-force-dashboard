@@ -173,7 +173,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~645 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~646 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -261,7 +261,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~506 行<!--/AUTO-->
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~507 行<!--/AUTO-->
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -296,14 +296,15 @@ Delta Force Dashboard/
 #### 类：`TableWidget(QWidget)`
 
 双栏布局容器：顶部按钮组视图 7/30 可切换（默认 7，emit `view_changed(int)`；
-MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均分
+表格是视图窗口主人（ADR-0003 Q8），MainWindow 订阅信号后按 `current_view()`
+重拉 records——C6 起窗口侧不再持 `_view_n` 镜像）。分栏均分
 `mid=ceil(n/2)`——7→4+3、30→15+15。
 
 | 方法 | 说明 |
 |------|------|
 | <!--AUTO:sig:app/table_widget.py:TableWidget.__init__-->`__init__(parent=None, default_view)`<!--/AUTO--> | 构建视图切换按钮组（7/30）+ 左右两栏容器（各含标题 + _DaySubTable） |
-| `current_view()` | 返回当前视图条数（7 / 30） |
-| `view_changed = Signal(int)` | 按钮组切换时 emit 当前视图条数；MainWindow 订阅 → `_on_view_changed` → `refresh_display`（Q9 表格/曲线图/汇总全联动） |
+| `current_view()` | 返回当前视图条数（7 / 30）——视图条数的唯一读取口（C6） |
+| `view_changed = Signal(int)` | 按钮组切换时 emit 当前视图条数；MainWindow 订阅 → `_on_view_changed` → `refresh_display`（Q9 表格/曲线图/汇总全联动；载荷供不持有表格的观察者） |
 | <!--AUTO:sig:app/table_widget.py:TableWidget.draw-->`draw(records, today)`<!--/AUTO--> | 拆分 records 为左右两栏（均分），传递跨栏的 prev_warehouse 给右栏 |
 
 ---
