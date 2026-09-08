@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.icons import render_icon
-from app.motion import animate_property
+from app.motion import animate_property, stop
 from app.theme import get_color
 from formatting import format_compact, format_short_date
 
@@ -276,17 +276,15 @@ class ChartWidget(QWidget):
     _DRAW_ANIM_MS = 200
 
     def _play_draw_anim(self) -> None:
-        # C4-债4：启动新动画前 stop + deleteLater 旧动画。stop 零帧零 finished
-        # ——旧动画残帧不再写 opacity（防同目标竞态抖动），也不会触发旧动画的
-        # finished 去干扰新动画句柄；deleteLater 防旧动画对象无界累积。
-        # _draw_anim 是寻址句柄（防 GC 由 animate_property 的 C++ parent 承担），
-        # __init__ 未初始化该属性，读取需 getattr 兜底。
+        """曲线揭示动画：opacity 0→1（`_DRAW_ANIM_MS`）。
+
+        C4-债4/5 的调用方级处置（启动前 stop + deleteLater 旧动画、finished
+        identity 检查、句柄复位）已归 motion 统一实现（C1 深化）——本类不再
+        持有动画句柄，二次 draw 时 motion 自动丢弃旧动画（零帧、零 finished，
+        旧动画残帧不再写 opacity）。
+        """
         if self._warehouse_curve is None or self._cash_curve is None:
             return
-        old = getattr(self, "_draw_anim", None)
-        if old is not None:
-            old.stop()
-            old.deleteLater()
 
         def set_opacity(v: float) -> None:
             if self._warehouse_curve is not None:
@@ -295,19 +293,9 @@ class ChartWidget(QWidget):
                 self._cash_curve.setOpacity(v)
 
         set_opacity(0.0)
-        anim = animate_property(self, set_opacity, duration_ms=self._DRAW_ANIM_MS)
-        self._draw_anim = anim
-        if anim is None:  # 动画关闭路径：animate_property 直接落终态返回 None
-            return
-
-        def on_finished(a=anim):
-            # identity 检查：防旧动画（被 stop 后不再触发 finished）迟到清理
-            # 误清新动画句柄；动画自然结束后自回收。
-            if self._draw_anim is a:
-                self._draw_anim = None
-            a.deleteLater()
-
-        anim.finished.connect(on_finished)
+        # 动效关闭时 animate_property 直接落终态 setter(1.0) 并返回 False
+        # ——曲线立即完整显示（U-06 契约）。
+        animate_property(self, set_opacity, duration_ms=self._DRAW_ANIM_MS)
 
     def _create(self, x, warehouse_vals, cash_vals, dates) -> None:
         """从零创建 PlotWidget + 双 ViewBox + 全部子元素。"""
@@ -674,15 +662,10 @@ class ChartWidget(QWidget):
 
     def _clear_all(self) -> None:
         """销毁图表及占位。"""
-        # C4-债5：先停在途揭示动画再销毁 plot widget——stop 零帧零 finished
-        # （on_finished 不被触发，不干扰句柄），deleteLater 回收动画对象防
-        # 无界累积，句柄手动复位（stop 不发 finished → 必须显式置 None）。
-        # 动画关闭路径下 _draw_anim 未初始化，getattr 兜底（C4-债4 事实）。
-        old = getattr(self, "_draw_anim", None)
-        if old is not None:
-            old.stop()
-            old.deleteLater()
-            self._draw_anim = None
+        # C4-债5 + C1：先丢弃在途揭示动画再销毁 plot widget——motion.stop
+        # 零帧零 finished、出表、回收动画对象（旧实现需手搓 stop + deleteLater
+        # + 句柄复位 + getattr 兜底未初始化属性）。
+        stop(self)
 
         self._clear_placeholder()
 

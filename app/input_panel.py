@@ -9,9 +9,7 @@ from __future__ import annotations
 
 __all__ = ["MoneyLineEdit", "InputPanel"]
 
-import weakref
-
-from PySide6.QtCore import QPoint, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -21,7 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.motion import animations_enabled, fade_in_widget
+from app.motion import fade_in_widget, shake
 from app.theme import get_color
 from calculator import ProfitCalculatorLogic
 from formatting import (
@@ -79,46 +77,16 @@ class MoneyLineEdit(QLineEdit):
         self.validity_changed.emit(valid and text != "")
 
     def _shake(self) -> None:
-        """非法输入抖动反馈（W-02）：150ms 水平平移 [-6,6,-4,4] 回原位。
+        """非法输入抖动反馈（W-02）：150ms 水平平移 [-6, 6, -4] 回原位。
 
-        仅用户输入触发的校验失败时调用（失焦立即校验同路径）；
-        动画对象挂 self 防 GC；动效关闭时直接跳过。
-        C4-债5：DeleteWhenStopped 自删 + finished 清句柄——旧实现动画结束后
-        对象滞留为子对象直至父销毁（长期使用无界累积），且句柄残留 Stopped
-        引用；DWS 自删后句柄指针悬空，finished 时必须同步清 _shake_anim。
-        闭包以 weakref 持有 self 破引用环（动画 ← 信号连接 ← 闭包 ← self）：
-        强持有会让「控件在动画在途时被销毁」的路径依赖循环 GC 整链回收，
-        DWS 的延迟删除与循环回收互踩 → access violation（C4-债5 实测复现；
-        同 kpi_presenter C4-债3 的破环定案）。
-        C4-债7：finished 回调带 identity 检查（默认参数捕获 anim）——并发
-        在途时旧动画 finished 不误清新句柄（与 chart_widget on_finished 同款）。
+        仅用户输入触发的校验失败时调用（失焦立即校验同路径）；「连续非法
+        不重复抖」的防抖仍由调用方守卫（见 _update_validity）。
+
+        C1 深化：关键帧与生命周期（weakref 破环 / identity 检查 / 回收）
+        全部内化到 motion.shake——本控件不再持有动画句柄，C4-债5/7 的
+        调用方级雷区随之消失。
         """
-        if not animations_enabled():
-            return
-        anim = QPropertyAnimation(self, b"pos", self)
-        anim.setDuration(150)
-        start = self.pos()
-        anim.setKeyValueAt(0.0, start)
-        anim.setKeyValueAt(0.25, start + QPoint(-6, 0))
-        anim.setKeyValueAt(0.5, start + QPoint(6, 0))
-        anim.setKeyValueAt(0.75, start + QPoint(-4, 0))
-        anim.setKeyValueAt(1.0, start)
-
-        owner = weakref.ref(self)
-
-        def _on_finished(a=anim) -> None:
-            edit = owner()
-            # C4-债7：identity 检查（默认参数捕获 anim 保 identity 比较，
-            # 与 chart_widget on_finished 同款）——并发在途时旧动画的
-            # finished 不得误清新句柄（直调路径可绕过防抖；Qt 同 property
-            # 新动画 start 自动停旧动画使其 finished 不触发，此处为防御性
-            # 一致性加固，对齐 C4-债3/5 定案）。
-            if edit is not None and edit._shake_anim is a:
-                edit._shake_anim = None
-
-        anim.finished.connect(_on_finished)
-        anim.start(QPropertyAnimation.DeletionPolicy.DeleteWhenStopped)
-        self._shake_anim = anim
+        shake(self)
 
     def set_value(self, text: str) -> None:
         """程序化设值，跳过格式化重入保护。
@@ -397,10 +365,9 @@ class InputPanel(QWidget):
 
     def set_saved_indicator(self, text: str) -> None:
         self.saved_indicator.setText(text)
-        # U-06：保存/提示出现时 180ms 淡入（feedback-only，动画对象挂 self）
-        # C4-债11：不接返回值——原 _saved_indicator_anim 全文件只写不读（纯
-        # 惰性创建、无 __init__ 初始化）；fade 防 GC 由 C++ parent（widget）+
-        # C4-债6 的 _fade_anim property 承担，删只写句柄。
+        # U-06：保存/提示出现时 180ms 淡入（feedback-only）
+        # C4-债11 + C1：不接返回值——fade 的防 GC / 清理 / 句柄归 motion
+        # 的注册表统一承担，本控件无只写句柄。
         if text:
             fade_in_widget(self.saved_indicator, duration_ms=180)
 

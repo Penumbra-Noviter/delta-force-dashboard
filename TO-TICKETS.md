@@ -52,6 +52,16 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文由 git 历史承担）。
 
+### 架构评审批次（2026-09-08，improve-codebase-architecture，基线 a53c102）
+
+> 来源：全库架构审查（`improve-codebase-architecture` skill，7 项候选）+ 用户拍板「按强度顺序逐个推进」。候选池见 [TECH_DEBT.md](TECH_DEBT.md)；叙述见 DEV_LOG〈滚动摘要 2026-09-08〉；本表只承载工单事实。
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| C1 | 动画句柄生命周期回归 `app/motion.py`：在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 关键帧内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）；六条 u06 契约换观测点 + `tests/test_motion.py` 11 例 | ✅ 2026-09-08 | 本提交 |
+
+期末验证：**642/642 全绿**（55.8s）、doc_sync 双绿（先 update 7 标记再 check）；diff 8 文件；行为零变化（三种关动效语义、count-up 落终路径、图表揭示动画逐帧等价）。
+
 ### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
 
 > 来源：simplify-codebase 审计（生产/测试两域只读 Explore）+ 用户拍板 A+C。叙述见 DEV_LOG〈滚动摘要 2026-08-29〉；本表只承载工单事实。

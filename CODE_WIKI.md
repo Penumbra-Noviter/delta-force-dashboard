@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）+ F-01 增强（2026-08-14）全部完成）  
 > 生成日期：2026-08-14  
-> 测试状态：<!--AUTO:tests_total:total-->631<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->642<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->631<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->642<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -142,6 +142,7 @@ Delta Force Dashboard/
 │   ├── test_json_file.py    ← <!--AUTO:tests:tests/test_json_file.py-->3<!--/AUTO--> 个测试（JSON 原子写 + 容错读）
 │   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   ├── test_icons.py       ← <!--AUTO:tests:tests/test_icons.py-->6<!--/AUTO--> 个测试（IC-01 SVG 图标：键集守卫/渲染有效/颜色注入/尺寸/未知键/占位符无残留）
+│   ├── test_motion.py      ← <!--AUTO:tests:tests/test_motion.py-->11<!--/AUTO--> 个测试（C1 在途动画注册表：工厂 bool/同目标替换丢弃/finish 落终/stop 丢弃/关动效落终态/不可弱引用宿主防御/弱键出表/fade effect 摘除）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -216,7 +217,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~384 行<!--/AUTO-->）
+### 4.3 `app/input_panel.py` — 输入面板（<!--AUTO:lines:app/input_panel.py-->~354 行<!--/AUTO-->）
 
 #### 类：`MoneyLineEdit(QLineEdit)`
 
@@ -307,7 +308,7 @@ MainWindow 订阅后改 `_view_n` 重拉 records，Q8 深模块）。分栏均�
 
 ---
 
-### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~607 行<!--/AUTO-->）
+### 4.5 `app/chart_widget.py` — 图表组件（<!--AUTO:lines:app/chart_widget.py-->~591 行<!--/AUTO-->）
 
 #### 函数：`adaptive_range(values)`
 
@@ -598,7 +599,7 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 
 **核心**：`build_dashboard(mw) -> DashboardBundle` 模块函数直构仪表盘页——组件创建、布局、信号显式连接一次完成（替代旧 registry 回调间接层）；`DashboardBundle` dataclass 持 8 成员（input_panel/table/chart/summary_label/summary_caption/cash_summary_label/cash_summary_caption/hint_label），MainWindow 解包保留同名属性。信号连接（save/cancel/reuse/edit/delete/view_changed）在 bundle 内显式接线，零 registry。
 
-### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~225 行<!--/AUTO-->）
+### 4.19 `app/kpi_presenter.py` — KPI 双磁贴渲染（C4-02，<!--AUTO:lines:app/kpi_presenter.py-->~177 行<!--/AUTO-->）
 
 **核心**：`KpiPresenter(QObject)` 注入 4 labels（summary_label/summary_caption/cash_summary_label/cash_summary_caption），三出口——`update(logic, view_n)`（文本 + count-up 动画 + 样式全量渲染）/ `apply_theme_styles(logic, view_n)`（仅重算 signal 换色，不动文本动画，C1-08 语义）/ `reset()`（账号切换动画帧归零 + 终止在途动画，Y-05）。signal 计算经 `app.main_window._kpi_signal`（AA-01 单一来源，调用期延迟解析规避循环 import）。count-up 动画按磁贴独立槽（C4-债2）：`_countup_anims: dict[QLabel, QAbstractAnimation]` 每磁贴一个在途动画、始终可寻址——落值入口 pop + `setCurrentTime(duration)` 优雅落终；直落三态/同值直落移除 entry；0≤len≤2 不变式。动画生命周期随状态收敛（C4-债3）：自然结束 → finished 回调（weakref 闭包破引用环）→ identity 检查移除 entry + `deleteLater`；`reset()` 显式 `stop` + `deleteLater`——presenter Qt children 与 dict 双双有界。
 
@@ -647,20 +648,32 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 
 ---
 
-### 4.24 `app/motion.py` — 反馈型动效（U-06，<!--AUTO:lines:app/motion.py-->~148 行<!--/AUTO-->）
+### 4.24 `app/motion.py` — 反馈型动效（U-06 + C1 深化，<!--AUTO:lines:app/motion.py-->~275 行<!--/AUTO-->）
 
-反馈型动效工具：QWidget 淡入 + 通用属性动画。Qt QSS 不支持 transition（hover 背景平滑过渡不可用，DEV_LOG U-06 取舍），动效集中在可动画处——页面切换淡入（QGraphicsOpacityEffect + QPropertyAnimation）、图表曲线绘制揭示（QVariantAnimation 驱动 QGraphicsItem.setOpacity）、保存指示淡入。
+反馈型动效工具：QWidget 淡入 + 抖动 + 通用属性/数值动画。Qt QSS 不支持 transition（hover 背景平滑过渡不可用，DEV_LOG U-06 取舍），动效集中在可动画处——保存指示淡入（QGraphicsOpacityEffect + QPropertyAnimation）、非法输入抖动（关键帧位移）、图表曲线绘制揭示（QVariantAnimation 驱动 QGraphicsItem.setOpacity）、KPI count-up（数值插值）。
 
-**feedback-only motion 规则**：只做触发后 ≤200ms 的反馈动画，无装饰性循环；动画是纯视觉增强，终态即时可达——中断/关闭不影响功能；动画对象由调用方持有引用（防 GC 提前回收），结束后移除 QGraphicsEffect（防 effect 通道常驻渲染开销）；全局开关 settings `animations=false` 时全部动效失效但功能完整（MainWindow 启动经 `set_animations_enabled` 注入）。
+**feedback-only motion 规则**：只做触发后 ≤200ms 的反馈动画，无装饰性循环；动画是纯视觉增强，终态即时可达——中断/关闭不影响功能；全局开关 settings `animations=false` 时全部动效失效但功能完整（MainWindow 启动经 `set_animations_enabled` 注入）。
+
+**C1 深化——句柄收进本模块，调用方只报目标**：历史形态（C4-债3~12）是「每个调用方各自手搓生命周期四件套」（在途句柄存动态属性/字典/未初始化属性三种机制，各自重复 weakref 破环、identity 检查、stop 后同步清句柄、DWS/deleteLater 回收），同一族 bug（在途动画与宿主销毁并发 → access violation）被反复修复。现在唯一实现在此：
+
+- **在途注册表 `_running`**：target（弱键）→ 在途条目（动画 + cleanup）；宿主销毁即出表，动画以 target 为 Qt parent 随 C++ 树消亡；
+- **工厂返回 `bool`**（是否真的启动），动画对象不外泄——调用方不持句柄，也就不存在句柄悬空/误清；
+- **同目标恒单在途**：工厂遇在途动画默认丢弃旧的（零帧、零 finished），结构性消除同目标竞争写；
+- **控制动词**：`is_running(target)` / `stop(target)`（丢弃、不落终帧）/ `finish(target)`（落终帧）；调用点语义一一对应（图表清空/账号归零用 stop，磁贴重触发用 finish）；
+- **关动效决策点亦在此**：一次性反馈（fade/shake）跳过，数值型（property/value）直接落终态。
 
 | 函数 | 说明 |
 |------|------|
-| <!--AUTO:sig:app/motion.py:fade_in_widget-->`fade_in_widget(widget, duration_ms=150, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | widget 淡入到不透明，动画结束移除 effect 并清 `_fade_anim` property；返回运行中动画对象（调用方持有防 GC），动效关闭返回 None；duration≤0 钳为 1ms（C4-债9：duration=0 时 start 即 Stopped、finished 不触发 → property 残留悬空，Falsify 实测 abort） |
-| <!--AUTO:sig:app/motion.py:animate_property-->`animate_property(parent, setter, duration_ms=200, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 0.0→1.0 插值逐帧回调 setter(value)——用于非 QObject property 目标（pyqtgraph 曲线 QGraphicsItem opacity，QPropertyAnimation 无法驱动）；动效关闭直接 `setter(1.0)` 落终态 |
-| <!--AUTO:sig:app/motion.py:animate_value-->`animate_value(parent, old_value, new_value, setter, duration_ms=300, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 数值插值 old→new 逐帧回调 setter（KPI 数字 count-up，W-01）；动效关闭直接 `setter(new_value)` 落终态 |
+| <!--AUTO:sig:app/motion.py:fade_in_widget-->`fade_in_widget(widget, duration_ms=150, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | widget 淡入到不透明；返回是否启动（动效关闭/不可弱引用宿主 → False 且不挂 effect）；结束后摘除 QGraphicsEffect；duration≤0 钳为 1ms（C4-债9：duration=0 时 start 即 Stopped、finished 不触发 → 在途条目残留） |
+| <!--AUTO:sig:app/motion.py:shake-->`shake(widget, *, duration_ms=150, offset=6)`<!--/AUTO--> | 非法输入抖动（W-02）：水平平移 [-offset, +offset, -⅔·offset] 回原位；关键帧模式内化于此（C1），调用方只报「抖谁」 |
+| <!--AUTO:sig:app/motion.py:animate_property-->`animate_property(target, setter, duration_ms=200, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 0.0→1.0 插值逐帧回调 setter(value)——用于非 QObject property 目标（pyqtgraph 曲线 QGraphicsItem opacity，QPropertyAnimation 无法驱动）；target 同时是注册表键与 Qt parent；动效关闭/无宿主直接 `setter(1.0)` 落终态 |
+| <!--AUTO:sig:app/motion.py:animate_value-->`animate_value(target, old_value, new_value, setter, duration_ms=300, easing=QEasingCurve.Type.OutCubic)`<!--/AUTO--> | 数值插值 old→new 逐帧回调 setter（KPI 数字 count-up，W-01）；动效关闭/无宿主直接 `setter(new_value)` 落终态 |
+| <!--AUTO:sig:app/motion.py:is_running-->`is_running(target)`<!--/AUTO--> | target 是否有在途动画（注册表只承载在途条目——自然结束/stop/finish 均同步出表） |
+| <!--AUTO:sig:app/motion.py:stop-->`stop(target)`<!--/AUTO--> | 丢弃在途动画（零帧、不发 finished、出表 + 回收 + 执行 cleanup）；用于目标即将销毁/重置 |
+| <!--AUTO:sig:app/motion.py:finish-->`finish(target)`<!--/AUTO--> | 让在途动画落终帧并回收（`setCurrentTime(duration())` 同步触发 finished）；用于同目标即将播新动画 |
 | <!--AUTO:sig:app/motion.py:set_animations_enabled-->`set_animations_enabled(enabled)`<!--/AUTO--> / `animations_enabled()` | 全局动效开关（默认开）；MainWindow 启动从 settings `animations` 键注入 |
 
-**生命周期收敛契约（C4-债6/债9）**：fade_in_widget 同 widget 连续触发先 `stop()` 旧动画并**同步清** `_fade_anim` property（DWS 自删不发 finished、清理回调不执行 → 不清则 property 残留已删对象指针，use-after-free 窗口）；finished 闭包以 weakref 持有 widget 破环（强闭包环在「控件动画在途时销毁」路径与 DWS 延迟删除互踩 → access violation，C4-债3/5 同款定案）。
+**生命周期收敛契约（C1；前身 C4-债3/5/6/7/9/11/12）**：finished 处理器三重防护——weakref 取宿主（宿主已亡整段跳过）、identity 检查（陈旧 finished 不误清新条目）、出表 + cleanup + deleteLater 一步不落（不用 DeleteWhenStopped：自删后再显式 deleteLater 会对已删 wrapper 抛 RuntimeError）。回观测契约：`is_running(target)` + 宿主子对象计数（`QVariantAnimation` children），调用方与测试不再触及动画对象本身。
 
 ### 4.25 `app/load_state.py` — 数据页状态机（V-02，<!--AUTO:lines:app/load_state.py-->~52 行<!--/AUTO-->）
 
@@ -701,7 +714,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->631<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->642<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -800,6 +813,7 @@ main.py
 | `tests/test_migration.py` | <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> | 旧数据一次性迁移（O-22：幂等跳过/复制非移动/失败 warning）+ `.migrated` 完成标记与清理提示（F-02）+ main() mkdir 顺序回归 |
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
+| `tests/test_motion.py` | <!--AUTO:tests:tests/test_motion.py-->11<!--/AUTO--> | C1 在途动画注册表与控制动词：工厂返回 bool/同目标替换丢弃旧动画/finish 落终帧 vs stop 丢弃/关动效落终态/不可弱引用宿主防御/弱键宿主销毁出表/fade effect 两条路径摘除 |
 | `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme super() 刷新基类图标（IC-03）/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`

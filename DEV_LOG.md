@@ -6,7 +6,18 @@
 
 ---
 
-## 滚动摘要（2026-08-29 — simplify-codebase A+C 批次）
+## 滚动摘要（2026-09-08 — 架构评审 C1：动画句柄生命周期回归 motion）
+
+- **`improve-codebase-architecture` 全库审查 → C1 立项落地（全绿 642/642、doc_sync 双绿）**：
+  - **问题（评审 C1，Strong）**：动画生命周期知识复制在 4 处——`motion.fade_in_widget` / `input_panel._shake` / `kpi_presenter._countup_anims` / `chart_widget._draw_anim`，四种句柄存放机制（动态属性 / 字典槽 / 未初始化属性）各写一套 weakref 破环 + identity 检查 + 清理；C4-债3/4/5/6/7/9/11/12 共 8 个提交修的是同一族「在途动画与宿主销毁并发 → access violation」模式。
+  - **深化**：`app/motion.py` 新增在途注册表 `_running`（target 弱键 → 动画 + cleanup；动画以 target 为 Qt parent）+ 控制动词 `is_running`/`stop`（丢弃）/`finish`（落终）；四工厂（含新增 `shake`）统一返回 bool、动画对象不外泄、同目标替换默认丢弃旧的；关动效决策点收进 motion（fade 不挂 effect / shake 跳过 / 数值型落终态三种可观察行为不变）。
+  - **落点迁移**：`_shake` 手搓 41 行 → `motion.shake(self)`；KPI 每磁贴 dict 槽 + `_pop_countup_anim` → 注册表（`finish(label)` 保 C4-债2 落终语义）；chart 的 `getattr(self,"_draw_anim",None)` 句柄舞蹈 → `animate_property(self, …)` + `motion.stop(self)`。
+  - **观测面**：六条 u06 契约测试语义不变、只换观测点（`is_running(target)` + 宿主 `QVariantAnimation` 子对象计数）；新增 `tests/test_motion.py` 11 例（工厂 bool / 替换丢弃 / finish 落终 vs stop 丢弃 / 关动效 / 不可弱引用宿主 / 弱键出表 / fade effect 两条路径摘除）。
+  - **决策（grilling 三轮，用户全按推荐）**：句柄不外泄（工厂 bool + `is_running` 观测）；`stop`=丢弃与 `finish`=落终拆成双动词；`shake` 关键帧内化；不新开模块（深化留在 `app/motion.py`）。
+  - **Falsify 收获**：`test_none_label_raises_on_update`（注入 None label）暴露「None 进弱键注册表抛 TypeError、错误指向 motion 而非调用方」——补 `_hostable` 防御（无宿主 = 无动画，数值型仍落终态），误用回到调用方自身位置报错。
+  - **验收**：642/642 全绿（55.8s）；doc_sync 先 update（7 标记：lines/sig/tests_total）再 check 双绿；AST 扫描 touched 文件零未用 import。
+
+---
 
 - **简化审计 + 变更（simplify-codebase skill，Survey→Change，全绿 631/631、doc_sync 双绿）**：
   - **A 类（生产零消费者删除）**：`app/theme.py` 删 16 个死主题 token ×light/dark（BORDER_LIGHT/CHART_TEXT/ERROR_*/INFO_*/PANEL_2/PIN_OFF_BG/PIN_ON_BG/SUCCESS_*/SURFACE_0/1/2/TEXT_DISABLED/TEXT_LINK，逐键 grep 全仓零引用含 QSS 消费）；删 `theme.get_theme()`（全仓零调用）+ `__all__`/`app/__init__.py` 导出 + CODE_WIKI 3 处引用；删 `MainWindow.view_n` property（测试全用 `_view_n`）；删 3 个死 import（main_window 的 signal_color/format_short_date、table_widget 的 QRadioButton）

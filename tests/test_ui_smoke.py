@@ -292,7 +292,7 @@ def test_w01_kpi_countup(qapp):
     # 数值变化（100 → 200）→ 动画触发，结束后文本 == 新值格式化
     logic._total = 200.0
     presenter.update(logic, 7)
-    assert label in presenter._countup_anims
+    assert motion.is_running(label)  # C1：在途观测点由 _countup_anims 改为注册表
     QTest.qWait(400)
     assert label.text() == format_signed_money(200.0)[0]
 
@@ -300,12 +300,11 @@ def test_w01_kpi_countup(qapp):
     presenter.update(logic, 7)
     assert label.text() == format_signed_money(200.0)[0]
 
-    # 动效关闭 → animate_value 直接落终态
+    # 动效关闭 → animate_value 直接落终态（返回 False，未启动）
     motion.set_animations_enabled(False)
     try:
         seen: list[float] = []
-        anim = motion.animate_value(QFrame(), 10.0, 20.0, seen.append)
-        assert anim is None
+        assert motion.animate_value(QFrame(), 10.0, 20.0, seen.append) is False
         assert seen == [20.0]
     finally:
         motion.set_animations_enabled(True)
@@ -392,10 +391,12 @@ def test_u06_motion_feedback(sample_window):
 
     注：页面切换淡入已移除（QStackedWidget + QGraphicsOpacityEffect 快速切页
     崩溃风险，U-11）；曲线与保存指示动画保留。
+    C1：在途观测点由 `_draw_anim` / `_fade_anim` 句柄改为 motion.is_running。
     """
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QFrame
 
+    from app import motion
     from app.motion import fade_in_widget
 
     win = sample_window
@@ -405,27 +406,28 @@ def test_u06_motion_feedback(sample_window):
     # 曲线绘制动画：draw 后启动，完成后 opacity 归 1
     records = win.logic.recent_records(7)
     win.chart.draw(records)
-    assert win.chart._draw_anim is not None
+    assert motion.is_running(win.chart)
     QTest.qWait(400)
+    assert not motion.is_running(win.chart)
     if win.chart._warehouse_curve is not None:
         assert win.chart._warehouse_curve.opacity() == 1.0
 
-    # fade_in_widget 契约：结束后移除 QGraphicsOpacityEffect 且 property 清空
+    # fade_in_widget 契约：结束后移除 QGraphicsOpacityEffect 且在途出表
     box = QFrame()
-    fade_in_widget(box, duration_ms=50)
+    assert fade_in_widget(box, duration_ms=50) is True
+    assert motion.is_running(box)
     QTest.qWait(120)
     assert box.graphicsEffect() is None
-    assert box.property("_fade_anim") is None
+    assert not motion.is_running(box)
 
 
 def test_u06_fade_in_widget_consecutive_contract(qapp):
-    """C4-债6：连续 fade 契约保持——在途二次 fade 停旧覆盖新，排水后清零。
+    """C4-债6：连续 fade 契约保持——在途二次 fade 丢弃旧的、登记新的，排水后清零。
 
-    诚实声明：本测为契约保持而非红绿反证——同调用内 setProperty 覆盖使
-    「stop 后 property 残留已删指针」在外部不可观察（读路径要么旧指针要么
-    新动画），在途销毁路径当前亦不崩；修复前后行为等价。修复为防御性/
-    一致性加固（C4-债3/5 定案：weakref 破环 + stop 后同步清 property），
-    本测锁定可观察契约：在途二次触发 → 排水后 effect/property 清零、无崩溃。
+    诚实声明：本测为契约保持而非红绿反证——在途二次触发在旧实现下亦不崩；
+    修复为防御性/一致性加固（C4-债3/5 定案）。C1 后由 motion 注册表承担
+    「同目标单在途 + 清理不误伤新动画」，本测锁定可观察契约：在途二次触发
+    → 排水后 effect 清零、在途出表、无崩溃。
     """
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QFrame
@@ -437,11 +439,12 @@ def test_u06_fade_in_widget_consecutive_contract(qapp):
     motion.set_animations_enabled(True)
     try:
         box = QFrame()
-        fade_in_widget(box, 50)
+        assert fade_in_widget(box, 50) is True
         QTest.qWait(20)  # 在途
-        fade_in_widget(box, 50)  # stop 旧动画 + 覆盖新动画
-        QTest.qWait(150)  # 排水：新动画自然结束 + DWS 自删 + finished 清理
-        assert box.property("_fade_anim") is None
+        assert fade_in_widget(box, 50) is True  # 丢弃旧的 + 登记新的
+        assert motion.is_running(box)
+        QTest.qWait(150)  # 排水：新动画自然结束 + 回收 + finished 清理
+        assert not motion.is_running(box)
         assert box.graphicsEffect() is None
         # 存活即通过（在途连续触发无崩溃）
     finally:
@@ -452,13 +455,12 @@ def test_u06_fade_in_widget_zero_duration_guard(qapp):
     """C4-债9：fade_in_widget duration_ms<=0 护栏（反证锚点 0 + Falsify 负值边界）。
 
     修复前 duration_ms 直接透传 setDuration：duration=0 时 QPropertyAnimation
-    start 即 Stopped、finished 不触发，DWS 已删 C++ 对象但 _fade_anim property
-    残留悬空 wrapper——对返回值调任何方法抛 RuntimeError（红）；max(1, ...)
-    护栏后返回有效动画对象，排水后 property/graphicsEffect 收敛 None 无崩溃
-    （绿）。时长 1ms 的动画极快自然结束，不断言具体状态值，只断言语义
-    「有效动画 + 最终收敛」。
+    start 即 Stopped、finished 不触发，动画对象被自删但句柄残留悬空 wrapper
+    ——对返回值调任何方法抛 RuntimeError（红）；max(1, ...) 护栏后返回 True
+    且在途条目就位，排水后出表、graphicsEffect 收敛 None 无崩溃（绿）。
+    时长 1ms 的动画极快自然结束，不断言具体状态值，只断言语义
+    「已启动 + 最终收敛」。
     """
-    from PySide6.QtCore import QAbstractAnimation
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QFrame
 
@@ -470,18 +472,12 @@ def test_u06_fade_in_widget_zero_duration_guard(qapp):
     try:
         for duration in (0, -1):
             box = QFrame()
-            anim = fade_in_widget(box, duration_ms=duration)
-            # 修复前此行抛 RuntimeError（start 即 Stopped + finished 不触发 +
-            # DWS 已删 C++ 对象）；护栏后为有效动画（启动瞬间 Running/Stopped
-            # 均合法，不按时序断言）
-            assert anim is not None
-            assert anim.state() in (
-                QAbstractAnimation.State.Running,
-                QAbstractAnimation.State.Stopped,
-            )
-            assert box.property("_fade_anim") is not None
-            QTest.qWait(200)  # 排水：1ms 动画极快自然结束 + DWS 自删 + finished 清理
-            assert box.property("_fade_anim") is None
+            assert fade_in_widget(box, duration_ms=duration) is True
+            # 修复前此处只能拿到已删 wrapper（调用即 RuntimeError）；护栏后
+            # 在途条目有效（启动瞬间 Running/Stopped 均合法，不按时序断言）
+            assert motion.is_running(box)
+            QTest.qWait(200)  # 排水：1ms 动画极快自然结束 + 回收 + finished 清理
+            assert not motion.is_running(box)
             assert box.graphicsEffect() is None
     finally:
         motion.set_animations_enabled(prev)
@@ -490,13 +486,14 @@ def test_u06_fade_in_widget_zero_duration_guard(qapp):
 def test_u06_draw_anim_bounded_lifecycle(sample_window):
     """C4-债4 AC-1：15 次连续 draw → qWait(400) → chart 零 QVariantAnimation 残留。
 
-    旧实现每次 draw 覆盖 _draw_anim 不回收旧动画，16 次 draw 残留 16 个动画
-    子对象（反证锚点）；修复后 stop + deleteLater + finished 自回收，归零。
+    旧实现每次 draw 覆盖句柄不回收旧动画，16 次 draw 残留 16 个动画
+    子对象（反证锚点）；修复后旧动画被丢弃 + 回收，归零。
     必须按 QVariantAnimation 类型过滤——chart 有 PlotWidget 等常驻子控件。
     """
     from PySide6.QtCore import QVariantAnimation
     from PySide6.QtTest import QTest
 
+    from app import motion
     from app.chart_widget import ChartWidget
 
     win = sample_window
@@ -512,8 +509,8 @@ def test_u06_draw_anim_bounded_lifecycle(sample_window):
     assert sum(
         isinstance(c, QVariantAnimation) for c in chart.children()
     ) == 0
-    # U-5：动画自然结束后句柄复位 None（不再残留 Stopped 动画引用）
-    assert chart._draw_anim is None
+    # U-5 + C1：动画自然结束后出表（不再残留 Stopped 动画引用）
+    assert not motion.is_running(chart)
 
 
 def test_u06_draw_anim_race_single_running(sample_window):
@@ -547,7 +544,7 @@ def test_u06_draw_anim_race_single_running(sample_window):
 
 
 def test_u06_draw_anim_final_state_and_switch_off(sample_window):
-    """C4-债4 AC-3/AC-4：动画结束 opacity==1.0；关闭动效时零动画对象 + 句柄 None。
+    """C4-债4 AC-3/AC-4：动画结束 opacity==1.0；关闭动效时零动画对象 + 未启动。
 
     AC-4 用全新 ChartWidget 验证——sample_window 的 chart 在 MainWindow 构造期
     已被 draw 过（旧实现遗留动画永不回收），「无动画对象」须在无历史残留的
@@ -562,12 +559,12 @@ def test_u06_draw_anim_final_state_and_switch_off(sample_window):
     win = sample_window
     records = win.logic.recent_records(7)
 
-    # AC-4：全局动效关闭 → draw 仍立即完整显示，零动画对象、句柄 None
+    # AC-4：全局动效关闭 → draw 仍立即完整显示，零动画对象、未启动
     chart = ChartWidget()
     motion.set_animations_enabled(False)
     try:
         chart.draw(records)
-        assert chart._draw_anim is None
+        assert not motion.is_running(chart)
         assert sum(
             isinstance(c, QVariantAnimation) for c in chart.children()
         ) == 0
@@ -584,14 +581,13 @@ def test_u06_draw_anim_final_state_and_switch_off(sample_window):
 
 
 def test_u06_clear_all_stops_running_draw_anim(sample_window):
-    """C4-债5 AC-1：动画半程 _clear_all → 在途动画停止、句柄复位 None。
+    """C4-债5 AC-1：动画半程 _clear_all → 在途动画停止、注册表出表。
 
-    旧实现 _clear_all 不停止在途 _draw_anim（依赖 ≤200ms 自然回收 + 闭包
-    判空），清空后句柄仍指向 Running 动画（反证锚点）；加固后先 stop +
-    deleteLater + 句柄复位，清空立即收敛（stop 零帧零 finished——on_finished
-    不被触发，句柄必须手动复位）。
+    旧实现 _clear_all 不停止在途动画（依赖 ≤200ms 自然回收 + 闭包判空），
+    清空后仍指向 Running 动画（反证锚点）；加固后丢弃在途动画，清空立即收敛
+    （C1 后由 motion.stop 承担：零帧零 finished + 出表 + 回收）。
     """
-    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtCore import QAbstractAnimation, QVariantAnimation
     from PySide6.QtTest import QTest
 
     from app import motion
@@ -600,18 +596,23 @@ def test_u06_clear_all_stops_running_draw_anim(sample_window):
     win = sample_window
     records = win.logic.recent_records(7)
     # C4-债8：环境态自持——本用例依赖动效开启（Running 断言），显式置开 +
-    # try/finally 恢复（同 test_u06_motion_global_switch 惯例；关闭态下
-    # _draw_anim 为 None，Running 断言会 AttributeError，历史红证）。
+    # try/finally 恢复（同 test_u06_motion_global_switch 惯例；关闭态下无在途
+    # 动画，Running 断言会红，历史红证）。
     prev = motion.animations_enabled()
     motion.set_animations_enabled(True)
     try:
         chart = ChartWidget()  # 同 AC-1：全新 chart 复现锚点，不随构造时机漂移
         chart.draw(records)
         QTest.qWait(100)  # 动画半程（200ms 时长）；Running 断言自证半程成立
-        assert chart._draw_anim.state() == QAbstractAnimation.State.Running
+        assert motion.is_running(chart)
+        assert sum(
+            isinstance(c, QVariantAnimation)
+            and c.state() == QAbstractAnimation.State.Running
+            for c in chart.children()
+        ) == 1
         chart._clear_all()
-        assert getattr(chart, "_draw_anim", None) is None  # 句柄复位
-        # 排水等待：stop 后无在途回调 + deleteLater 全部处理，避免 chart 随
+        assert not motion.is_running(chart)  # 在途出表
+        # 排水等待：stop 后无在途回调 + 回收全部处理，避免 chart 随
         # 测试结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
         QTest.qWait(400)
     finally:
@@ -627,12 +628,11 @@ def test_u06_motion_global_switch(qapp):
     motion.set_animations_enabled(False)
     try:
         box = QFrame()
-        assert motion.fade_in_widget(box, duration_ms=50) is None
+        assert motion.fade_in_widget(box, duration_ms=50) is False
         assert box.graphicsEffect() is None  # 不挂 effect，功能完整
 
         seen: list[float] = []
-        anim = motion.animate_property(QFrame(), seen.append, duration_ms=50)
-        assert anim is None
+        assert motion.animate_property(QFrame(), seen.append, duration_ms=50) is False
         assert seen == [1.0]  # 终态即时可达
     finally:
         motion.set_animations_enabled(True)

@@ -122,12 +122,14 @@ def test_validation_via_real_event_chain(qapp, type_and_settle):
 def test_w02_shake_on_invalid_input(qapp, type_and_settle):
     """W-02：非法输入触发抖动动画（状态从 valid 变 invalid），防抖不重复。
 
-    C4-债5：动画结束 DWS 自删 + finished 清句柄——断言从「句柄仍持有
-    Stopped 动画」改为「句柄已清空 + 子对象零 QPropertyAnimation 残留」
+    C4-债5 + C1：动画结束出表 + 回收——断言从「句柄仍持有 Stopped 动画」
+    改为「在途注册表已出表 + 子对象零 QPropertyAnimation 残留」
     （旧实现动画对象滞留为子对象直至父销毁，长期使用无界累积）。
     """
     from PySide6.QtCore import QPropertyAnimation
     from PySide6.QtTest import QTest
+
+    from app import motion
 
     ip = InputPanel()
     ip.show()
@@ -135,16 +137,16 @@ def test_w02_shake_on_invalid_input(qapp, type_and_settle):
 
     type_and_settle(ip.cash_entry, "100")  # valid
     type_and_settle(ip.cash_entry, "abc")  # valid → invalid：抖动触发
-    assert ip.cash_entry._shake_anim is not None
+    assert motion.is_running(ip.cash_entry)
     QTest.qWait(200)  # 动画结束（150ms），pos 恢复原位
-    # 动画结束后句柄随 finished 清空，DWS 自删不滞留子对象
-    assert ip.cash_entry._shake_anim is None
+    # 动画结束后自动出表并回收，不滞留子对象
+    assert not motion.is_running(ip.cash_entry)
     assert not any(
         isinstance(c, QPropertyAnimation) for c in ip.cash_entry.children()
     )
     # 连续非法（已 invalid）→ 不重复抖动（防抖），也不新建动画
     type_and_settle(ip.cash_entry, "xyz")
-    assert ip.cash_entry._shake_anim is None
+    assert not motion.is_running(ip.cash_entry)
     assert not any(
         isinstance(c, QPropertyAnimation) for c in ip.cash_entry.children()
     )
@@ -157,13 +159,13 @@ def test_w02_shake_identity_guard(qapp):
     诚实声明：本测为契约守卫而非红绿反证——Qt 在「同 target 同 property」
     上启动新 QPropertyAnimation 会自动停掉旧动画（stop 零帧零 finished，
     PySide6 6.11.1 实测 finished_log 仅新动画），「旧动画自然结束触发
-    finished 时新动画仍在 Running」的并发路径当前不可构造，修复前本测
-    同样通过。identity 检查与 chart_widget on_finished 同款，属防御性
-    一致性加固（C4-债3/5 定案）；本测锁定其可观察契约：直调 _shake 二次
-    覆盖句柄后，旧动画的 finished（若将来 Qt 行为变化或路径可达）不得
-    误清新句柄，句柄只随新动画自然结束清空。
+    finished 时新动画仍在 Running」的并发路径当前不可构造。C1 深化后
+    identity 检查内化于 motion（在途注册表），本测锁定其可观察契约：
+    二次 _shake 后仍恰有一条在途动画（注册表在表 + 子对象恰一条 Running），
+    旧动画原定结束点过后依然在途（陈旧 finished 未误清），新动画自然结束
+    后出表。
     """
-    from PySide6.QtCore import QAbstractAnimation
+    from PySide6.QtCore import QAbstractAnimation, QPropertyAnimation
     from PySide6.QtTest import QTest
 
     from app import motion
@@ -181,21 +183,27 @@ def test_w02_shake_identity_guard(qapp):
         entry = ip.cash_entry
         entry._shake()  # anim1：150ms
         QTest.qWait(50)  # anim1 在途（约剩 100ms）
-        anim1 = entry._shake_anim
-        entry._shake()  # anim2：新启动（Qt 自动停 anim1），句柄覆盖为 anim2
-        anim2 = entry._shake_anim
-        assert anim2 is not anim1
+        entry._shake()  # anim2：新启动（motion 丢弃 anim1 后登记 anim2）
+        assert motion.is_running(entry)
+        assert sum(
+            isinstance(c, QPropertyAnimation)
+            and c.state() == QAbstractAnimation.State.Running
+            for c in entry.children()
+        ) == 1  # 同目标恰一条在途（旧动画已丢弃）
         QTest.qWait(130)  # anim1 原定结束点已过（其 finished 未触发）；anim2 仍在 Running
         # C4-债12：时序加固——Windows 定时器粒度 ~15.6ms，高负载下 anim2 此时
-        # 仅剩 ~20ms；先断言 Running 再断言句柄 identity：时序漂移时红在辅助
-        # 断言（明确提示）而非误判 identity 契约（旧断言失败含义含混）。
-        assert anim2.state() == QAbstractAnimation.State.Running
-        assert entry._shake_anim is anim2  # 句柄未被陈旧 finished 误清
+        # 仅剩 ~20ms；先断言在途/运行，时序漂移时红在辅助断言（明确提示）。
+        assert motion.is_running(entry)
+        assert sum(
+            isinstance(c, QPropertyAnimation)
+            and c.state() == QAbstractAnimation.State.Running
+            for c in entry.children()
+        ) == 1  # 在途状态未被陈旧 finished 误清
         QTest.qWait(100)  # anim2（150ms）自然结束
-        assert entry._shake_anim is None
+        assert not motion.is_running(entry)
     finally:
         motion.set_animations_enabled(prev)
-    # 排水等待：在途动画自然结束 + DWS 自删全部处理，避免 entry 随测试
+    # 排水等待：在途动画自然结束 + 回收全部处理，避免 entry 随测试
     # 结束被 Python GC 时残留待删动画子对象（延迟双重删除 abort）
     QTest.qWait(100)
     ip.close()
@@ -486,8 +494,9 @@ def test_saved_indicator_fade_contract(qapp):
 
     诚实声明：本测为契约保持而非红绿反证——只写句柄删除无可观察行为差异。
     既有覆盖（test_ui_smoke 保存流程）只断言指示器文案；本测补 fade 行为
-    契约：set_saved_indicator 触发淡入（_fade_anim property 同步就位）→
-    排水后 effect/property 收敛 None、无崩溃（对齐 U-06 fade 契约）。
+    契约：set_saved_indicator 触发淡入（在途注册表在表 + effect 就位）→
+    排水后出表、effect 收敛 None、无崩溃（对齐 U-06 fade 契约；C1 后观测
+    点由 `_fade_anim` property 改为 motion.is_running）。
     """
     from PySide6.QtTest import QTest
 
@@ -503,10 +512,11 @@ def test_saved_indicator_fade_contract(qapp):
         try:
             ip.set_saved_indicator("已保存 ✓")
             assert ip.saved_indicator.text() == "已保存 ✓"
-            # fade 触发：property 同步就位（180ms 在途，无时序断言）
-            assert ip.saved_indicator.property("_fade_anim") is not None
-            QTest.qWait(400)  # 排水：180ms 动画自然结束 + DWS 自删 + finished 清理
-            assert ip.saved_indicator.property("_fade_anim") is None
+            # fade 触发：同步在途（180ms，无时序断言）
+            assert motion.is_running(ip.saved_indicator)
+            assert ip.saved_indicator.graphicsEffect() is not None
+            QTest.qWait(400)  # 排水：180ms 动画自然结束 + 回收 + finished 清理
+            assert not motion.is_running(ip.saved_indicator)
             assert ip.saved_indicator.graphicsEffect() is None
         finally:
             ip.close()

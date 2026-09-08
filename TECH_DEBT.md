@@ -52,6 +52,12 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
+| DFD-1 | `_kpi_signal` 是 `format_window_text(...)[1]` 的 1 行转发，却躺在最大的枢纽模块里，并制造 main_window ↔ kpi_presenter 循环依赖（kpi_presenter 用调用期延迟导入绕环）；删除测试通过（纯浅透传） | 架构评审 C2 | Strong | 📝 待立项 | GUI |
+| DFD-2 | `fetch_page_base._data` 三处赋值零读取（删除测试通过）；基类 `_render_error` 默认 = `_render_data([])` 使空/错态不可分，三子类各写一遍占位清空逻辑（exchange 未写，错误态与空态共用） | 架构评审 C3 | Strong | 📝 待立项 | 数据页/GUI |
+| DFD-3 | `kpi_presenter` 用展示文案字面量 `value != "数据不足"` 决定动画分支（presentation 改文案即静默改变行为）；「暂无数据」×7、「加载中…」×2 写法散落 5 模块 | 架构评审 C4 | Strong | 📝 待立项 | GUI |
+| DFD-4 | `build_dashboard(mw)` 经副作用写回 `mw._dashboard_page`，MainWindow 随后私读 dashboard 私有属性（`_title_label` 等）；测试需伪造「长得像 MainWindow」的整对象 | 架构评审 C5 | Strong | 📝 待立项 | GUI |
+| DFD-5 | 视图窗口同一事实两份（`TableWidget._view_days` 与 `MainWindow._view_n`），仅靠 `view_changed` 信号维持相等；非按钮路径的程序化改动会漂移（测试双断言钉住） | 架构评审 C6 | Worth exploring | 📝 待立项 | GUI |
+| DFD-6 | 主题刷新是约定制：`hasattr` 树遍历收集 + 六组件各自私藏「换色记忆」；同一 `apply_theme` 下 TableWidget 实为整表重绘、ChartWidget 才是真增量（隐藏代价差异） | 架构评审 C7 | Worth exploring | 📝 待立项 | GUI |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -60,7 +66,11 @@
 
 ## 技术债处置记录
 
-（暂无——历史批次处置明细在 `TO-TICKETS.md` 已完成归档。）
+### 2026-09-08（架构评审批次）
+
+| 编号 | 遗留项 | 处置 | 提交 |
+|------|--------|------|------|
+| C1 | 动画生命周期知识复制 4 处（`motion.fade_in_widget` / `_shake` / `_countup_anims` / `_draw_anim`），C4-债 同族 bug 反复修 ≥5 次 | ✅ 已修（立项 → TO-TICKETS C1 → 在途注册表深化 + 落点迁移） | 本提交 |
 
 ---
 

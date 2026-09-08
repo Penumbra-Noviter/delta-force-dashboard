@@ -15,13 +15,12 @@ from __future__ import annotations
 
 __all__ = ["KpiPresenter"]
 
-import weakref
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QAbstractAnimation, QObject
+from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QLabel
 
-from app.motion import animate_value
+from app.motion import animate_value, finish, stop
 from app.theme import summary_style
 from presentation import format_signed_money, format_window_text
 from signals import RateSignal
@@ -49,8 +48,8 @@ def _kpi_signal(
 class KpiPresenter(QObject):
     """KPI 双磁贴（总盈亏 / 现金总变化）渲染器。
 
-    继承 QObject：animate_value 的动画对象以 self 为 Qt parent（防 GC），
-    与旧 MainWindow 持有动画的语义一致。
+    count-up 动画的宿主是各磁贴 label 本身（C1 深化）：在途句柄归
+    app.motion 的注册表，本类不再持有动画对象。
 
     Args:
         summary_label: 总盈亏磁贴大数字行。
@@ -58,9 +57,8 @@ class KpiPresenter(QObject):
         cash_summary_label: 现金总变化磁贴大数字行。
         cash_summary_caption: 现金总变化磁贴说明行。
 
-    前置条件：4 个 label 必须互异——per-tile 动画槽以 label 为键
-    （_countup_anims），重复注入同一 label 会使多槽位共享一个键位、
-    动画寻址失效。
+    前置条件：4 个 label 必须互异——在途动画以 label 为注册表键
+    （motion 侧），重复注入同一 label 会使两个磁贴共用一条在途动画。
     """
 
     def __init__(
@@ -78,10 +76,6 @@ class KpiPresenter(QObject):
         # W-01：count-up 上一帧数值（None = 尚未渲染过/数据不足）
         self._last_summary_total: float | None = None
         self._last_cash_delta: float | None = None
-        # C4-债2 per-tile 独立动画槽：label → 在途动画，键恒为动画目标磁贴。
-        # 自然结束 → finished → entry 移除 + deleteLater（C4-债3）——dict
-        # 与 Qt children 双双有界（0 ≤ len ≤ 2）。
-        self._countup_anims: dict[QLabel, QAbstractAnimation] = {}
 
     def update(self, logic: ProfitCalculatorLogic, view_n: int) -> None:
         """双磁贴全量渲染（说明 + 大数字 + count-up + 信号色样式）。
@@ -128,16 +122,11 @@ class KpiPresenter(QObject):
         切换是数据源更换，随后的 update 数字直接落终态——不做
         「旧账号数值滚动到新账号数值」的误导动画。
 
-        C4-债3：在途动画显式 stop + deleteLater 回收（stop 不发 finished
-        → deleteLater 必须显式）。引用环由 finished 闭包的 weakref 持有
-        破除（见 _set_kpi_value docstring 雷区说明）——本方法负责显式
-        回收：不调 reset 直接销毁 presenter 的路径（如测试 fixture 之外
-        的持有者）会留下 Stopped 动画静默泄漏（有环但无触发路径，不崩）。
+        C1 深化：在途动画的丢弃与回收归 motion.stop（零帧、出表、
+        deleteLater 一步不落）；本类只报「哪两个磁贴要归零」。
         """
-        for anim in self._countup_anims.values():
-            anim.stop()
-            anim.deleteLater()  # stop 不发 finished → 必须显式回收
-        self._countup_anims.clear()
+        stop(self._summary_label)
+        stop(self._cash_summary_label)
         self._last_summary_total = None
         self._last_cash_delta = None
 
@@ -189,77 +178,36 @@ class KpiPresenter(QObject):
     ) -> None:
         """KPI 磁贴数字落值：数值变化时 count-up 滚动（W-01），否则直接设置。
 
-        动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致；
-        动画对象挂 presenter 防 GC。
+        动画复用 format_signed_money 逐帧格式化，终态与直接设置完全一致。
 
-        C4-债2 per-tile 独立动画槽（A1 根治）：任何落值入口（动画分支或
-        直落分支）先按本次磁贴 label 弹出旧动画并统一 setCurrentTime(duration())
-        优雅落终——同磁贴重触发与直落共用同一落终路径，跨磁贴零触碰
-        （双磁贴同帧动画互不截断）。动画触发三条件（old != new 且均非
-        None 且 value != "数据不足"）满足时新动画写入本磁贴键位，否则
-        直落 setText（同调用内覆盖落终终帧，F1 终态不被残留帧改写）。
+        C4-债2 per-tile 独立动画（A1 根治）：在途动画以本磁贴 label 为
+        注册表键（motion 侧），跨磁贴零触碰（双磁贴同帧动画互不截断）。
 
-        C4-债3 生命周期收敛：新动画连接 finished → _pop_countup_anim——
-        自然结束 → finished → entry 移除 + deleteLater。落终路径（pop +
-        setCurrentTime(duration()) 同步触发 finished）时 entry 已弹出 →
-        handler no-op，旧动画由本入口显式 deleteLater 回收（两次 pop
-        安全）。
+        C4-债2 落终路径 + C1 深化：任何落值入口先对本次磁贴 label 调
+        ``motion.finish`` 优雅落终（旧动画终值先写到位），再按三条件
+        （old != new 且均非 None 且 value != "数据不足"）决定是否播新
+        count-up；不播则直落 setText（同调用内覆盖落终终帧，F1 终态不被
+        残留帧改写）。
 
-        引用环雷区：finished 闭包捕获 presenter 会形成引用环（动画 ←
-        信号连接 ← 闭包 ← presenter）——若窗口销毁（未 reset）时环不破，
-        presenter 与在途动画存活，动画迟到 valueChanged 帧会写已销毁的
-        label（access violation）。闭包以 weakref 持有 presenter 破环：
-        presenter 失去唯一强引用（窗口 GC）即随 C++ 树销毁、动画随父
-        销毁、连接随对象销毁，无迟到触发；直接持有 presenter 的路径
-        （测试 fixture）仍必须先 stop 在途动画（reset）再冲刷 deleteLater
-        ——reset 显式回收是 children 归零的唯一通道，stop 不发 finished
-        → deleteLater 必须显式。Stopped 动画静默泄漏不崩。
+        C4-债3/5 的引用环雷区（finished 闭包捕获宿主 → 窗口销毁后迟到
+        valueChanged 帧写已销毁 label → access violation）由 motion 统一
+        处置：动画以 label 为 Qt parent（label 亡则动画亡），finished
+        处理器 weakref 取宿主 + identity 检查。本类不再持有动画对象。
         """
-        prev = self._countup_anims.pop(label, None)
-        if prev is not None:
-            prev.setCurrentTime(prev.duration())
-            # C4-债3：落终路径 finished 同步触发时 entry 已被 pop →
-            # handler no-op，此处显式回收旧动画（自然结束路径由
-            # _pop_countup_anim 回收）。
-            prev.deleteLater()
+        finish(label)
         if (
             old is not None
             and new is not None
             and old != new
             and value != "数据不足"
         ):
-            anim = animate_value(
-                self,
+            if not animate_value(
+                label,
                 old,
                 new,
                 lambda v: label.setText(format_signed_money(v)[0]),
                 duration_ms=300,
-            )
-            if anim is not None:
-                self._countup_anims[label] = anim
-                # C4-债3：自然结束 → finished → 回收链（entry 移除 + deleteLater）。
-                # 闭包以 weakref 持有 presenter 破引用环（见 docstring 雷区说明）
-                # ——窗口销毁时 presenter 失强引用即随 C++ 树销毁，动画与连接
-                # 随之消亡，无迟到触发。
-                owner = weakref.ref(self)
-
-                def _on_finished() -> None:
-                    presenter = owner()
-                    if presenter is not None:
-                        presenter._pop_countup_anim(label, anim)
-
-                anim.finished.connect(_on_finished)
+            ):
+                label.setText(value)  # 动效关闭：直接落终态
         else:
             label.setText(value)
-
-    def _pop_countup_anim(self, label: QLabel, anim: QAbstractAnimation) -> None:
-        """finished 后回收动画：从在途映射移除 entry + deleteLater。
-
-        identity 检查（``get(label) is anim``）保证同步/异步 finished 均无
-        竞争：落终路径下 finished 同步触发时 entry 已被弹出 → no-op；
-        若槽内已是更新的动画（同磁贴再触发后旧动画迟到 finish）→ 不误删
-        新 entry。
-        """
-        if self._countup_anims.get(label) is anim:
-            self._countup_anims.pop(label, None)
-            anim.deleteLater()
