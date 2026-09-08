@@ -524,14 +524,36 @@ def test_profit_page_preload_fans_out_to_children(qapp) -> None:
 
 
 def test_default_render_error_delegates_to_empty_render(qapp, monkeypatch) -> None:
-    """C2-05：基类默认钩子仅委托 _render_data([])（错误路径行为逐字节等价）。"""
-    from app.exchange_page import ExchangePage
+    """C2-05 + C3：基类默认钩子仅委托 _render_data([])（错误路径行为逐字节等价）。
 
-    page = ExchangePage(client=make_stub_client())
+    C3 后三页各自覆盖 `_render_error`（错误态与空态可区分），故用最小子类
+    直接验证基类默认实现。
+    """
+    from app.fetch_page_base import FetchPageBase
+
     calls: list[list] = []
-    monkeypatch.setattr(page, "_render_data", lambda data: calls.append(data))
+
+    class _Page(FetchPageBase):
+        def _fetch(self) -> list:
+            return []
+
+        def _build_body(self, layout) -> None:
+            return None
+
+        def _render_data(self, data) -> None:
+            calls.append(data)
+
+    page = _Page(client=make_stub_client())
     page._render_error()
     assert calls == [[]]  # 默认实现 = 空态渲染，无额外行为
+
+
+def test_base_has_no_write_only_data_member(qapp) -> None:
+    """C3：基类删除只写不读的 `_data` 僵尸成员（渲染经参数传递，不靠自持状态）。"""
+    from app.crafting_page import CraftingPage
+
+    page = CraftingPage(client=make_stub_client())
+    assert not hasattr(page, "_data")
 
 
 def test_crafting_error_invokes_render_error_hook(qapp, monkeypatch) -> None:
@@ -585,8 +607,8 @@ def test_crafting_error_renders_distinct_from_empty(qapp) -> None:
     page.hide()
 
 
-def test_exchange_error_path_renders_empty_state(qapp) -> None:
-    """C2-05：兑换页未覆盖钩子——错误路径渲染 == 空态（现状等价）。"""
+def test_exchange_error_renders_distinct_from_empty(qapp) -> None:
+    """C3：兑换页错误态与空态可区分（此前未覆盖钩子 → 错误时卡片显示空态文案）。"""
     from app.exchange_page import ExchangePage
     from kkrb_client import KkrbError
 
@@ -602,8 +624,10 @@ def test_exchange_error_path_renders_empty_state(qapp) -> None:
     assert worker.wait(5000)
     qapp.processEvents()
 
+    assert page._status_label.text() == "⚠ 数据获取失败，点击重试"
     for card in page._cards:
-        assert card._item_name.text() == "暂无数据"
+        assert card._item_name.text() == "加载失败，点击重试"
+        assert card._item_name.text() != "暂无数据"  # 与空态可区分
     page.hide()
 
 

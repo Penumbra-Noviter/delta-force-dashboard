@@ -5,6 +5,13 @@
 showEvent 懒加载、加载/成功/错误三件套、refresh/preload/shutdown
 与 _load_state/_worker/_client 状态机全部收敛于此；
 子类只需提供数据获取函数、页面主体构建与数据渲染。
+
+**状态面归基类、渲染归子类（C3 深化）**：三态由调用路径表达——
+加载中/失败写 `_status_label`（基类），成功与空态走 `_render_data(data)`，
+错误态走 `_render_error()`；空/错态占位文案单源为 `_EMPTY_TEXT` /
+`_ERROR_TEXT` 两个类常量，子类渲染时引用，不再各写字面量。基类默认
+`_render_error()` = 空态渲染（状态标签已承载错误提示），需要卡片级
+可区分错误态的子类覆盖之。
 """
 
 from __future__ import annotations
@@ -51,12 +58,19 @@ class FetchPageBase(QWidget):
     - ``_fetch()``：返回数据列表的可调用实现（在后台线程执行）
     - ``_build_body(layout)``：在标题栏下方构建页面主体
     - ``_render_data(data)``：将数据渲染到已构建的主体
+
+    子类可覆盖 ``_render_error()`` 提供与空态可区分的错误渲染
+    （占位文案用 ``_ERROR_TEXT`` / ``_EMPTY_TEXT`` 单源常量）。
     """
 
     #: 标题栏文案（子类覆盖）
     _title = "数据页面"
     #: 日志文案前缀（子类覆盖，如「制造产物」「弹药包」）
     _page_name = "数据页面"
+    #: 空态占位文案（C3：单源，子类渲染引用）
+    _EMPTY_TEXT = "暂无数据"
+    #: 错误态占位文案（C3：单源，与空态可区分）
+    _ERROR_TEXT = "加载失败，点击重试"
 
     def __init__(self, parent: QWidget | None = None,
                  client: KkrbClient | None = None) -> None:
@@ -72,7 +86,6 @@ class FetchPageBase(QWidget):
         self._load_state = LoadState()
         self._shut_down = False
         self._worker: FetchWorker | None = None
-        self._data: list[Any] = []
 
         self._build_ui()
 
@@ -156,7 +169,6 @@ class FetchPageBase(QWidget):
 
     def _on_fetch_done(self, data: list[Any]) -> None:
         self._load_state.succeed()
-        self._data = data
         self._status_label.setVisible(False)
         self._refresh_btn.setEnabled(True)
         self._render_data(data)
@@ -173,7 +185,6 @@ class FetchPageBase(QWidget):
         # 错误状态：label 可点击重试（U-07，文案与行为一致）
         self._status_label.setVisible(True)
         self._status_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self._data = []
         self._refresh_btn.setEnabled(True)
         self._render_error()
 
@@ -181,7 +192,8 @@ class FetchPageBase(QWidget):
         """错误态渲染钩子（C2-05）。
 
         默认实现 = 空态渲染（等价 ``_render_data([])``，错误路径行为与
-        现状逐字节等价）；子类可覆盖为与空态可区分的错误文案。
+        现状逐字节等价——状态标签已承载错误提示）；子类覆盖为与空态
+        可区分的卡片级错误文案时用 ``_ERROR_TEXT``（C3 单源）。
         """
         self._render_data([])
 

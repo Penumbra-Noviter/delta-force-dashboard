@@ -10,7 +10,7 @@ Windows 桌面收益追踪工具（PySide6）：每日记录现金/仓库价值�
 python -m venv venv && venv\Scripts\activate   # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 python main.py                                # 运行（运行态数据落在 ~/Delta Force Dashboard/）
-pytest                                        # 全量测试（642 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
+pytest                                        # 全量测试（643 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
 python scripts/doc_sync.py --check            # CODE_WIKI 机械标记防漂移（pre-commit 钩子自动跑）
 python scripts/doc_sync.py                    # 改代码后刷新 CODE_WIKI 的测试数/行数/签名标记
 ```
@@ -31,6 +31,7 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
 - 架构评审按强度顺序推进（`improve-codebase-architecture` 全库审查 7 项候选）：
   - **C1 ✅**：动画句柄生命周期回归 `app/motion.py`——在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 内化；四落点迁移 + `tests/test_motion.py` 11 例
   - **C2 ✅**：删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 绕环延迟导入，判定归位私有 `_window_signal`
-  - 状态：**642/642 测试**、doc_sync 双绿；候选 C3~C6（Strong）与 C7（Worth exploring）在 TECH_DEBT 候选池
-- 下一步：C3（FetchPageBase 删只写不读的 `_data`，空/错态判定上收一次）
+  - **C3 ✅**：FetchPageBase 删只写不读的 `_data`；空/错态占位文案单源为类常量 `_EMPTY_TEXT`/`_ERROR_TEXT`；ExchangePage 补 `_render_error`（错误态不再与空态同形）
+  - 状态：**643/643 测试**、doc_sync 双绿；候选 C4~C6（Strong）与 C7（Worth exploring）在 TECH_DEBT 候选池
+- 下一步：C4（KPI 动画改读语义不读「数据不足」展示文案）
 - 清场保持：`.worktrees/` 与 `.scratch/` 空，分支仅 main

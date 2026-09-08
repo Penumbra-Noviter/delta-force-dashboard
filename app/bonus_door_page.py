@@ -48,7 +48,7 @@ class BonusDoorPage(FetchPageBase):
         self._card_grid.setSpacing(12)
         self._cards: list[QFrame] = []
 
-        self._placeholder = QLabel("暂无数据")
+        self._placeholder = QLabel(self._EMPTY_TEXT)
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setVisible(False)
 
@@ -112,18 +112,18 @@ class BonusDoorPage(FetchPageBase):
         self._placeholder.setVisible(True)
 
     def _render_data(self, data: list[BonusDoorItem]) -> None:
-        """按数据动态重建卡片网格；空数据 → 显式占位「暂无数据」。"""
+        """按数据动态重建卡片网格；空数据 → 显式占位（``_EMPTY_TEXT``）。"""
         items = data or []
         self._rebuild_cards(items)
         if items:
             self._placeholder.setVisible(False)
         else:
-            self._show_placeholder("暂无数据")
+            self._show_placeholder(self._EMPTY_TEXT)
 
     def _render_error(self) -> None:
-        """错误态渲染：占位「加载失败，点击重试」（与空态可区分，C2-05）。"""
+        """错误态渲染：占位 ``_ERROR_TEXT``（与空态可区分，C2-05 + C3 单源）。"""
         self._rebuild_cards([])
-        self._show_placeholder("加载失败，点击重试")
+        self._show_placeholder(self._ERROR_TEXT)
 
     def apply_theme(self) -> None:
         """主题切换钩子：仅刷新基类图标（IC-03）。

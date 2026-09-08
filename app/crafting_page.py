@@ -66,7 +66,7 @@ class CraftingPage(FetchPageBase):
         card._station_label.setObjectName("craftStation")
         cl.addWidget(card._station_label)
 
-        card._product_label = QLabel("暂无数据")
+        card._product_label = QLabel(self._EMPTY_TEXT)
         card._product_label.setObjectName("craftProduct")
         # U-02：卡片主角名归 section 档（原 18px 越过页面标题 16px 层级）
         card._product_label.setStyleSheet("font-size: 16px; font-weight: bold;")
@@ -92,8 +92,8 @@ class CraftingPage(FetchPageBase):
         """重置一张台位卡为占位态：站名 —、产物 product_text、其余字段清空。
 
         AA-02：_render_data 空槽位与 _render_error 共用同一清空逻辑
-        （仅产物文案不同：「暂无数据」空态 / 「加载失败，点击重试」错误态），
-        消除两处 5 字段重置循环的重复。
+        （仅产物文案不同：``_EMPTY_TEXT`` 空态 / ``_ERROR_TEXT`` 错误态，
+        C3 单源），消除两处 5 字段重置循环的重复。
         """
         card._station_label.setText("—")
         card._product_label.setText(product_text)
@@ -114,7 +114,7 @@ class CraftingPage(FetchPageBase):
                 product = products[i]
                 card._station_label.setText(product.station or "—")
                 card._product_label.setText(
-                    product.product if product.product else "暂无数据"
+                    product.product if product.product else self._EMPTY_TEXT
                 )
                 card._profit_label.setText(
                     f"总利润：{format_money(product.profit)}"
@@ -126,16 +126,16 @@ class CraftingPage(FetchPageBase):
                     f"建议出售时段：{product.sell_time}"
                 )
             else:
-                self._reset_card(card, "暂无数据")
+                self._reset_card(card, self._EMPTY_TEXT)
 
     def _render_error(self) -> None:
         """错误态渲染：与空态可区分的错误文案（C2-05，spec 4.2.10）。
 
-        经 _reset_card 共享清空逻辑（AA-02），产物文案「加载失败，点击重试」
-        （空态为「暂无数据」）——用户可分辨「没数据」与「出错了」。
+        经 _reset_card 共享清空逻辑（AA-02），产物文案取 ``_ERROR_TEXT``
+        （空态为 ``_EMPTY_TEXT``，C3 单源）——用户可分辨「没数据」与「出错了」。
         """
         for card in self._cards:
-            self._reset_card(card, "加载失败，点击重试")
+            self._reset_card(card, self._ERROR_TEXT)
 
     def apply_theme(self) -> None:
         """主题切换钩子：仅刷新基类图标（IC-03）。

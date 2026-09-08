@@ -169,9 +169,9 @@ class ExchangePage(FetchPageBase):
             )
 
     def _update_card(self, card: QFrame, item: AmmoPackageItem | None) -> None:
-        """更新卡片内容。"""
+        """更新卡片内容（``item is None`` → 空态占位，``_EMPTY_TEXT`` 单源）。"""
         if item is None:
-            card._item_name.setText("暂无数据")
+            card._item_name.setText(self._EMPTY_TEXT)
             card._grade_label.setText("")
             card._profit.setText("")
             card._price.setText("")
@@ -201,3 +201,14 @@ class ExchangePage(FetchPageBase):
                 break
             best = best_by_package.get(cfg.display_name)
             self._update_card(self._cards[i], best)
+
+    def _render_error(self) -> None:
+        """错误态渲染：卡片条目文案取 ``_ERROR_TEXT``（C3，与空态可区分）。
+
+        补上兑换页此前缺失的错误态（C2-05 惯例只在制造/密码门两页落地）：
+        此前错误与空态共用 ``_render_data([])``，卡片显示「暂无数据」——
+        用户只能靠状态标签分辨。现在三页错误态一致可区分。
+        """
+        for card in self._cards:
+            self._update_card(card, None)
+            card._item_name.setText(self._ERROR_TEXT)

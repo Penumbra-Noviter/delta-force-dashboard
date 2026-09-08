@@ -59,9 +59,10 @@
 | Ticket | 标题 | 完成 | 提交 |
 |--------|------|------|------|
 | C1 | 动画句柄生命周期回归 `app/motion.py`：在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 关键帧内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）；六条 u06 契约换观测点 + `tests/test_motion.py` 11 例 | ✅ 2026-09-08 | `1508728` |
-| C2 | 删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 调用期延迟导入：判定归位 presenter 私有 `_window_signal`（AA-01 单一来源不漂移），跨模块 import 与循环依赖消失；守卫测试改扫描目标；顺带修正 CODE_WIKI §4.19 的 C1 后残留叙述 | ✅ 2026-09-08 | 本提交 |
+| C2 | 删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 调用期延迟导入：判定归位 presenter 私有 `_window_signal`（AA-01 单一来源不漂移），跨模块 import 与循环依赖消失；守卫测试改扫描目标；顺带修正 CODE_WIKI §4.19 的 C1 后残留叙述 | ✅ 2026-09-08 | `266faaf` |
+| C3 | FetchPageBase 删只写不读的 `_data` 僵尸成员；空/错态占位文案单源为类常量 `_EMPTY_TEXT`/`_ERROR_TEXT`（三页引用）；ExchangePage 补 `_render_error` 覆盖（错误态此前与空态同形）；+2 测试（基类默认钩子最小子类验证、`_data` 缺席守卫） | ✅ 2026-09-08 | 本提交 |
 
-期末验证：**642/642 全绿**（55.8s / C2 后 144 项相关用例重跑通过）、doc_sync 双绿；diff 8 文件（C1）+ 6 文件（C2）；行为零变化（三种关动效语义、count-up 落终路径、图表揭示动画逐帧等价；KPI 信号判定语义与格式完全不变）。
+期末验证：**643/643 全绿**（56.1s）、doc_sync 双绿（先 update 6 标记再 check）；diff 逐批次 8/6/8 文件；行为变化仅 C3 一处（兑换页错误态文案由「暂无数据」改为「加载失败，点击重试」，与制造/密码门两页对齐）。
 
 ### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
 

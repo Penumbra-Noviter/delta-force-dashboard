@@ -24,6 +24,13 @@
   - **顺带修正**：CODE_WIKI §4.19 叙述仍是 C1 前的形态（`_countup_anims` 字典槽 + presenter 侧生命周期），已改写为注册表 + motion 持有。
   - **验收**：相关 144 项（ui_smoke/kpi_presenter/dashboard_page）重跑通过；全量 642/642、doc_sync 双绿。
 
+- **C3 落地（同批次，Strong）——FetchPageBase 删僵尸 `_data` + 空/错态文案单源**：
+  - **问题**：`_data` 三处赋值零读取（删除测试通过）；空/错态占位文案字面量散落（「暂无数据」×8、「加载失败，点击重试」×4）；ExchangePage 无 `_render_error` 覆盖 → 错误时卡片显示「暂无数据」，只能靠状态标签分辨。
+  - **决策（grilling）**：状态区分已天然存在于「哪个钩子被调用」（`_on_fetch_done → _render_data` / `_on_fetch_error → _render_error`），故不引入三态枚举（(C) 是在已有区分之上再包一层）；取 (B)——删 `_data` + 类常量 `_EMPTY_TEXT`/`_ERROR_TEXT` 单源 + exchange 补 5 行错误态。
+  - **变更**：`fetch_page_base` 删 `_data`（三处）并新增两个类常量；crafting/bonus/exchange 三页渲染改引用常量；exchange 新增 `_render_error`（卡片条目文案 `_ERROR_TEXT`）。
+  - **测试**：`test_default_render_error_delegates_to_empty_render` 改用最小子类验证基类默认（三页均已覆盖钩子）；`test_exchange_error_path_renders_empty_state` → `test_exchange_error_renders_distinct_from_empty`（断言可区分）；新增 `test_base_has_no_write_only_data_member`（`_data` 缺席守卫）。
+  - **验收**：相关 160 项（fetch_pages/bonus_door/ui_smoke）重跑通过；全量 643/643、doc_sync 双绿。
+
 ---
 
 - **简化审计 + 变更（simplify-codebase skill，Survey→Change，全绿 631/631、doc_sync 双绿）**：
