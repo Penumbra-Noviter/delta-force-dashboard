@@ -53,6 +53,14 @@
   - **变更**：删 `MainWindow._view_n`（init/`_on_view_changed`/`_get_records`/`_update_summary`/`_apply_kpi_styles` 五处）→ 统一查询 `self.table.current_view()`；`_on_view_changed(n)` 仅 `refresh_display()`（早退比对一并删除——表格只在实际变化时发信号）；删 `VIEW_DAYS` 死 import；`TableWidget` 类 docstring 同步（C6：MainWindow 不持镜像）。
   - **测试**：三处双断言改为单一来源断言（`table.current_view()`），`test_view_default_is_7` 加 `not hasattr(win, "_view_n")` 缺席守卫。
   - **验收**：全量 642/642（测试数不变）、doc_sync 双绿；行为零变化（净删除）。
+
+- **C7 落地（同批次，Worth exploring）——主题刷新从约定制变接口（收口）**：
+  - **问题**：刷新器集合靠 `hasattr(widget,"apply_theme")` 运行时反射遍历子树收集，且带「父有 apply_theme 则不再下钻」的隐式规则（防 profit_page 双扇出）；同一 `apply_theme` 下 `TableWidget` 实为整表重绘、`ChartWidget`/KPI 才是真增量——代价差异只写在注释里。
+  - **决策（grilling）**：Q18 (A) 显式登记列表（与 C4-01 删 registry、C5 接线归 `_connect_signals` 同一方向）；Q19 (A) 保留 table 整表重绘、把代价显式声明（真「仅重着色」是渲染路径重构，收益 < 风险）。
+  - **变更**：`_collect_theme_refreshers` → `_register_theme_refreshers`（显式 6 元列表：sidebar/input_panel/table/chart/profit_page/bonus_door_page；边界注释：KpiPresenter 非 QWidget、签名不同，仍走 `_apply_kpi_styles`）；`table_widget.apply_theme` docstring 补「整表重绘 O(行数)、零取数、差异刻意」；`fetch_page_base.apply_theme` docstring 同步（不再说「自动纳入树遍历」）。
+  - **测试**：`test_theme_refreshers_collected_at_startup` → `test_theme_refreshers_registered_explicitly`（列表逐项相等 + 顺序 + 防双扇出 + 登记方法零 `hasattr` 反射守卫）；覆盖性用例照旧（独立走树校验）。
+  - **验收**：全量 642/642、doc_sync 双绿（先 update 3 标记）。
+  - **批次收口**：7 项候选全部处置（C1~C5 Strong + C6/C7 Worth exploring），TECH_DEBT 候选区仅剩 DFD-7（测试基建，非评审候选）。
   - **发现（未修，记 TECH_DEBT DFD-7）**：`pytest tests/test_fetch_pages.py` 单独运行时 36 项全通过但解释器退出码 `0xC0000374`（heap corruption）；与任一其它文件同跑即 exit 0。**经 `git stash` 回到 C3 基线复现**——与 C4 无关的既有测试基建问题（疑 Qt/QThread 析构顺序），本轮不扩范围修。
 
 ---

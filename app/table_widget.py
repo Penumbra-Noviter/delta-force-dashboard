@@ -535,6 +535,12 @@ class TableWidget(QWidget):
         （幂等：文本不变，仅颜色随当前主题重解析）；从未 draw 时
         仅刷新按钮样式（表格本为空）。get_color 在方法体内解析，
         避免 import 期冻结（AST 防复发检查）。
+
+        **代价显式化（C7）**：本方法走的是**整表重绘**（O(行数)，≤30 行）
+        ——单元格前景/背景色只能随渲染设置，无法像 chart/kpi 那样只改笔色；
+        与其他组件「真增量换色」的差异是刻意的。零取数：只用 `_last_records`
+        / `_last_today` 缓存，`_get_records` 不被调用（由
+        `test_refresh_theme_does_not_redraw_data` 锁定）。
         """
         self._update_view_btn_styles()
         if self._last_records is None:

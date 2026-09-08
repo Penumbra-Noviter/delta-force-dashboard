@@ -125,9 +125,9 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._connect_signals()
         self._apply_qss()
-        # C1-08：仪表盘组件已全部入树后收集主题刷新器并首次应用
+        # C1-08 + C7：全部组件装配完成后显式登记主题刷新器并首次应用
         # （E2：sidebar 首帧主题完整，不依赖首次切换）
-        self._collect_theme_refreshers()
+        self._register_theme_refreshers()
         self._apply_theme_refreshers()
         # Y-03：标题栏显示当前账号名（注入模式无账号概念，保持原标题）
         self._update_account_title()
@@ -451,24 +451,28 @@ class MainWindow(QMainWindow):
         # C1-08：sidebar 由 _theme_refreshers 统一调用（启动期已应用，
         # E2）；此处不再直插，避免双路径
 
-    def _collect_theme_refreshers(self) -> None:
-        """启动期遍历子树收集具 apply_theme 的组件（自顶向下、父拥有子树）。
+    def _register_theme_refreshers(self) -> None:
+        """装配完成后显式登记主题刷新器（C7：替代运行时反射收集）。
 
-        节点有 apply_theme 即收集且不再下钻——profit_page 入列时
-        crafting/exchange 不得重复入列（防双扇出）；新组件只要实现
-        apply_theme 即自动纳入刷新（C1-08 契约）。
+        显式列表取代反射与「父有 apply_theme 则不下钻」的隐式规则：
+        刷新集合与顺序在代码里可见、可 review；漏登记由
+        `tests/test_ui_smoke.py::test_theme_refreshers_cover_all_apply_theme_widgets`
+        拦下（该用例独立走树校验「每个具 apply_theme 的组件被列表或其祖先覆盖」）。
+        守卫：`test_theme_refreshers_registered_explicitly` 断言本方法体不含反射判定。
+
+        边界：`KpiPresenter` 不是 QWidget 且签名为
+        `apply_theme_styles(logic, view_n)`，由 `refresh_theme` 的
+        `_apply_kpi_styles` 独立调用，不进本列表；`ProfitPage` 入列并扇出
+        crafting / exchange（单出口，防双扇出）。
         """
-        self._theme_refreshers: list[QWidget] = []
-
-        def walk(widget: QWidget) -> None:
-            if hasattr(widget, "apply_theme"):
-                self._theme_refreshers.append(widget)
-                return
-            for obj in widget.children():
-                if isinstance(obj, QWidget):
-                    walk(obj)
-
-        walk(self)
+        self._theme_refreshers: list[QWidget] = [
+            self.sidebar,
+            self.input_panel,
+            self.table,
+            self.chart,
+            self.profit_page,
+            self.bonus_door_page,
+        ]
 
     def _apply_theme_refreshers(self) -> None:
         """统一调用全部主题刷新器（启动期与 refresh_theme 共用）。"""

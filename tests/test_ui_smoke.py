@@ -2247,27 +2247,36 @@ def test_startup_combo_excludes_illegal_accounts(account_window_factory):
         win.close()
 
 
-# ── C1-08. 主题刷新契约（树遍历收集 + refresh_theme 解耦）──
+# ── C1-08 / C7. 主题刷新契约（显式登记列表 + refresh_theme 解耦）──
 
 
-def test_theme_refreshers_collected_at_startup(sample_window):
-    """C1-08：_theme_refreshers 非空且含 sidebar/input_panel/chart/table/profit_page。"""
+def test_theme_refreshers_registered_explicitly(sample_window):
+    """C1-08 + C7：`_theme_refreshers` 是装配期显式列表（顺序与成员固定，零反射）。
+
+    观测点：列表内容与顺序逐项相等（C7 取代树遍历后，集合在代码里可见）；
+    并守卫登记方法内不出现 `hasattr`（防反射回归）。
+    """
+    import inspect
+
+    from app.main_window import MainWindow
+
     win = sample_window
     refreshers = win._theme_refreshers
-    assert refreshers, "启动期必须收集到主题刷新器"
-    members = {id(w) for w in refreshers}
-    for expected in (
+    assert refreshers == [
         win.sidebar,
         win.input_panel,
-        win.chart,
         win.table,
+        win.chart,
         win.profit_page,
-        win.bonus_door_page,  # BD-03：密码门页具 apply_theme，自动纳入（C1-08 契约）
-    ):
-        assert id(expected) in members, f"{type(expected).__name__} 未入列"
+        win.bonus_door_page,  # BD-03：密码门页具 apply_theme，直接登记
+    ]
     # 防双扇出：profit_page 入列时 crafting/exchange 不得重复入列
+    members = {id(w) for w in refreshers}
     assert id(win.profit_page.crafting_page) not in members, "crafting 不应重复入列"
     assert id(win.profit_page.exchange_page) not in members, "exchange 不应重复入列"
+    # C7：登记不再依赖运行时反射
+    src = inspect.getsource(MainWindow._register_theme_refreshers)
+    assert "hasattr" not in src, "刷新器登记不得回退到 hasattr 反射收集"
 
 
 def test_theme_refreshers_cover_all_apply_theme_widgets(sample_window):

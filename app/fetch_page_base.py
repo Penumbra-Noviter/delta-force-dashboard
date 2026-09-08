@@ -205,9 +205,10 @@ class FetchPageBase(QWidget):
     def apply_theme(self) -> None:
         """根据当前主题重建刷新按钮图标（IC-03）。
 
-        自动纳入 _theme_refreshers 树遍历（C1-08 契约：实现 apply_theme
-        即被收集）；子类覆盖本方法时必须调用 super()，否则刷新按钮图标
-        在主题切换后颜色过时。
+        由 MainWindow 的显式刷新器列表调用（C1-08 契约 + C7：列表登记，
+        不再树遍历自动收集——数据页经 ProfitPage 扇出/密码门页直接登记）；
+        子类覆盖本方法时必须调用 super()，否则刷新按钮图标在主题切换后
+        颜色过时。
         """
         from app.theme import get_color  # noqa: PLC0415
 

@@ -63,9 +63,12 @@
 | C3 | FetchPageBase 删只写不读的 `_data` 僵尸成员；空/错态占位文案单源为类常量 `_EMPTY_TEXT`/`_ERROR_TEXT`（三页引用）；ExchangePage 补 `_render_error` 覆盖（错误态此前与空态同形）；+2 测试（基类默认钩子最小子类验证、`_data` 缺席守卫） | ✅ 2026-09-08 | `327c07b` |
 | C4 | KPI count-up 判据改纯语义（删 `value != "数据不足"` 展示文案判据——`new is None` 已覆盖）；加载中文案单源为 `_LOADING_TEXT`（状态标签 ⟳ 前缀 + exchange 卡片初始占位）；+2 测试（源码守卫「本模块无展示文案字面量」、加载中文案单源） | ✅ 2026-09-08 | `c8514b0` |
 | C5 | 仪表盘页族同构：`DashboardPage(QWidget)` 取代 `build_dashboard(mw)`（构造参数即接口、标签公开、删工厂转发）；7 组信号接线归 `MainWindow._connect_signals`；`_build_card` 内迁 `_card_frame()`；MainWindow 私读与副作用写回全消 | ✅ 2026-09-08 | `bfa01dd` |
-| C6 | 视图窗口单 Owner：删 `MainWindow._view_n` 镜像（`_get_records`/`_update_summary`/`_apply_kpi_styles` 改查 `table.current_view()`）；`_on_view_changed` 去状态比对（表格只在实际变化时发信号）；测试改断言单一来源 + `_view_n` 缺席守卫 | ✅ 2026-09-08 | 本提交 |
+| C6 | 视图窗口单 Owner：删 `MainWindow._view_n` 镜像（`_get_records`/`_update_summary`/`_apply_kpi_styles` 改查 `table.current_view()`）；`_on_view_changed` 去状态比对（表格只在实际变化时发信号）；测试改断言单一来源 + `_view_n` 缺席守卫 | ✅ 2026-09-08 | `3022e6a` |
+| C7 | 主题刷新从约定制变接口：`_register_theme_refreshers` 显式登记列表取代 `hasattr` 树遍历（零反射守卫 + 覆盖性测试照旧）；`table.apply_theme` 的整表重绘代价显式声明（从缓存、零取数） | ✅ 2026-09-08 | 本提交 |
 
-期末验证：**642/642 全绿**（66.3s）、doc_sync 双绿（先 update 2 标记再 check）；diff 逐批次 8/6/8/5/7/4 文件；行为零变化（C6 为净删除：同一事实唯一主人回归 ADR-0003 Q8 定案）。行为变化仅 C3 一处（兑换页错误态文案）；另记测试基建发现 DFD-7（`test_fetch_pages.py` 单独运行 heap corruption，与生产代码无关）。
+期末验证：**642/642 全绿**（62.5s）、doc_sync 双绿（先 update 3 标记再 check）；diff 逐批次 8/6/8/5/7/4/4 文件；行为零变化（C6/C7 均为净删除或纯文档化）。行为变化仅 C3 一处（兑换页错误态文案）；另记测试基建发现 DFD-7（`test_fetch_pages.py` 单独运行 heap corruption，与生产代码无关）。
+
+**评审批次收口（2026-09-08）**：7 项候选全部处置完毕（C1~C5 Strong 全做、C6/C7 Worth exploring 全做），TECH_DEBT 候选区仅剩 DFD-7（测试基建，非评审候选）。
 
 ### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
 

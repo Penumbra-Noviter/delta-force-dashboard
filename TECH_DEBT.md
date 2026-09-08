@@ -52,7 +52,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-6 | 主题刷新是约定制：`hasattr` 树遍历收集 + 六组件各自私藏「换色记忆」；同一 `apply_theme` 下 TableWidget 实为整表重绘、ChartWidget 才是真增量（隐藏代价差异） | 架构评审 C7 | Worth exploring | 📝 待立项 | GUI |
 | DFD-7 | `pytest tests/test_fetch_pages.py` **单独运行**时全部用例通过但解释器退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION）；与任一其它测试文件同跑则 exit 0——疑为 Qt/QThread 析构顺序（页面/FetchWorker 未走 show/wait/hide 或 worker 在途时宿主先亡）。生产代码无关联（C4 验收时发现，C3 基线同样复现） | C4 验收发现 | Worth exploring | 📝 待立项 | 测试基建 |
 
 ### 复核关闭（Speculative 类，防重复提议）
@@ -71,7 +70,8 @@
 | C3 | `fetch_page_base._data` 只写不读 + 基类空/错态不可分 + 占位文案字面量散落 | ✅ 已修（立项 → TO-TICKETS C3 → 删 `_data` + 文案单源类常量 + exchange 补错误态） | `327c07b` |
 | C4 | `kpi_presenter` 按展示文案字面量决定动画分支（改文案即静默改变行为）+ 加载中文案两处各写 | ✅ 已修（立项 → TO-TICKETS C4 → 纯语义判据 + `_LOADING_TEXT` 单源 + 源码守卫） | `c8514b0` |
 | C5 | `build_dashboard(mw)` 反向依赖宿主（7 私有槽 + `_build_card` + 高度 + today）+ 副作用写回 + MainWindow 私读页面标签 | ✅ 已修（立项 → TO-TICKETS C5 → `DashboardPage` 页族同构 + 接线归 MainWindow） | `bfa01dd` |
-| C6 | 视图窗口同一事实两份（`MainWindow._view_n` 镜像 `TableWidget._view_days`），靠一条信号维持相等 | ✅ 已修（立项 → TO-TICKETS C6 → 删镜像，查询 `current_view()` 单一来源） | 本提交 |
+| C6 | 视图窗口同一事实两份（`MainWindow._view_n` 镜像 `TableWidget._view_days`），靠一条信号维持相等 | ✅ 已修（立项 → TO-TICKETS C6 → 删镜像，查询 `current_view()` 单一来源） | `3022e6a` |
+| C7 | 主题刷新约定制（`hasattr` 树遍历 + 隐式「父有则不下钻」）+ `table.apply_theme` 整表重绘的隐藏代价 | ✅ 已修（立项 → TO-TICKETS C7 → 显式登记列表 + 代价显式声明） | 本提交 |
 
 ---
 

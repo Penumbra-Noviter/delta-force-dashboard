@@ -35,6 +35,7 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
   - **C4 ✅**：KPI count-up 判据改纯语义（删展示文案判据）+ 源码守卫；加载中文案单源 `_LOADING_TEXT`
   - **C5 ✅**：仪表盘页族同构 `DashboardPage(QWidget)`（构造参数即接口、标签公开）；7 组信号接线归 `MainWindow._connect_signals`；`_build_card` 内迁 `_card_frame()`
   - **C6 ✅**：删 `MainWindow._view_n` 镜像，视图条数唯一来源 `table.current_view()`（回归 ADR-0003 Q8 定案）
-  - 状态：**642/642 测试**、doc_sync 双绿；候选 C7（Worth exploring）在 TECH_DEBT 候选池（另有 C4 验收发现的 DFD-7 测试基建项）
-- 下一步：C7（主题刷新从约定制变接口）
+  - **C7 ✅**：主题刷新显式登记列表取代 `hasattr` 树遍历（零反射守卫）；`table.apply_theme` 整表重绘代价显式声明
+  - 状态：**642/642 测试**、doc_sync 双绿；**评审 7 项候选全部处置完毕**，TECH_DEBT 候选区仅剩 DFD-7（测试基建项：`test_fetch_pages.py` 单独运行 heap corruption）
+- 下一步：无遗留评审候选；如需继续，DFD-7 可作为独立工单（与生产代码无关）
 - 清场保持：`.worktrees/` 与 `.scratch/` 空，分支仅 main

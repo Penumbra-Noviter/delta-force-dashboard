@@ -173,7 +173,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~646 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~651 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -261,7 +261,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~507 行<!--/AUTO-->
+### 4.4 `app/table_widget.py` — 数据表格（<!--AUTO:lines:app/table_widget.py-->~512 行<!--/AUTO-->
 
 #### 类：`PnLBadge(QWidget)`
 
@@ -382,7 +382,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
 
-**主题刷新契约（C1-07/C1-08）**：具 `apply_theme()` 的组件构成统一刷新契约——MainWindow 启动期（`_build_ui` 后）递归遍历子树收集（自顶向下、父拥有子树；节点有 `apply_theme` 即收集且不再下钻）为 `self._theme_refreshers`；`refresh_theme` 重写为「`_apply_qss`（移除 sidebar.apply_theme）+ 按钮文字 + 置顶样式 + refreshers 统一调用」，不再触发数据刷新（`table.draw/_update_summary/_update_today_status` 调用移除，主题与数据刷新彻底解耦）；KPI 磁贴颜色由 `KpiPresenter.apply_theme_styles()` 另法保持（纯内存重算 signal，零 I/O；C4-02 收敛，MainWindow 仅薄调用）；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整）。组件侧契约：TableWidget `apply_theme()` 基于 `draw()` 缓存（`_last_records/_last_today`）重渲染行内颜色、**不重新取数**；CraftingPage 为显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange 两子页。
+**主题刷新契约（C1-07/C1-08 + C7 深化）**：具 `apply_theme()` 的组件构成统一刷新契约——MainWindow 装配完成后经 `_register_theme_refreshers` **显式登记** `self._theme_refreshers = [sidebar, input_panel, table, chart, profit_page, bonus_door_page]`（C7：取代原 `hasattr` 树遍历与「父有 apply_theme 则不下钻」的隐式规则；集合与顺序代码可见，漏登记由覆盖性测试拦下，登记方法内零反射判定有守卫）；`refresh_theme` 重写为「`_apply_qss`（移除 sidebar.apply_theme）+ 按钮文字 + 置顶样式 + refreshers 统一调用」，不再触发数据刷新（`table.draw/_update_summary/_update_today_status` 调用移除，主题与数据刷新彻底解耦）；KPI 磁贴颜色由 `KpiPresenter.apply_theme_styles()` 另法保持（纯内存重算 signal，零 I/O；C4-02 收敛，MainWindow 仅薄调用；presenter 非 QWidget、签名不同，不进刷新器列表）；启动期同样执行一次 refreshers（保 sidebar 首帧主题完整）。组件侧契约：TableWidget `apply_theme()` 基于 `draw()` 缓存（`_last_records/_last_today`）**整表重绘**行内颜色（O(行数)，≤30 行；C7 起代价显式声明——单元格色只能随渲染设置，与其他组件的真增量换色差异是刻意的）、**不重新取数**；CraftingPage 为显式空实现（样式全部由 QSS 选择器驱动）；ProfitPage 扇出 crafting + exchange 两子页。
 
 ---
 
@@ -595,7 +595,7 @@ kkrb.net API 客户端：会话（CSRF 握手：首页 → getMenu → cookie �
 
 ---
 
-### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~196 行<!--/AUTO-->）
+### 4.17 `app/fetch_page_base.py` — 数据页公共基类（T-03/V-02/C2，<!--AUTO:lines:app/fetch_page_base.py-->~197 行<!--/AUTO-->）
 ### 4.18 `app/dashboard_page.py` — 仪表盘页（C4-01 直构；C5 页族同构，<!--AUTO:lines:app/dashboard_page.py-->~188 行<!--/AUTO-->）
 
 **核心**：`DashboardPage(QWidget)`（与 ProfitPage/CraftingPage/ExchangePage/BonusDoorPage 同族）一次性完成仪表盘页（QStackedWidget Page 0）的组件创建与布局。构造参数即接口——`DashboardPage(today, chart_min_h, chart_max_h)`（值而非宿主）；公开属性 `bundle`（`DashboardBundle` dataclass 8 成员：input_panel/table/chart/summary_label/summary_caption/cash_summary_label/cash_summary_caption/hint_label）、`title_label` / `today_status_label` / `date_label`。布局层级：标题栏 → 日期 → 顶部条（输入卡限宽 520 + KPI 双磁贴卡）→ 表格卡（stretch 1）→ 图表卡（min/max 高）→ 底部提示栏；卡片外观由模块私有 `_card_frame()` 提供（QFrame#cardFrame + 微阴影）。
