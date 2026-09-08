@@ -52,7 +52,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-1 | `_kpi_signal` 是 `format_window_text(...)[1]` 的 1 行转发，却躺在最大的枢纽模块里，并制造 main_window ↔ kpi_presenter 循环依赖（kpi_presenter 用调用期延迟导入绕环）；删除测试通过（纯浅透传） | 架构评审 C2 | Strong | 📝 待立项 | GUI |
 | DFD-2 | `fetch_page_base._data` 三处赋值零读取（删除测试通过）；基类 `_render_error` 默认 = `_render_data([])` 使空/错态不可分，三子类各写一遍占位清空逻辑（exchange 未写，错误态与空态共用） | 架构评审 C3 | Strong | 📝 待立项 | 数据页/GUI |
 | DFD-3 | `kpi_presenter` 用展示文案字面量 `value != "数据不足"` 决定动画分支（presentation 改文案即静默改变行为）；「暂无数据」×7、「加载中…」×2 写法散落 5 模块 | 架构评审 C4 | Strong | 📝 待立项 | GUI |
 | DFD-4 | `build_dashboard(mw)` 经副作用写回 `mw._dashboard_page`，MainWindow 随后私读 dashboard 私有属性（`_title_label` 等）；测试需伪造「长得像 MainWindow」的整对象 | 架构评审 C5 | Strong | 📝 待立项 | GUI |
@@ -70,7 +69,8 @@
 
 | 编号 | 遗留项 | 处置 | 提交 |
 |------|--------|------|------|
-| C1 | 动画生命周期知识复制 4 处（`motion.fade_in_widget` / `_shake` / `_countup_anims` / `_draw_anim`），C4-债 同族 bug 反复修 ≥5 次 | ✅ 已修（立项 → TO-TICKETS C1 → 在途注册表深化 + 落点迁移） | 本提交 |
+| C1 | 动画生命周期知识复制 4 处（`motion.fade_in_widget` / `_shake` / `_countup_anims` / `_draw_anim`），C4-债 同族 bug 反复修 ≥5 次 | ✅ 已修（立项 → TO-TICKETS C1 → 在途注册表深化 + 落点迁移） | `1508728` |
+| C2 | `_kpi_signal` 1 行转发 + main_window ↔ kpi_presenter 循环依赖（调用期延迟导入） | ✅ 已修（立项 → TO-TICKETS C2 → 判定归位 presenter 私有 `_window_signal`） | 本提交 |
 
 ---
 

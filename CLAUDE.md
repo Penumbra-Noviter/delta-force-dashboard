@@ -28,7 +28,9 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
 
 ## 当前状态与下一步（2026-09-08）
 
-- 架构评审 C1 落地（`improve-codebase-architecture` 全库审查首项，Strong）：动画句柄生命周期回归 `app/motion.py`——在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）+ 新增 tests/test_motion.py 11 例：**642/642 测试**、doc_sync 双绿
-- 评审候选 C2~C6（Strong）与 C7（Worth exploring）已录入 TECH_DEBT 候选池，按强度顺序逐个推进
-- 下一步：C2（删 `_kpi_signal` 1 行中继与绕环延迟导入）
+- 架构评审按强度顺序推进（`improve-codebase-architecture` 全库审查 7 项候选）：
+  - **C1 ✅**：动画句柄生命周期回归 `app/motion.py`——在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 内化；四落点迁移 + `tests/test_motion.py` 11 例
+  - **C2 ✅**：删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 绕环延迟导入，判定归位私有 `_window_signal`
+  - 状态：**642/642 测试**、doc_sync 双绿；候选 C3~C6（Strong）与 C7（Worth exploring）在 TECH_DEBT 候选池
+- 下一步：C3（FetchPageBase 删只写不读的 `_data`，空/错态判定上收一次）
 - 清场保持：`.worktrees/` 与 `.scratch/` 空，分支仅 main

@@ -17,6 +17,13 @@
   - **Falsify 收获**：`test_none_label_raises_on_update`（注入 None label）暴露「None 进弱键注册表抛 TypeError、错误指向 motion 而非调用方」——补 `_hostable` 防御（无宿主 = 无动画，数值型仍落终态），误用回到调用方自身位置报错。
   - **验收**：642/642 全绿（55.8s）；doc_sync 先 update（7 标记：lines/sig/tests_total）再 check 双绿；AST 扫描 touched 文件零未用 import。
 
+- **C2 落地（同批次，Strong）——删 `_kpi_signal` 中继与绕环延迟导入**：
+  - **问题**：`main_window._kpi_signal` 是 `format_window_text(...)[1]` 的 1 行转发（删除测试通过 = 纯浅透传），却躺在最大的枢纽模块里，并逼出 `kpi_presenter` 的调用期延迟导入绕循环依赖。
+  - **决策（grilling）**：判定归位 kpi_presenter 私有 `_window_signal`（不新开 presentation 公共包装——那只是把浅模块搬家；NamedTuple 化留作后续）；AA-01 守卫保留、扫描目标改名。
+  - **变更**：`main_window._kpi_signal` 删除 + `format_window_text`/`RateSignal` 死 import 清理；`kpi_presenter` 中继与调用期导入删除，`update`/`apply_theme_styles` 共用 `_window_signal`；`test_kpi_signal_shared_pure_function` 改断言私有 helper + 源码扫描新名。
+  - **顺带修正**：CODE_WIKI §4.19 叙述仍是 C1 前的形态（`_countup_anims` 字典槽 + presenter 侧生命周期），已改写为注册表 + motion 持有。
+  - **验收**：相关 144 项（ui_smoke/kpi_presenter/dashboard_page）重跑通过；全量 642/642、doc_sync 双绿。
+
 ---
 
 - **简化审计 + 变更（simplify-codebase skill，Survey→Change，全绿 631/631、doc_sync 双绿）**：

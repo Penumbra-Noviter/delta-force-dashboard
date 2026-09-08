@@ -2336,33 +2336,33 @@ def test_kpi_styles_follow_theme_toggle(sample_window):
 
 
 def test_kpi_signal_shared_pure_function():
-    """AA-01：KPI 磁贴 signal 走共享纯函数 _kpi_signal（两处调用点单一来源）。
+    """AA-01 + C2：KPI 磁贴 signal 走 presenter 私有 `_window_signal`（两处调用点单一来源）。
 
     信号判定语义与 format_window_text 对齐（spec：无数据/仅 1 条 → NONE，
     正/负/零 → POSITIVE/NEGATIVE/NEUTRAL）；期望值来自 spec 语义而非实现。
+    C2 深化后判定归位 KpiPresenter 内部（原 main_window._kpi_signal 转发 +
+    调用期延迟导入已删除），守卫语义不变：两处判定不漂移。
     """
     import inspect
 
-    from app.main_window import _kpi_signal
+    from app.kpi_presenter import KpiPresenter, _window_signal
     from signals import RateSignal
 
     # 无数据（total None）→ NONE；仅 1 条记录 → NONE
-    assert _kpi_signal(0, None, "总盈亏", 7) is RateSignal.NONE
-    assert _kpi_signal(1, 100.0, "总盈亏", 7) is RateSignal.NONE
+    assert _window_signal(0, None, "总盈亏", 7) is RateSignal.NONE
+    assert _window_signal(1, 100.0, "总盈亏", 7) is RateSignal.NONE
     # 多记录：正 / 负 / 零
-    assert _kpi_signal(2, 100.0, "总盈亏", 7) is RateSignal.POSITIVE
-    assert _kpi_signal(2, -100.0, "总盈亏", 7) is RateSignal.NEGATIVE
-    assert _kpi_signal(2, 0.0, "总盈亏", 7) is RateSignal.NEUTRAL
+    assert _window_signal(2, 100.0, "总盈亏", 7) is RateSignal.POSITIVE
+    assert _window_signal(2, -100.0, "总盈亏", 7) is RateSignal.NEGATIVE
+    assert _window_signal(2, 0.0, "总盈亏", 7) is RateSignal.NEUTRAL
     # label/days 透传（现金磁贴同源）
-    assert _kpi_signal(2, 50.0, "现金总变化", 30) is RateSignal.POSITIVE
+    assert _window_signal(2, 50.0, "现金总变化", 30) is RateSignal.POSITIVE
 
     # 两处 signal 计算必须走同一函数（AA-01 验收：消除 Divergent Change；
     # C4 块 2 后计算点收敛到 KpiPresenter 的 update 渲染路径与主题换色路径）
-    from app.kpi_presenter import KpiPresenter
-
     for method in ("_update_tile", "apply_theme_styles"):
         src = inspect.getsource(getattr(KpiPresenter, method))
-        assert "_kpi_signal(" in src, f"{method} 未走共享 _kpi_signal"
+        assert "_window_signal(" in src, f"{method} 未走共享 _window_signal"
 
 
 def test_sidebar_themed_at_startup(sample_window):

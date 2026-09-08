@@ -58,9 +58,10 @@
 
 | Ticket | 标题 | 完成 | 提交 |
 |--------|------|------|------|
-| C1 | 动画句柄生命周期回归 `app/motion.py`：在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 关键帧内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）；六条 u06 契约换观测点 + `tests/test_motion.py` 11 例 | ✅ 2026-09-08 | 本提交 |
+| C1 | 动画句柄生命周期回归 `app/motion.py`：在途注册表（target 弱键）+ `is_running`/`stop`/`finish` + 四工厂 bool 化 + `shake` 关键帧内化；四落点迁移（`_shake`/KPI 槽/chart 句柄/fade）；六条 u06 契约换观测点 + `tests/test_motion.py` 11 例 | ✅ 2026-09-08 | `1508728` |
+| C2 | 删 `main_window._kpi_signal` 1 行中继与 kpi_presenter 调用期延迟导入：判定归位 presenter 私有 `_window_signal`（AA-01 单一来源不漂移），跨模块 import 与循环依赖消失；守卫测试改扫描目标；顺带修正 CODE_WIKI §4.19 的 C1 后残留叙述 | ✅ 2026-09-08 | 本提交 |
 
-期末验证：**642/642 全绿**（55.8s）、doc_sync 双绿（先 update 7 标记再 check）；diff 8 文件；行为零变化（三种关动效语义、count-up 落终路径、图表揭示动画逐帧等价）。
+期末验证：**642/642 全绿**（55.8s / C2 后 144 项相关用例重跑通过）、doc_sync 双绿；diff 8 文件（C1）+ 6 文件（C2）；行为零变化（三种关动效语义、count-up 落终路径、图表揭示动画逐帧等价；KPI 信号判定语义与格式完全不变）。
 
 ### 简化批次（2026-08-29，simplify-codebase skill，Survey→Change，基线 cb3ceae）
 

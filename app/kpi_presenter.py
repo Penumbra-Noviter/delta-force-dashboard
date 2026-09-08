@@ -6,9 +6,11 @@ KpiPresenter 注入 4 个 labels，对外三个出口：
   不动文本/动画）；
 - reset()：账号切换归零（Y-05——切换后数字直落终态，不做跨账号滚动动画）。
 
-signal 判定仍走 app.main_window._kpi_signal（AA-01 单一来源，函数本体
-留在 main_window 不动）；因 main_window 模块加载期引用本模块，本模块
-对 _kpi_signal 采用调用期延迟解析，规避循环导入。
+signal 判定走本模块私有 `_window_signal`（C2 深化）：它取
+`presentation.format_window_text` 的信号分量，是本模块唯一耦合该元组形状
+的地方——update 与 apply_theme_styles 共用它，两处判定不漂移（AA-01）。
+此前该判定住在 `app.main_window._kpi_signal`，为绕 main_window ↔ 本模块
+的循环导入而调用期延迟解析；归位后跨模块 import 与循环依赖一并消失。
 """
 
 from __future__ import annotations
@@ -30,19 +32,17 @@ if TYPE_CHECKING:
     from calculator import ProfitCalculatorLogic
 
 
-def _kpi_signal(
+def _window_signal(
     count: int, total: float | None, label: str, days: int
 ) -> RateSignal:
-    """延迟解析 app.main_window._kpi_signal（AA-01 单一来源）。
+    """窗口汇总的信号分量（AA-01 单一来源，C2 归位于真正的消费者内部）。
 
-    main_window 在模块加载期 import 本模块（KpiPresenter 构造），此刻其
-    模块内 _kpi_signal 尚未定义，不能在模块顶层 from-import；调用发生在
-    main_window 完整加载之后（MainWindow.__init__ → presenter.update），
-    此处调用期导入安全。
+    判定规则归 `presentation.format_window_text`（无数据/仅 1 条 → NONE，
+    正/负/零 → POSITIVE/NEGATIVE/NEUTRAL）；本函数只把「取信号分量」这件事
+    收成一行，update 与 apply_theme_styles 共用——presentation 的返回形状
+    若变，只改这里一处。纯函数：同输入必同输出，可安全双调用。
     """
-    from app.main_window import _kpi_signal as impl
-
-    return impl(count, total, label, days)
+    return format_window_text(count, total, label, days)[1]
 
 
 class KpiPresenter(QObject):
@@ -109,11 +109,11 @@ class KpiPresenter(QObject):
         """
         count, total = logic.summary(view_n)
         self._summary_label.setStyleSheet(
-            summary_style(_kpi_signal(count, total, "总盈亏", view_n))
+            summary_style(_window_signal(count, total, "总盈亏", view_n))
         )
         cash_count, cash_delta = logic.cash_summary(view_n)
         self._cash_summary_label.setStyleSheet(
-            summary_style(_kpi_signal(cash_count, cash_delta, "现金总变化", view_n))
+            summary_style(_window_signal(cash_count, cash_delta, "现金总变化", view_n))
         )
 
     def reset(self) -> None:
@@ -165,7 +165,7 @@ class KpiPresenter(QObject):
         Returns:
             本次 total（调用方回存为下一帧的 last）。
         """
-        signal = _kpi_signal(count, total, name, view_n)
+        signal = _window_signal(count, total, name, view_n)
         text, _ = format_window_text(count, total, name, view_n)
         caption, value = self._split_kpi_text(text)
         caption_label.setText(caption)

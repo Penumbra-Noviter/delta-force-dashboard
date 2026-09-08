@@ -53,7 +53,6 @@ from calculator import DayRecord, ProfitCalculatorLogic
 from kkrb_client import KkrbClient
 from presentation import (
     format_saved_indicator,
-    format_window_text,
 )
 from settings_store import (
     SettingsStore,
@@ -61,7 +60,6 @@ from settings_store import (
     decode_legacy_geometry,
     encode_window_state,
 )
-from signals import RateSignal
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +78,6 @@ if platform.system() == "Windows":
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         logger.warning("DPI awareness 设置失败")
-
-
-def _kpi_signal(count: int, total: float | None, label: str, days: int) -> RateSignal:
-    """KPI 磁贴信号的共享纯函数：经 format_window_text 取信号（AA-01）。
-
-    C4-02 后信号判定入口收敛于此：KpiPresenter 的 update / apply_theme_styles
-    均经本函数重算（判定规则仍归 presentation.format_window_text），
-    MainWindow 不再直算。纯函数：同输入必同输出，可安全双调用。
-    """
-    return format_window_text(count, total, label, days)[1]
 
 
 class MainWindow(QMainWindow):
