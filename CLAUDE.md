@@ -10,7 +10,7 @@ Windows 桌面收益追踪工具（PySide6）：每日记录现金/仓库价值�
 python -m venv venv && venv\Scripts\activate   # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 python main.py                                # 运行（运行态数据落在 ~/Delta Force Dashboard/）
-pytest                                        # 全量测试（642 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
+pytest                                        # 全量测试（643 项，Qt 用例自动 offscreen；沙箱内加 --basetemp=.pytest_cache\tmp）
 python scripts/doc_sync.py --check            # CODE_WIKI 机械标记防漂移（pre-commit 钩子自动跑）
 python scripts/doc_sync.py                    # 改代码后刷新 CODE_WIKI 的测试数/行数/签名标记
 ```
@@ -36,6 +36,7 @@ Python 3.10+ / PySide6 / pyqtgraph / pytest；PyInstaller onedir 打包（`dist/
   - **C5 ✅**：仪表盘页族同构 `DashboardPage(QWidget)`（构造参数即接口、标签公开）；7 组信号接线归 `MainWindow._connect_signals`；`_build_card` 内迁 `_card_frame()`
   - **C6 ✅**：删 `MainWindow._view_n` 镜像，视图条数唯一来源 `table.current_view()`（回归 ADR-0003 Q8 定案）
   - **C7 ✅**：主题刷新显式登记列表取代 `hasattr` 树遍历（零反射守卫）；`table.apply_theme` 整表重绘代价显式声明
-  - 状态：**642/642 测试**、doc_sync 双绿；**评审 7 项候选全部处置完毕**，TECH_DEBT 候选区仅剩 DFD-7（测试基建项：`test_fetch_pages.py` 单独运行 heap corruption）
-- 下一步：无遗留评审候选；如需继续，DFD-7 可作为独立工单（与生产代码无关）
+  - **DFD-7 ✅**：测试基建根因修复（C4 验收发现）——Qt 引用环在解释器关闭期被 GC → Qt 对象在 QApplication 析构后析构 → 退出码 `0xC0000374`；修复 = `conftest.qt_teardown`（每例 gen-0）+ `qapp` 模块末全量收尾 + `main.py` 退出加固 + 子进程回归锁
+  - 状态：**643/643 测试**（67.9s）、doc_sync 双绿；评审 7 项候选 + DFD-7 全部处置完毕，TECH_DEBT 候选区净清零
+- 下一步：无遗留工单（评审候选与技术债候选区均空）
 - 清场保持：`.worktrees/` 与 `.scratch/` 空，分支仅 main

@@ -717,11 +717,13 @@ def test_profit_apply_theme_fans_out_to_children(qapp) -> None:
 # ── C1-09. craft 卡内联样式无颜色字面量 ──────────────────
 
 
-def test_crafting_card_inline_style_has_no_color_literal() -> None:
+def test_crafting_card_inline_style_has_no_color_literal(qapp) -> None:
     """C1-09：制造卡内联 styleSheet 不得含颜色字面量（颜色全部 QSS 选择器驱动）。
 
     内联样式仅允许字号/字重等字体样式；出现 #hex / rgba( 即红——
     颜色冻结在构建期会随主题失效（C1 契约）。
+    DFD-7：本用例建真实 QWidget，必须显式依赖 qapp——此前靠同文件其它用例
+    先建 QApplication 才不崩（独跑即 `0xC0000409`，顺序依赖）。
     """
     import re
 

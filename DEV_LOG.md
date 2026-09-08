@@ -61,6 +61,19 @@
   - **测试**：`test_theme_refreshers_collected_at_startup` → `test_theme_refreshers_registered_explicitly`（列表逐项相等 + 顺序 + 防双扇出 + 登记方法零 `hasattr` 反射守卫）；覆盖性用例照旧（独立走树校验）。
   - **验收**：全量 642/642、doc_sync 双绿（先 update 3 标记）。
   - **批次收口**：7 项候选全部处置（C1~C5 Strong + C6/C7 Worth exploring），TECH_DEBT 候选区仅剩 DFD-7（测试基建，非评审候选）。
+
+- **DFD-7 根因修复（同批次，测试基建；立项 → 定位 → 修复 → 回归锁）**：
+  - **症状**：`pytest tests/test_fetch_pages.py` 单独运行时 36 用例全绿，但**进程退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION）**；与任一其它测试文件同跑即 exit 0。前置结论：`git worktree` 回 `a53c102` 基线同样复现 → 与 C1~C7 无关的既有缺陷。
+  - **定位（diagnosing-bugs 流程）**：
+    1. **反馈环**：单条命令 + 退出码，~8s、确定性（3/3 红）；逐文件扫描确认**仅 test_fetch_pages.py** 独跑崩溃（其余 24 文件全绿）。
+    2. **最小化**：单测逐个独跑 → 只有 `test_crafting_card_inline_style_has_no_color_literal` 独跑即崩（`0xC0000409`：它建 QWidget 却缺 `qapp` 夹具 = 无 QApplication）；但**文件级崩溃另有其因**（deselect 它仍崩）。对后半段 18 例跑 ddmin → 收敛到 **7 例**（1 个 fake client 页 + 2 个真 client 页 + ProfitPage + 4 个起 FetchWorker 的错误态页），且无单例充分。
+    3. **假设与证伪**：① 缺 qapp（成立但只解释独跑崩溃）；② 对象活过 QApplication 才析构（**证伪**：故意把页面留在模块级 `_LEAK` 里反而 6/6 不崩）；③ **引用环在解释器关闭期被 GC**（成立——atexit 日志显示崩溃那次**从未到达 atexit**，正常 19 次则 threads/pages/widgets 全 0）。
+    4. **对照实验（决定性）**：基线 6/6 崩、**空 autouse 夹具对照 6/6 崩**（排除「加夹具改时序」）、收尾夹具（gc + DeferredDelete 冲刷）**0/6**。
+  - **根因**：QObject 引用环（信号连接构成 page ↔ worker ↔ 绑定方法）留给解释器关闭期的 GC 回收 → Qt 对象在 `QApplication` 析构**之后**才析构 → Windows 堆损坏。
+  - **修复**：`tests/conftest.py` 新增 autouse `qt_teardown`（每例 `gc.collect(0)`，+6s/643 例）+ `qapp` 夹具在模块 QApplication 析构前做一次全量收尾（`gc.collect` → 冲刷 DeferredDelete → processEvents → collect）；`main.py` 事件循环返回后 `del window` + `gc.collect()`（生产侧同源加固）。**模块级收尾单独用无效（6/6 仍崩）**、全量 collect 每例收尾会把套件拖到 119s——故取 gen-0 每例 + 模块末全量。
+  - **回归锁**：新增 `tests/test_qt_teardown.py`——子进程单独跑 `tests/test_fetch_pages.py` 断言退出码 0（~9s）。Falsify：把 `qt_teardown` 取消 autouse → 单文件 5/5 崩 + 该回归测试红。
+  - **顺手修**：`test_crafting_card_inline_style_has_no_color_literal` 补 `qapp` 夹具（原靠同文件其它用例先建 QApplication 才不崩，属顺序依赖）。
+  - **验收**：单文件 6/6 exit 0（修复前 5/5 崩）、全量 643/643（67.9s）、doc_sync 双绿。
   - **发现（未修，记 TECH_DEBT DFD-7）**：`pytest tests/test_fetch_pages.py` 单独运行时 36 项全通过但解释器退出码 `0xC0000374`（heap corruption）；与任一其它文件同跑即 exit 0。**经 `git stash` 回到 C3 基线复现**——与 C4 无关的既有测试基建问题（疑 Qt/QThread 析构顺序），本轮不扩范围修。
 
 ---

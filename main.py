@@ -8,6 +8,7 @@ Delta Force Dashboard — PySide6 版入口。
 
 from __future__ import annotations
 
+import gc
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
@@ -178,6 +179,13 @@ def main() -> None:
     # 退出前清理 LocalServer
     server.close()
     QLocalServer.removeServer(_SERVER_NAME)
+
+    # DFD-7 同源加固：在 Qt 运行时仍存活时显式释放窗口对象。QObject 引用环
+    # （信号连接构成 page ↔ worker ↔ 绑定方法）若留给解释器关闭期的 GC 回收，
+    # Qt 对象会在 QApplication 析构之后才销毁 → Windows 堆损坏
+    # （0xC0000374；测试侧同因，见 tests/conftest.py::qt_teardown）。
+    del window
+    gc.collect()
 
     sys.exit(exit_code)
 

@@ -5,10 +5,12 @@ C5 评审后从 test_table_theme / test_input_panel / test_ui_smoke 收敛而来
 offscreen 平台必须在任何 QApplication 创建前设置。
 C2-03：make_stub_client 工厂为页面/窗口构造注入提供零网络 stub client
 （替代已删除的 offscreen 哨兵，见 app/fetch_page_base.preload）。
+DFD-7：qt_teardown 夹具在每个用例后强制回收 Qt 对象（防解释器关闭期堆损坏）。
 """
 
 from __future__ import annotations
 
+import gc
 import os
 from collections.abc import Callable
 from types import SimpleNamespace
@@ -66,11 +68,22 @@ def make_store(tmp_path, max_backups: int = 3):
 
 @pytest.fixture(scope="module")
 def qapp():
-    """进程级 QApplication（offscreen），供主窗口/表格/图表控件创建。"""
+    """进程级 QApplication（offscreen），供主窗口/表格/图表控件创建。
+
+    收尾（DFD-7）：在本模块 QApplication 析构**之前**做一次全量回收——每用例
+    的 `qt_teardown` 只收 gen 0（便宜），跨用例存活到 gen 1/2 的 Qt 引用环在
+    这里统一清掉；若留给解释器关闭期的 GC，Qt 对象会在 QApplication 析构后
+    才析构 → Windows 堆损坏（0xC0000374）。
+    """
+    from PySide6.QtCore import QCoreApplication, QEvent
     from PySide6.QtWidgets import QApplication
 
     app = QApplication.instance() or QApplication([])
     yield app
+    gc.collect()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    QCoreApplication.processEvents()
+    gc.collect()
 
 
 @pytest.fixture
@@ -126,3 +139,27 @@ def cleanup_encryption():
 
     yield
     set_encryption_key(None)
+
+
+@pytest.fixture(autouse=True)
+def qt_teardown():
+    """每个用例后回收本用例产生的 Qt 引用环（DFD-7：防解释器关闭期堆损坏）。
+
+    症状：`pytest tests/test_fetch_pages.py` 单独运行时全部用例通过，但进程
+    退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION）；与任一其它测试文件同跑则
+    正常。经 ddmin + 对照实验定位（2026-09-08）：
+
+    - 引用环（信号连接构成 page ↔ worker ↔ 绑定方法）留给解释器关闭期的 GC
+      回收时，Qt 对象会在 QApplication 销毁**之后**才析构 → Windows 堆损坏；
+    - 用例结束时（QApplication 仍存活）回收引用环即消除：基线 6/6 崩溃、
+      空夹具对照 6/6 崩溃、本夹具 0/6；
+    - 作用域必须是用例级——模块级一次收尾无效（6/6 仍崩），需在每例后清掉
+      当例产生的环。
+
+    本夹具只收 gen 0（便宜：全量 643 例 +6s；全量 collect 会 +59s）；跨用例
+    存活到 gen 1/2 的环由 `qapp` 夹具在模块 QApplication 析构前全量收尾。
+
+    回归锁：`tests/test_qt_teardown.py`（子进程跑 test_fetch_pages.py 断言退出码 0）。
+    """
+    yield
+    gc.collect(0)

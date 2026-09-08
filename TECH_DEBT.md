@@ -52,7 +52,6 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-7 | `pytest tests/test_fetch_pages.py` **单独运行**时全部用例通过但解释器退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION）；与任一其它测试文件同跑则 exit 0——疑为 Qt/QThread 析构顺序（页面/FetchWorker 未走 show/wait/hide 或 worker 在途时宿主先亡）。生产代码无关联（C4 验收时发现，C3 基线同样复现） | C4 验收发现 | Worth exploring | 📝 待立项 | 测试基建 |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
@@ -71,7 +70,8 @@
 | C4 | `kpi_presenter` 按展示文案字面量决定动画分支（改文案即静默改变行为）+ 加载中文案两处各写 | ✅ 已修（立项 → TO-TICKETS C4 → 纯语义判据 + `_LOADING_TEXT` 单源 + 源码守卫） | `c8514b0` |
 | C5 | `build_dashboard(mw)` 反向依赖宿主（7 私有槽 + `_build_card` + 高度 + today）+ 副作用写回 + MainWindow 私读页面标签 | ✅ 已修（立项 → TO-TICKETS C5 → `DashboardPage` 页族同构 + 接线归 MainWindow） | `bfa01dd` |
 | C6 | 视图窗口同一事实两份（`MainWindow._view_n` 镜像 `TableWidget._view_days`），靠一条信号维持相等 | ✅ 已修（立项 → TO-TICKETS C6 → 删镜像，查询 `current_view()` 单一来源） | `3022e6a` |
-| C7 | 主题刷新约定制（`hasattr` 树遍历 + 隐式「父有则不下钻」）+ `table.apply_theme` 整表重绘的隐藏代价 | ✅ 已修（立项 → TO-TICKETS C7 → 显式登记列表 + 代价显式声明） | 本提交 |
+| C7 | 主题刷新约定制（`hasattr` 树遍历 + 隐式「父有则不下钻」）+ `table.apply_theme` 整表重绘的隐藏代价 | ✅ 已修（立项 → TO-TICKETS C7 → 显式登记列表 + 代价显式声明） | `89042a4` |
+| DFD-7 | 测试基建：`test_fetch_pages.py` 单独运行进程退出码 `0xC0000374`（Qt 引用环在解释器关闭期回收 → Qt 对象在 QApplication 析构后析构） | ✅ 已修（立项 → TO-TICKETS DFD-7 → conftest 每例 gen-0 回收 + qapp 模块末全量收尾 + main.py 退出加固 + 子进程回归锁） | 本提交 |
 
 ---
 

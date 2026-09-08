@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）+ F-01 增强（2026-08-14）全部完成）  
 > 生成日期：2026-08-14  
-> 测试状态：<!--AUTO:tests_total:total-->642<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->643<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->642<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -143,6 +143,7 @@ Delta Force Dashboard/
 │   ├── test_bonus_door_page.py ← <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> 个测试（BD-02 密码门页面：三态/空态/动态卡片重建/双主题 QSS/构造注入断网）
 │   ├── test_icons.py       ← <!--AUTO:tests:tests/test_icons.py-->6<!--/AUTO--> 个测试（IC-01 SVG 图标：键集守卫/渲染有效/颜色注入/尺寸/未知键/占位符无残留）
 │   ├── test_motion.py      ← <!--AUTO:tests:tests/test_motion.py-->11<!--/AUTO--> 个测试（C1 在途动画注册表：工厂 bool/同目标替换丢弃/finish 落终/stop 丢弃/关动效落终态/不可弱引用宿主防御/弱键出表/fade effect 摘除）
+│   ├── test_qt_teardown.py ← <!--AUTO:tests:tests/test_qt_teardown.py-->1<!--/AUTO--> 个测试（DFD-7 回归：子进程单独跑 test_fetch_pages.py 断言退出码 0，锁「Qt 对象在解释器关闭期析构 → 堆损坏」）
 │   └── test_doc_sync.py     ← <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> 个测试（F-01 冒烟：`doc_sync.py --check` 通过即 CODE_WIKI 基线同步）
 ├── app_icon.ico             ← 应用图标（exe 文件 + 运行窗口，PyInstaller datas 内嵌）
 ├── delta_force_dashboard.spec           ← PyInstaller 打包配置（onedir + 图标，O-20 瘦身）
@@ -159,7 +160,7 @@ Delta Force Dashboard/
 
 ## 四、核心模块详细说明
 
-### 4.1 `main.py` — 程序入口（<!--AUTO:lines:main.py-->~151 行<!--/AUTO-->）
+### 4.1 `main.py` — 程序入口（<!--AUTO:lines:main.py-->~158 行<!--/AUTO-->）
 
 **职责**：启动 PySide6 应用，单实例保证，应用图标，事件循环管理。
 
@@ -167,7 +168,7 @@ Delta Force Dashboard/
 |------|------|
 | `_SERVER_NAME` | 单实例锁名称 `"profit_calculator_singleton_lock"` |
 | <!--AUTO:sig:main.py:_is_already_running-->`_is_already_running()`<!--/AUTO--> | 通过 QLocalServer 检测是否已有实例运行 |
-| <!--AUTO:sig:main.py:main-->`main()`<!--/AUTO--> | 高 DPI 设置 → 创建 QApplication → 单实例检查 → 创建 MainWindow → 事件循环 → 清理 |
+| <!--AUTO:sig:main.py:main-->`main()`<!--/AUTO--> | 高 DPI 设置 → 创建 QApplication → 单实例检查 → 创建 MainWindow → 事件循环 → 清理（含 DFD-7 加固：事件循环返回后在 Qt 仍存活时 `del window` + `gc.collect()`，防解释器关闭期析构 Qt 对象） |
 
 **单实例机制**：使用 QLocalServer（Qt 原生方案），崩溃后自动清理残留 socket 文件。若已有实例运行则打日志后 `sys.exit(0)`（静默语义保持，日志便于诊断「双击无窗口」——多为上一实例进程残留）。
 
@@ -717,7 +718,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->642<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -817,6 +818,7 @@ main.py
 | `tests/test_doc_sync.py` | <!--AUTO:tests:tests/test_doc_sync.py-->2<!--/AUTO--> | F-01 冒烟：运行 `python scripts/doc_sync.py --check` 断言通过（CODE_WIKI 基线同步锁死） |
 | `tests/test_chart_geometry.py` | <!--AUTO:tests:tests/test_chart_geometry.py-->6<!--/AUTO--> | 图表几何纯函数 adaptive_range：正常范围/单值/空列表/负值/全同值（rng==0 分支） |
 | `tests/test_motion.py` | <!--AUTO:tests:tests/test_motion.py-->11<!--/AUTO--> | C1 在途动画注册表与控制动词：工厂返回 bool/同目标替换丢弃旧动画/finish 落终帧 vs stop 丢弃/关动效落终态/不可弱引用宿主防御/弱键宿主销毁出表/fade effect 两条路径摘除 |
+| `tests/test_qt_teardown.py` | <!--AUTO:tests:tests/test_qt_teardown.py-->1<!--/AUTO--> | DFD-7 回归：子进程单独运行 `tests/test_fetch_pages.py` 断言退出码 0（Qt 对象在解释器关闭期析构 → Windows 堆损坏 `0xC0000374`；修复见 conftest `qt_teardown`） |
 | `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme super() 刷新基类图标（IC-03）/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
 
 **运行方式**：在项目根目录执行 `pytest`
@@ -925,6 +927,7 @@ python scripts/install-hooks.bat         # 安装 pre-commit 钩子到 .git/hook
 6. **输入框去抖**：`MoneyLineEdit` 使用 150ms 去抖的 QTimer，快速输入时避免每次按键都触发校验
 7. **DPI 感知**：Windows 下通过 `SetProcessDpiAwareness(1)` 配合 `Qt.HighDpiScaleFactorRoundingPolicy.PassThrough`
 8. **几何格式兼容**：`_setup_window()` 同时兼容新格式（hex QByteArray）和旧格式（Tkinter `WxH+X+Y` 字符串）
+9. **Qt 对象回收时机（DFD-7，2026-09-08）**：QObject 引用环（信号连接构成 page ↔ worker ↔ 绑定方法）必须**在 QApplication 存活期内**回收——留给解释器关闭期的 GC 会让 Qt 对象在 `QApplication` 析构之后才析构，Windows 下表现为进程退出码 `0xC0000374`（STATUS_HEAP_CORRUPTION），且「用例全绿但进程退出码异常」。测试侧由 `tests/conftest.py::qt_teardown`（autouse：`gc.collect()` → 冲刷 `DeferredDelete` → 再 collect）保证；生产侧由 `main.py` 事件循环返回后 `del window` + `gc.collect()` 保证。回归锁 `tests/test_qt_teardown.py`（子进程断言退出码 0）
 
 ---
 
