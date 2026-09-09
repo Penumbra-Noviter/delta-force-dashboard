@@ -8,6 +8,8 @@
 
 ## 滚动摘要（2026-09-08 — 架构评审 C1：动画句柄生命周期回归 motion）
 
+- **打包验证（2026-09-09，C1~C7 + DFD-7 批次后重建，基线 643/643）**：PyInstaller 6.21.0 `delta_force_dashboard.spec --noconfirm` 重建 onedir（`dist/Delta Force Dashboard/` 66.4M，exe 6.9MB，UPX 压缩；构建前全量 pytest 643/643 + doc_sync --check 双绿）；**避坑 1（bincache 沙箱拦截）**：本机沙箱只放行工作区/平台临时区，PyInstaller 6.21 全局 bincache（`%LOCALAPPDATA%\pyinstaller\bincache01py31264bit`）写入被拒（PermissionError on COLLECT）——`configure.py` 优先读 `PYINSTALLER_CONFIG_DIR` 环境变量，构建时重定向到 `%TEMP%` 下全新缓存目录绕开（不触碰全局缓存，产物与正常流程一致；两处 WARNING 均无害：`pyqtgraph.opengl` 可选子模块未收集（应用不 import）、`python3.dll` NotCompressible 被 UPX 跳过）；**避坑 2（沙箱拦截命名管道 → 单实例锁误判）**：沙箱内启动 exe 时 `QLocalServer.listen` 返回「拒绝访问」→ `_is_already_running` 误判「已有实例在运行」静默退出（非产物缺陷，源码态最小复现同款失败）——冒烟按历史惯例以完整权限真实启动：**PID 5196 存活 12s（172MB），crash.log 无新增（2184B 未变），日志新增今日启动行（kkrb_client CSRF token 已获取 = 预加载正常），回收后进程零残留**；release 资产 `dist/default.zip` 重建 41.3MB（290 条目，覆盖 08-29 旧版）；build/ 中间产物已生成（可随时清）；此构建含 C1~C7 重构与 DFD-7 测试基建修复，冒烟即对其启动路径的打包侧验收
+
 - **`improve-codebase-architecture` 全库审查 → C1 立项落地（全绿 642/642、doc_sync 双绿）**：
   - **问题（评审 C1，Strong）**：动画生命周期知识复制在 4 处——`motion.fade_in_widget` / `input_panel._shake` / `kpi_presenter._countup_anims` / `chart_widget._draw_anim`，四种句柄存放机制（动态属性 / 字典槽 / 未初始化属性）各写一套 weakref 破环 + identity 检查 + 清理；C4-债3/4/5/6/7/9/11/12 共 8 个提交修的是同一族「在途动画与宿主销毁并发 → access violation」模式。
   - **深化**：`app/motion.py` 新增在途注册表 `_running`（target 弱键 → 动画 + cleanup；动画以 target 为 Qt parent）+ 控制动词 `is_running`/`stop`（丢弃）/`finish`（落终）；四工厂（含新增 `shake`）统一返回 bool、动画对象不外泄、同目标替换默认丢弃旧的；关动效决策点收进 motion（fade 不挂 effect / shake 跳过 / 数值型落终态三种可观察行为不变）。
