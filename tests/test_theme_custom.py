@@ -98,7 +98,7 @@ def test_register_custom_rejects_name_colliding_with_builtin(
 def test_register_custom_rejects_non_builtin_base(caplog, theme_guard) -> None:
     """base 非内置主题 → 拒绝写入 + 记 warning，CUSTOM 保持原状。"""
     with caplog.at_level(logging.WARNING, logger="app.theme"):
-        theme_mod.register_custom("custom", "nord", {"BTN_BG": "#123456"})
+        theme_mod.register_custom("custom", "solarized", {"BTN_BG": "#123456"})
 
     assert theme_mod.CUSTOM == {}
     assert [r for r in caplog.records if r.levelno == logging.WARNING], (

@@ -178,6 +178,77 @@ THEMES = {
         "DANGER_BORDER": "#2d1a20",
         "DANGER_HOVER_BG": "#FF5F56",
     },
+    "nord": {
+        # ── Nord（Set 12：极夜底 + frost 冷调主色）──
+        # 暗色基调：Nord 极夜蓝灰底 + 冷调 frost 青主色；语义色保持绿涨红跌。
+        # 装饰色「Nord 冷调但提饱和」亮彩集：原版 Nord aurora 饱和度全部 <0.55
+        # 会撞 U-03 饱和度门槛，故重调为提饱和亮彩（实现期经 _hls/_contrast_ratio/
+        # _delta_e76 实测，见 tests/test_theme_roles.py 角色阈值守卫）。
+        "BG": "#2E3440",             # nord0 极夜（主背景）
+        "FG_LABEL": "#D8DEE9",       # nord4 正文（frost 亮灰）
+        "FG_MUTED": "#9AA7B8",       # 次级文字（对 CARD_BG ≥4.5:1）
+        "FG_POS": "#A3BE8C",         # nord14 绿涨（语义色）
+        "FG_NEG": "#BF616A",         # nord11 红跌（语义色）
+        "FG_TODAY": "#88C0D0",       # nord8 frost 青（主色/今日高亮）
+        "BTN_BG": "#88C0D0",         # nord8 frost 青主按钮（深字 AA）
+        "BTN_BG_HOVER": "#A3D5E2",   # 悬停提亮
+        "BTN_FG": "#2E3440",         # nord0 深底文字（青底显深字）
+        "BTN_HOVER_FG": "#ECEFF4",   # 危险按钮 hover 前景（nord6 雪白）
+        "BORDER_DEFAULT": "rgba(255,255,255,.08)",
+        "BORDER_VALID": "#A3BE8C",
+        "BORDER_INVALID": "#BF616A",
+        "BORDER_WARNING": "#EBCB8B",  # nord13 黄（警告）
+        "SEPARATOR": "rgba(255,255,255,.06)",
+        "PLACEHOLDER": "#9AA7B8",
+        "MUTED_BG": "#434C5E",        # nord2 panel-2 次级底
+        "CHART_CASH": "#88C0D0",      # frost 青（现金线）
+        "CHART_WAREHOUSE": "#EBCB8B", # nord13 黄（仓库线）
+        "CHART_TOTAL": "#A3BE8C",     # nord14 绿（总盈亏线=涨色）
+        "CHART_GRID": "#4C566A",      # nord3（6 位 hex；pyqtgraph 不解析 rgba）
+        "CHART_BG": "#2E3440",
+        "OVERLAY_BG": "rgba(0, 0, 0, 35)",
+        "CHART_AXIS": "#9AA7B8",
+        "TABLE_TEXT": "#D8DEE9",
+        "TABLE_TEXT_BOLD": "#ECEFF4",
+        "TABLE_ROW_EVEN_BG": "#3B4252",
+        "TABLE_ROW_ODD_BG": "#434C5E",
+        "TABLE_ROW_HOVER_BG": "#4C566A",
+        "TABLE_ROW_TODAY_BG": "#3D4A5C",
+        "TABLE_HEADER_BG": "#434C5E",
+        "TABLE_HEADER_FG": "#9AA7B8",
+        "CARD_BG": "#3B4252",         # nord1 卡片
+        "CARD_BORDER": "rgba(255,255,255,.07)",
+        "INPUT_BG": "#434C5E",
+        "INPUT_FG": "#ECEFF4",
+        "FOCUS_RING": "#88C0D0",
+        "SELECTION_BG": "#88C0D0",
+        "SELECTION_FG": "#2E3440",
+        "NAV_HOVER_BG": "rgba(255, 255, 255, 0.1)",
+        "NAV_SELECT_BG": "rgba(136, 192, 208, 0.14)",
+        "TEXT_PRIMARY": "#ECEFF4",
+        "TEXT_SECONDARY": "#D8DEE9",
+        "BORDER_HEAVY": "rgba(255,255,255,.12)",
+        "WARNING_BG": "#3B3623",
+        "WARNING_FG": "#EBCB8B",
+        "BADGE_FG": "#ECEFF4",
+        # 装饰色（Nord 冷调提饱和亮彩，U-03 角色规则：S≥0.55 / 对 CARD_BG AA 4.5:1 /
+        # 两两 ΔE76≥25 / 与 FG_POS·FG_NEG 亮度差≥0.05 / 明度带 NORD_BAND）
+        "PACKAGE_COLOR_0": "#9AAEF2",   # 蓝紫（通行证基础）
+        "PACKAGE_COLOR_1": "#F8EA7F",   # 金（4 级）
+        "PACKAGE_COLOR_2": "#8FE3DF",   # 青绿（3 级）
+        "PACKAGE_COLOR_3": "#F6A196",   # 珊瑚红（5 级）
+        "PACKAGE_COLOR_4": "#D29BF5",   # 紫（通行证高级）
+        "PACKAGE_COLOR_5": "#E4C797",   # 橙（进阶物流）
+        "PACKAGE_COLOR_6": "#EF9AC0",   # 粉（特级物流）
+        # 滚动条
+        "SCROLLBAR_BG": "#434C5E",
+        "SCROLLBAR_HANDLE": "rgba(255,255,255,.12)",
+        # 操作按钮语义色
+        "DANGER_BG": "#2E2326",
+        "DANGER_FG": "#BF616A",
+        "DANGER_BORDER": "#4A2C33",
+        "DANGER_HOVER_BG": "#BF616A",
+    },
 }
 
 # ── 自定义主题单槽位 + 六元锚点白名单 ─────────────────

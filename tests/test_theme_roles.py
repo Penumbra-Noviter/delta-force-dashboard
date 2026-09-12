@@ -31,6 +31,7 @@ DECORATIVE_KEYS = tuple(f"PACKAGE_COLOR_{i}" for i in range(7))  # 固定键清�
 DELTA_L_MIN = 0.05        # 装饰 vs 语义的 HSL 亮度差下限
 LIGHT_BAND = (0.20, 0.32)  # light 深墨带
 DARK_BAND = (0.72, 0.84)   # dark 亮彩带
+NORD_BAND = (0.72, 0.80)   # nord 亮彩带（冷调亮彩，暗底亮字逻辑同 dark）
 BAND_WIDTH_MAX = 0.10     # 带内最大宽度
 SATURATION_MIN = 0.55     # 饱和度下限
 DELTA_E_MIN = 25.0        # 两两色差（ΔE76）下限
@@ -90,6 +91,12 @@ def _delta_e76(a: str, b: str) -> float:
 
 
 # ── 键名如实：单一角色键集 ────────────────────────────────
+
+
+def test_nord_key_set_matches_light_and_dark() -> None:
+    """nord 键集与 light/dark 严格一致（零新增键 / 零缺失键，验收 02）。"""
+    assert set(theme_mod.THEMES["nord"]) == set(theme_mod.THEMES["light"])
+    assert set(theme_mod.THEMES["nord"]) == set(theme_mod.THEMES["dark"])
 
 
 def test_package_color_keys_defined_in_both_themes() -> None:
@@ -180,7 +187,7 @@ def test_decorative_lightness_band() -> None:
 
     现状缺陷：light L∈[0.498,0.773] 宽度 0.275（#C08A3E 暗 vs #A58BFF 亮，混排显脏）。
     """
-    bands = {"light": LIGHT_BAND, "dark": DARK_BAND}
+    bands = {"light": LIGHT_BAND, "dark": DARK_BAND, "nord": NORD_BAND}
     for theme, (lo, hi) in bands.items():
         palette = theme_mod.THEMES[theme]
         lightness = [_hls(palette[key])[1] for key in DECORATIVE_KEYS]
