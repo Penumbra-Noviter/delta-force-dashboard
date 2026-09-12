@@ -424,20 +424,15 @@ class MainWindow(QMainWindow):
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
 
-        self._update_theme_btn_text()
+        self._update_theme_btn()
 
-    def _update_theme_btn_text(self) -> None:
-        # IC-02：emoji → SVG 图标（light 主题显示 moon「暗色」目标，dark 反之）
-        if self._theme == "light":
-            self.sidebar.theme_btn.setText("暗色")
-            self.sidebar.theme_btn.setIcon(
-                render_icon("moon", get_color("FG_MUTED"))
-            )
-        else:
-            self.sidebar.theme_btn.setText("亮色")
-            self.sidebar.theme_btn.setIcon(
-                render_icon("sun", get_color("FG_MUTED"))
-            )
+    def _update_theme_btn(self) -> None:
+        # 多主题 04：按钮文案显示当前主题名；light=太阳、dark/nord=月亮。
+        label = Sidebar.THEME_LABELS.get(self._theme, self._theme)
+        icon_name = "sun" if self._theme == "light" else "moon"
+        self.sidebar.theme_btn.setText(label)
+        self.sidebar.theme_btn.setIcon(render_icon(icon_name, get_color("FG_MUTED")))
+        self.sidebar.set_theme_checked(self._theme)
 
     # ═══════════════════════════════════════════════════════
     # 信号连接
@@ -454,7 +449,7 @@ class MainWindow(QMainWindow):
         self.table.view_changed.connect(self._on_view_changed)
 
         # 侧边栏按钮
-        self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
+        self.sidebar.theme_selected.connect(self._select_theme)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
         # Y-04：账号区——新建账号（命名对话框）；下拉选择切换（Y-05 接线）
@@ -519,9 +514,10 @@ class MainWindow(QMainWindow):
         for widget in self._theme_refreshers:
             widget.apply_theme()
 
-    def _toggle_theme(self) -> None:
-        self._theme = "dark" if self._theme == "light" else "light"
-        set_theme(self._theme)
+    def _select_theme(self, name: str) -> None:
+        """切换预设主题（light/dark/nord），全链路换色并落盘（多主题 04）。"""
+        self._theme = name
+        set_theme(name)
         self.refresh_theme()
         self._save_settings()
 
@@ -534,7 +530,7 @@ class MainWindow(QMainWindow):
         KPI 磁贴颜色由 _apply_kpi_styles 承担（signal 重算，不动文本/动画）。
         """
         self._apply_qss()
-        self._update_theme_btn_text()
+        self._update_theme_btn()
         self._update_pin_btn_style()
         self._apply_theme_refreshers()
         self._apply_kpi_styles()

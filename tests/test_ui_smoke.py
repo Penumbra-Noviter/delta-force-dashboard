@@ -343,8 +343,8 @@ def test_w04_chart_hover_markers(sample_window):
         assert marker.opts["symbol"] == "o"
 
     # 主题切换标记描边色更新不崩（apply_theme 路径覆盖）
-    win._toggle_theme()
-    win._toggle_theme()
+    win._select_theme("dark")
+    win._select_theme("light")
 
 
 def test_window_preset_screen_adaptive(qapp):
@@ -389,7 +389,7 @@ def test_ic_emoji_free_and_icon_single_source(sample_window):
     assert win.sidebar.pin_btn.text() == "置顶"
     assert win.sidebar.new_account_btn.text() == "新建账号"
     assert win.sidebar.account_title.text() == "账号"
-    assert win.sidebar.theme_btn.text() in ("暗色", "亮色")
+    assert win.sidebar.theme_btn.text() in ("亮色", "暗色", "Nord")
 
     # 图标装配（sample_window 构造已触发 apply_theme，C1-08 启动期一次）
     for item in win.sidebar._nav_items:
@@ -842,17 +842,50 @@ def test_delete_record_cancel(sample_window, monkeypatch):
 
 
 def test_theme_toggle(sample_window):
-    """主题按钮点击切换，文字随主题变化。"""
+    """主题菜单选中切换，文字随主题变化。"""
     win = sample_window
 
     initial_text = win.sidebar.theme_btn.text()
-    assert initial_text in ("暗色", "亮色")
+    assert initial_text in ("亮色", "暗色", "Nord")
 
-    win.sidebar.theme_btn.click()  # 切到另一主题
+    win.sidebar.theme_selected.emit("dark")  # 切到暗色
     assert win.sidebar.theme_btn.text() != initial_text
 
-    win.sidebar.theme_btn.click()  # 切回
+    win.sidebar.theme_selected.emit("light")  # 切回
     assert win.sidebar.theme_btn.text() == initial_text
+
+
+def test_theme_menu_has_three_checkable_presets(sample_window):
+    """主题菜单列出 light/dark/nord 三预设，checkable 且初始勾选 light。"""
+    win = sample_window
+    actions = win.sidebar.theme_menu.actions()
+
+    assert [a.text() for a in actions] == ["亮色", "暗色", "Nord"]
+    assert all(a.isCheckable() for a in actions)
+    assert actions[0].isChecked() is True  # 初始 light
+    assert actions[1].isChecked() is False
+    assert actions[2].isChecked() is False
+
+
+def test_theme_menu_emits_selected_signal(sample_window):
+    """点击菜单项 → theme_selected 信号携带主题名。"""
+    win = sample_window
+    received: list = []
+    win.sidebar.theme_selected.connect(received.append)
+
+    win.sidebar._theme_actions["nord"].trigger()
+
+    assert received == ["nord"]
+
+
+def test_select_theme_switches_three_presets(sample_window, theme_guard):
+    """_select_theme 对 light/dark/nord 均全链路换色（get_color 反映目标主题）。"""
+    from app.theme import THEMES, get_color
+
+    win = sample_window
+    for name in ("dark", "nord", "light"):
+        win._select_theme(name)
+        assert get_color("BG") == THEMES[name]["BG"]
 
 
 def _icon_rgb(icon) -> tuple:
@@ -885,7 +918,7 @@ def test_icons_follow_theme_toggle(sample_window):
     win = sample_window
     light_rgb = _icon_rgb(win.sidebar._nav_items[0].icon())
 
-    win.sidebar.theme_btn.click()  # light → dark（refresh_theme 全链路）
+    win.sidebar.theme_selected.emit("dark")  # light → dark（refresh_theme 全链路）
     dark_rgb = _icon_rgb(win.sidebar._nav_items[0].icon())
 
     assert light_rgb != dark_rgb, "主题切换后图标颜色未变化（apply_theme 漏重建）"
@@ -893,7 +926,7 @@ def test_icons_follow_theme_toggle(sample_window):
     for actual, expected in zip(dark_rgb, want):
         assert abs(actual - expected) <= 6, f"图标色 {dark_rgb} ≠ FG_LABEL {want}"
 
-    win.sidebar.theme_btn.click()  # 切回 light（theme._current_theme 全局态，防泄漏）
+    win.sidebar.theme_selected.emit("light")  # 切回 light（theme._current_theme 全局态，防泄漏）
 
 
 def test_theme_toggle_updates_exchange_labels(sample_window):
@@ -908,7 +941,7 @@ def test_theme_toggle_updates_exchange_labels(sample_window):
     win = sample_window
     exchange = win.profit_page.exchange_page
 
-    win.sidebar.theme_btn.click()  # light → dark
+    win.sidebar.theme_selected.emit("dark")  # light → dark
     for i, cfg in enumerate(_PACKAGE_CONFIG):
         assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
             f"dark 下第 {i} 卡标签残留构建期色（apply_theme 链路未生效）"
@@ -918,7 +951,7 @@ def test_theme_toggle_updates_exchange_labels(sample_window):
             f"dark 下第 {i} 卡分隔线残留构建期色（Z-01 未生效）"
         )
 
-    win.sidebar.theme_btn.click()  # 切回 light
+    win.sidebar.theme_selected.emit("light")  # 切回 light
     for i, cfg in enumerate(_PACKAGE_CONFIG):
         assert get_color(cfg.color) in exchange._cards[i]._pkg_label.styleSheet(), (
             f"light 下第 {i} 卡标签未随主题重解析"
@@ -1083,7 +1116,7 @@ def test_settings_persistence(sample_window, tmp_path):
     test_settings = tmp_path / "settings.json"
 
     # 通过公开交互触发状态变更；closeEvent → _save_settings 落盘（公开 seam）
-    win.sidebar.theme_btn.click()   # _toggle_theme 内部已保存 theme
+    win.sidebar.theme_selected.emit("dark")   # _select_theme 内部已保存 theme
     win.sidebar.pin_btn.click()     # _toggle_pin 不落盘
     win.close()
 
@@ -1137,7 +1170,7 @@ def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
         settings_store=SettingsStore(settings_file),
         client=make_stub_client(),
     )
-    win.sidebar.theme_btn.click()  # _toggle_theme → _save_settings
+    win.sidebar.theme_selected.emit("dark")  # _select_theme → _save_settings
     win.close()                    # closeEvent → _save_settings
 
     saved = json.loads(settings_file.read_text(encoding="utf-8"))
@@ -1799,7 +1832,7 @@ def test_close_persists_current_account_with_other_settings(account_window_facto
         ),
     )
 
-    win.sidebar.theme_btn.click()  # 触发状态变更（theme 落盘路径）
+    win.sidebar.theme_selected.emit("dark")  # 触发状态变更（theme 落盘路径）
     win.close()
 
     saved = json.loads(
@@ -2511,7 +2544,7 @@ def test_kpi_styles_follow_theme_toggle(sample_window):
     text_before = win._summary_label.text()
     light_style = win._summary_label.styleSheet()
 
-    win.sidebar.theme_btn.click()  # light → dark
+    win.sidebar.theme_selected.emit("dark")  # light → dark
 
     dark_style = win._summary_label.styleSheet()
     assert dark_style != light_style, "KPI 磁贴样式必须随主题变化"
@@ -2519,7 +2552,7 @@ def test_kpi_styles_follow_theme_toggle(sample_window):
     # dark 下样式含当前主题信号色（样本数据总盈亏为正 → FG_POS）
     assert get_color("FG_POS") in dark_style
 
-    win.sidebar.theme_btn.click()  # dark → light 往返
+    win.sidebar.theme_selected.emit("light")  # dark → light 往返
     assert win._summary_label.styleSheet() == light_style
 
 
@@ -2602,9 +2635,9 @@ def test_full_chain_theme_toggle_roundtrip(sample_window):
         )
 
     assert_chain_themed()          # 初始 light
-    win.sidebar.theme_btn.click()  # → dark
+    win.sidebar.theme_selected.emit("dark")  # → dark
     assert_chain_themed()
-    win.sidebar.theme_btn.click()  # → light（往返）
+    win.sidebar.theme_selected.emit("light")  # → light（往返）
     assert_chain_themed()
 
 
