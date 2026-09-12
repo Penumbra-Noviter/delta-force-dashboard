@@ -18,12 +18,13 @@ __all__ = ["Sidebar"]
 from typing import ClassVar
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QComboBox,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -44,6 +45,17 @@ class Sidebar(QWidget):
     account_selected = Signal(str)
     # Y-04：点「新建账号」按钮（命名对话框由 MainWindow 弹出）
     create_account_requested = Signal()
+    # 多主题 04：主题菜单选中预设（切换由 MainWindow 处理）
+    theme_selected = Signal(str)
+    # 多主题 06：主题菜单「自定义…」入口（打开对话框由 MainWindow 处理）
+    custom_theme_requested = Signal()
+    # 预设主题名（菜单列出顺序）与显示标签（按钮文案 / 菜单项共用）
+    THEME_NAMES: ClassVar[tuple[str, ...]] = ("light", "dark", "nord")
+    THEME_LABELS: ClassVar[dict[str, str]] = {
+        "light": "亮色",
+        "dark": "暗色",
+        "nord": "Nord",
+    }
     # 导航项「(文本, 图标键)」元组列表（IC-债1：替代文本/图标键平行列表，
     # 消除 zip 按索引配对的数据团）。新增导航项必须带图标键——缺失即构造/
     # apply_theme 解包 ValueError 快速失败（比 render_icon 更早暴露）；
@@ -114,6 +126,27 @@ class Sidebar(QWidget):
         self.theme_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.theme_btn)
 
+        # 多主题 04：主题按钮挂预设菜单（light/dark/nord 三预设，checkable 勾选当前项；
+        # 点击项经 theme_selected 信号交 MainWindow，.click() 不再走二值翻转）。
+        self.theme_menu = QMenu(self.theme_btn)
+        self._theme_actions: dict[str, QAction] = {}
+        for name in self.THEME_NAMES:
+            action = QAction(self.THEME_LABELS[name], self.theme_menu)
+            action.setCheckable(True)
+            action.triggered.connect(
+                lambda checked=False, n=name: self.theme_selected.emit(n)
+            )
+            self.theme_menu.addAction(action)
+            self._theme_actions[name] = action
+        # 多主题 06：分隔符 + 「自定义…」入口（普通 action，非 checkable）
+        self.theme_menu.addSeparator()
+        self._custom_theme_action = QAction("自定义…", self.theme_menu)
+        self._custom_theme_action.triggered.connect(
+            lambda checked=False: self.custom_theme_requested.emit()
+        )
+        self.theme_menu.addAction(self._custom_theme_action)
+        self.theme_btn.setMenu(self.theme_menu)
+
         self.pin_btn = QPushButton("置顶")
         self.pin_btn.setObjectName("pinBtn")
         self.pin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -152,6 +185,14 @@ class Sidebar(QWidget):
         self.account_title.hide()
         self.account_combo.hide()
         self.new_account_btn.hide()
+
+    def set_theme_checked(self, name: str) -> None:
+        """勾选菜单中当前主题对应的 action（其余取消勾选）。
+
+        由 MainWindow._update_theme_btn 调用；未知 name 全不勾选（防御）。
+        """
+        for key, action in self._theme_actions.items():
+            action.setChecked(key == name)
 
     @property
     def current_index(self) -> int:

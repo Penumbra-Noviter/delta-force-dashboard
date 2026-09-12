@@ -246,6 +246,7 @@ def test_schema_constants_relationship():
         "pinned": False,
         "theme": "light",
         "animations": True,
+        "custom_theme": {},
     }
     assert set(DEFAULTS) <= set(KNOWN_KEYS)
     assert "current_account" in KNOWN_KEYS
@@ -333,7 +334,7 @@ def test_main_window_has_no_bare_settings_keys():
 
     import app.main_window as mw
 
-    setting_keys = {"geometry", "pinned", "theme", "animations", "current_account"}
+    setting_keys = {"geometry", "pinned", "theme", "animations", "custom_theme", "current_account"}
     tree = ast.parse(inspect.getsource(mw))
     violations: list[str] = []
     for node in ast.walk(tree):

@@ -7,19 +7,30 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from signals import PnLSignal, RateSignal
 
 __all__ = [
     "THEMES",
+    "CUSTOM",
+    "ANCHOR_KEYS",
+    "clean_overrides",
+    "contrast_hints",
     "generate_qss",
     "get_color",
+    "is_hex_color",
+    "register_custom",
+    "resolve_palette",
     "set_theme",
     "signal_color",
     "summary_style",
 ]
 
 logger = logging.getLogger(__name__)
+
+# 6 位 hex 颜色字面量（#RRGGBB，大小写均可，含 # 前缀）
+_HEX_COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}")
 
 # ── 主题色板 ──────────────────────────────────────────
 # 护眼配色：暖纸白底 + 温润青色（teal）主色调，降低蓝光刺激
@@ -174,17 +185,202 @@ THEMES = {
         "DANGER_BORDER": "#2d1a20",
         "DANGER_HOVER_BG": "#FF5F56",
     },
+    "nord": {
+        # ── Nord（Set 12：极夜底 + frost 冷调主色）──
+        # 暗色基调：Nord 极夜蓝灰底 + 冷调 frost 青主色；语义色保持绿涨红跌。
+        # 装饰色「Nord 冷调但提饱和」亮彩集：原版 Nord aurora 饱和度全部 <0.55
+        # 会撞 U-03 饱和度门槛，故重调为提饱和亮彩（实现期经 _hls/_contrast_ratio/
+        # _delta_e76 实测，见 tests/test_theme_roles.py 角色阈值守卫）。
+        "BG": "#2E3440",             # nord0 极夜（主背景）
+        "FG_LABEL": "#D8DEE9",       # nord4 正文（frost 亮灰）
+        "FG_MUTED": "#9AA7B8",       # 次级文字（对 CARD_BG ≥4.5:1）
+        "FG_POS": "#A3BE8C",         # nord14 绿涨（语义色）
+        "FG_NEG": "#BF616A",         # nord11 红跌（语义色）
+        "FG_TODAY": "#88C0D0",       # nord8 frost 青（主色/今日高亮）
+        "BTN_BG": "#88C0D0",         # nord8 frost 青主按钮（深字 AA）
+        "BTN_BG_HOVER": "#A3D5E2",   # 悬停提亮
+        "BTN_FG": "#2E3440",         # nord0 深底文字（青底显深字）
+        "BTN_HOVER_FG": "#ECEFF4",   # 危险按钮 hover 前景（nord6 雪白）
+        "BORDER_DEFAULT": "rgba(255,255,255,.08)",
+        "BORDER_VALID": "#A3BE8C",
+        "BORDER_INVALID": "#BF616A",
+        "BORDER_WARNING": "#EBCB8B",  # nord13 黄（警告）
+        "SEPARATOR": "rgba(255,255,255,.06)",
+        "PLACEHOLDER": "#9AA7B8",
+        "MUTED_BG": "#434C5E",        # nord2 panel-2 次级底
+        "CHART_CASH": "#88C0D0",      # frost 青（现金线）
+        "CHART_WAREHOUSE": "#EBCB8B", # nord13 黄（仓库线）
+        "CHART_TOTAL": "#A3BE8C",     # nord14 绿（总盈亏线=涨色）
+        "CHART_GRID": "#4C566A",      # nord3（6 位 hex；pyqtgraph 不解析 rgba）
+        "CHART_BG": "#2E3440",
+        "OVERLAY_BG": "rgba(0, 0, 0, 35)",
+        "CHART_AXIS": "#9AA7B8",
+        "TABLE_TEXT": "#D8DEE9",
+        "TABLE_TEXT_BOLD": "#ECEFF4",
+        "TABLE_ROW_EVEN_BG": "#3B4252",
+        "TABLE_ROW_ODD_BG": "#434C5E",
+        "TABLE_ROW_HOVER_BG": "#4C566A",
+        "TABLE_ROW_TODAY_BG": "#3D4A5C",
+        "TABLE_HEADER_BG": "#434C5E",
+        "TABLE_HEADER_FG": "#9AA7B8",
+        "CARD_BG": "#3B4252",         # nord1 卡片
+        "CARD_BORDER": "rgba(255,255,255,.07)",
+        "INPUT_BG": "#434C5E",
+        "INPUT_FG": "#ECEFF4",
+        "FOCUS_RING": "#88C0D0",
+        "SELECTION_BG": "#88C0D0",
+        "SELECTION_FG": "#2E3440",
+        "NAV_HOVER_BG": "rgba(255, 255, 255, 0.1)",
+        "NAV_SELECT_BG": "rgba(136, 192, 208, 0.14)",
+        "TEXT_PRIMARY": "#ECEFF4",
+        "TEXT_SECONDARY": "#D8DEE9",
+        "BORDER_HEAVY": "rgba(255,255,255,.12)",
+        "WARNING_BG": "#3B3623",
+        "WARNING_FG": "#EBCB8B",
+        "BADGE_FG": "#ECEFF4",
+        # 装饰色（Nord 冷调提饱和亮彩，U-03 角色规则：S≥0.55 / 对 CARD_BG AA 4.5:1 /
+        # 两两 ΔE76≥25 / 与 FG_POS·FG_NEG 亮度差≥0.05 / 明度带 NORD_BAND）
+        "PACKAGE_COLOR_0": "#9AAEF2",   # 蓝紫（通行证基础）
+        "PACKAGE_COLOR_1": "#F8EA7F",   # 金（4 级）
+        "PACKAGE_COLOR_2": "#8FE3DF",   # 青绿（3 级）
+        "PACKAGE_COLOR_3": "#F6A196",   # 珊瑚红（5 级）
+        "PACKAGE_COLOR_4": "#D29BF5",   # 紫（通行证高级）
+        "PACKAGE_COLOR_5": "#E4C797",   # 橙（进阶物流）
+        "PACKAGE_COLOR_6": "#EF9AC0",   # 粉（特级物流）
+        # 滚动条
+        "SCROLLBAR_BG": "#434C5E",
+        "SCROLLBAR_HANDLE": "rgba(255,255,255,.12)",
+        # 操作按钮语义色
+        "DANGER_BG": "#2E2326",
+        "DANGER_FG": "#BF616A",
+        "DANGER_BORDER": "#4A2C33",
+        "DANGER_HOVER_BG": "#BF616A",
+    },
 }
+
+# ── 自定义主题单槽位 + 六元锚点白名单 ─────────────────
+# 自定义主题存「派生源 base + 锚点覆盖 overrides」，运行时合并为完整色板，
+# 其余键继承 base（不展开 50 键快照，见 resolve_palette）。
+CUSTOM: dict[str, dict[str, object]] = {}
+
+# 可覆写锚点白名单：仅这 6 键允许覆盖；装饰色 / 表格行底 / 边框 / 图表色 /
+# 图标色（FG_MUTED / FG_LABEL / BTN_FG）一律继承 base（spec · Implementation Decisions）。
+ANCHOR_KEYS = (
+    "BTN_BG",
+    "BTN_BG_HOVER",
+    "FG_TODAY",
+    "BG",
+    "FG_POS",
+    "FG_NEG",
+)
 
 
 # ── 当前主题名称（运行时由 UI 切换） ─────────────────
 _current_theme = "light"
 
 
-def set_theme(name: str) -> None:
-    """切换当前主题（"light" | "dark"）。"""
-    global _current_theme
+def resolve_palette(name: str) -> dict[str, str]:
+    """解析主题名 → 完整色板（只读视图语义，调用方不得原地改）。
+
+    内置命中直返；自定义命中合并 `{**THEMES[base], **overrides}`；
+    其余（含畸形自定义槽位）回退 `THEMES["light"]`。全函数永不 raise。
+    """
     if name in THEMES:
+        return THEMES[name]
+    entry = CUSTOM.get(name)
+    if isinstance(entry, dict):
+        base = entry.get("base")
+        overrides = entry.get("overrides")
+        if base in THEMES and isinstance(overrides, dict):
+            return {**THEMES[base], **overrides}
+    return THEMES["light"]
+
+
+def register_custom(name: str, base: str, overrides: dict[str, str]) -> None:
+    """注册自定义主题槽位（name → base 派生源 + 锚点覆盖）。
+
+    name 与内置主题重名、或 base 非内置主题时拒绝写入并记 warning
+    （CUSTOM 保持原状，不 raise）；合法时写入 `{"base", "overrides"}`，
+    overrides 经 `clean_overrides` 清洗（非法 hex / 非锚点键注册前剔除）。
+    """
+    if name in THEMES:
+        logger.warning("register_custom 拒绝：name %r 与内置主题重名", name)
+        return
+    if base not in THEMES:
+        logger.warning("register_custom 拒绝：base %r 非内置主题", base)
+        return
+    CUSTOM[name] = {"base": base, "overrides": clean_overrides(overrides)}
+
+
+def is_hex_color(value: object) -> bool:
+    """判断是否为 6 位 hex 颜色（`#RRGGBB`，大小写均可，含 # 前缀）。"""
+    return isinstance(value, str) and bool(_HEX_COLOR_RE.fullmatch(value))
+
+
+def clean_overrides(overrides: dict[str, str]) -> dict[str, str]:
+    """清洗 override 覆盖：仅保留锚点白名单内且值为 6 位 hex 的键。
+
+    非 dict 输入 / 非法 hex 值 / 非锚点键均被剔除（防手改坏 settings，
+    不 raise）；返回新 dict，不原地改输入。
+    """
+    if not isinstance(overrides, dict):
+        return {}
+    return {
+        key: value
+        for key, value in overrides.items()
+        if key in ANCHOR_KEYS and is_hex_color(value)
+    }
+
+
+def _lin(c: float) -> float:
+    """sRGB 分量 → 线性光分量（WCAG 反 gamma）。"""
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(color: str) -> float:
+    """sRGB（#RRGGBB）→ WCAG 相对亮度（0~1）。"""
+    c = color.lstrip("#")
+    r, g, b = (int(c[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    r, g, b = (_lin(x) for x in (r, g, b))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast_ratio(a: str, b: str) -> float:
+    """两色 WCAG 对比度（(L1+0.05)/(L2+0.05)）。"""
+    la, lb = _relative_luminance(a), _relative_luminance(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def contrast_hints(palette: dict[str, str]) -> list[str]:
+    """计算 3 组文字对的 WCAG 对比度软提示（不硬拒）。
+
+    检查 `BTN_BG` vs `BTN_FG`、`FG_TODAY` vs `BG`、`FG_POS` / `FG_NEG` vs
+    `BG`；任一 <4.5:1 返回对应提示。非 6 位 hex 值跳过。返回提示列表
+    （空列表 = 全部达标），由调用方决定如何展示。
+    """
+    hints: list[str] = []
+    pairs = (
+        ("BTN_BG", "BTN_FG", "按钮文字"),
+        ("FG_TODAY", "BG", "今日高亮"),
+        ("FG_POS", "BG", "涨色"),
+        ("FG_NEG", "BG", "跌色"),
+    )
+    for fg_key, bg_key, label in pairs:
+        fg = palette.get(fg_key, "")
+        bg = palette.get(bg_key, "")
+        if not is_hex_color(fg) or not is_hex_color(bg):
+            continue
+        ratio = _contrast_ratio(fg, bg)
+        if ratio < 4.5:
+            hints.append(f"{label}对比度 {ratio:.2f}:1 低于 4.5:1")
+    return hints
+
+
+def set_theme(name: str) -> None:
+    """切换当前主题（内置 THEMES 或已注册的自定义 CUSTOM）。"""
+    global _current_theme
+    if name in THEMES or name in CUSTOM:
         _current_theme = name
 
 
@@ -194,7 +390,7 @@ def get_color(key: str) -> str:
     未知键：记录 warning（含键名）后返回 ""（不 raise，防御语义保持）
     ——让「漏改键 → 静默失效」变成「漏改键 → 日志可见」（C1-06）。
     """
-    palette = THEMES[_current_theme]
+    palette = resolve_palette(_current_theme)
     value = palette.get(key, "")
     if value == "" and key not in palette:
         logger.warning("get_color 未知主题键: %r", key)
@@ -240,7 +436,7 @@ def summary_style(signal: RateSignal) -> str:
 
 def generate_qss(theme_name: str) -> str:
     """根据主题名称生成完整 QSS 样式表。"""
-    t = THEMES.get(theme_name, THEMES["light"])
+    t = resolve_palette(theme_name)
 
     bg = t["BG"]
     fg_label = t["FG_LABEL"]

@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
@@ -33,8 +34,11 @@ from config import (
     SETTINGS_FILE,
 )
 from app.theme import (
+    CUSTOM,
+    THEMES,
     generate_qss,
     get_color,
+    register_custom,
     set_theme,
 )
 from app.dashboard_page import DashboardPage
@@ -66,6 +70,7 @@ _KEY_PINNED = "pinned"
 _KEY_THEME = "theme"
 _KEY_ANIMATIONS = "animations"
 _KEY_CURRENT_ACCOUNT = "current_account"
+_KEY_CUSTOM_THEME = "custom_theme"
 
 # DPI scaling on Windows
 if platform.system() == "Windows":
@@ -90,7 +95,9 @@ class MainWindow(QMainWindow):
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self._settings = self.settings_store.load()
         self._theme = self._settings.get(_KEY_THEME, "light")
-        set_theme(self._theme)
+        # 多主题（03）：启动先注册自定义槽位，非法主题名回退 light（双保险——
+        # theme 层 resolve_palette 未知回退 light，此处显式校验并持久化）。
+        theme_corrected = self._resolve_startup_theme()
         # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
         set_animations_enabled(self._settings.get(_KEY_ANIMATIONS, True))
 
@@ -152,6 +159,10 @@ class MainWindow(QMainWindow):
 
         self.input_panel.focus_cash()
 
+        # 启动期非法主题名已回退 light：持久化纠正结果（多主题 03）。
+        if theme_corrected:
+            self._save_settings()
+
     # ═══════════════════════════════════════════════════════
     # 窗口设置
     # ═══════════════════════════════════════════════════════
@@ -209,6 +220,34 @@ class MainWindow(QMainWindow):
     # 设置持久化
     # ═══════════════════════════════════════════════════════
 
+    def _register_custom_theme(self) -> None:
+        """读 settings.custom_theme 注册自定义槽位（多主题 03）。
+
+        custom_theme 非 dict / base 非 str / overrides 非 dict 均跳过不注册；
+        register_custom 内部拒绝非法 base，clean_overrides 剔除非法覆盖——
+        全程不 raise，手改坏 settings 不崩。
+        """
+        custom = self._settings.get(_KEY_CUSTOM_THEME, {})
+        if not isinstance(custom, dict):
+            return
+        base = custom.get("base")
+        overrides = custom.get("overrides")
+        if isinstance(base, str) and isinstance(overrides, dict):
+            register_custom("custom", base, overrides)
+
+    def _resolve_startup_theme(self) -> bool:
+        """启动主题解析：注册 custom 后切主题，非法名回退 light。
+
+        返回是否纠正了非法主题名（True 时调用方持久化纠正结果）。
+        """
+        self._register_custom_theme()
+        corrected = False
+        if self._theme not in THEMES and self._theme not in CUSTOM:
+            self._theme = "light"
+            corrected = True
+        set_theme(self._theme)
+        return corrected
+
     def _save_settings(self) -> None:
         """合并更新设置并原子落盘（C3-11：走 settings_store.update，未知键保留）。
 
@@ -223,6 +262,8 @@ class MainWindow(QMainWindow):
         patch[_KEY_ANIMATIONS] = self._settings.get(_KEY_ANIMATIONS, True)
         if self.current_account is not None:
             patch[_KEY_CURRENT_ACCOUNT] = self.current_account
+        # 多主题（03）：custom_theme 一并落盘（存派生源 base+overrides，不展开 50 键）。
+        patch[_KEY_CUSTOM_THEME] = CUSTOM.get("custom", {})
         self._settings = self.settings_store.update(patch)
 
     def _update_account_title(self) -> None:
@@ -384,20 +425,15 @@ class MainWindow(QMainWindow):
         # ── 侧边栏导航切换 ──
         self.sidebar.nav_changed.connect(self._stack.setCurrentIndex)
 
-        self._update_theme_btn_text()
+        self._update_theme_btn()
 
-    def _update_theme_btn_text(self) -> None:
-        # IC-02：emoji → SVG 图标（light 主题显示 moon「暗色」目标，dark 反之）
-        if self._theme == "light":
-            self.sidebar.theme_btn.setText("暗色")
-            self.sidebar.theme_btn.setIcon(
-                render_icon("moon", get_color("FG_MUTED"))
-            )
-        else:
-            self.sidebar.theme_btn.setText("亮色")
-            self.sidebar.theme_btn.setIcon(
-                render_icon("sun", get_color("FG_MUTED"))
-            )
+    def _update_theme_btn(self) -> None:
+        # 多主题 04：按钮文案显示当前主题名；light=太阳、dark/nord=月亮。
+        label = Sidebar.THEME_LABELS.get(self._theme, self._theme)
+        icon_name = "sun" if self._theme == "light" else "moon"
+        self.sidebar.theme_btn.setText(label)
+        self.sidebar.theme_btn.setIcon(render_icon(icon_name, get_color("FG_MUTED")))
+        self.sidebar.set_theme_checked(self._theme)
 
     # ═══════════════════════════════════════════════════════
     # 信号连接
@@ -414,7 +450,8 @@ class MainWindow(QMainWindow):
         self.table.view_changed.connect(self._on_view_changed)
 
         # 侧边栏按钮
-        self.sidebar.theme_btn.clicked.connect(self._toggle_theme)
+        self.sidebar.theme_selected.connect(self._select_theme)
+        self.sidebar.custom_theme_requested.connect(self._open_custom_theme_dialog)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
         # Y-04：账号区——新建账号（命名对话框）；下拉选择切换（Y-05 接线）
@@ -479,9 +516,32 @@ class MainWindow(QMainWindow):
         for widget in self._theme_refreshers:
             widget.apply_theme()
 
-    def _toggle_theme(self) -> None:
-        self._theme = "dark" if self._theme == "light" else "light"
-        set_theme(self._theme)
+    def _open_custom_theme_dialog(self) -> None:
+        """打开自定义主题对话框；accept 后注册并应用 custom，cancel 无副作用。
+
+        预填当前自定义派生源（无自定义则以当前主题作 base）；对话框只收集
+        (base, overrides)，此处执行 register_custom + _select_theme("custom")。
+        """
+        from app.theme_dialog import ThemeDialog
+
+        custom = CUSTOM.get("custom")
+        if isinstance(custom, dict):
+            base = custom.get("base", "light")
+            overrides = custom.get("overrides", {})
+        else:
+            base = self._theme if self._theme in THEMES else "light"
+            overrides = {}
+
+        dlg = ThemeDialog(base, overrides, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_base, new_overrides = dlg.result()
+            register_custom("custom", new_base, new_overrides)
+            self._select_theme("custom")
+
+    def _select_theme(self, name: str) -> None:
+        """切换主题（预设 light/dark/nord 或已注册 custom），全链路换色并落盘。"""
+        self._theme = name
+        set_theme(name)
         self.refresh_theme()
         self._save_settings()
 
@@ -494,7 +554,7 @@ class MainWindow(QMainWindow):
         KPI 磁贴颜色由 _apply_kpi_styles 承担（signal 重算，不动文本/动画）。
         """
         self._apply_qss()
-        self._update_theme_btn_text()
+        self._update_theme_btn()
         self._update_pin_btn_style()
         self._apply_theme_refreshers()
         self._apply_kpi_styles()

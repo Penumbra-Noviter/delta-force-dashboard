@@ -2,7 +2,7 @@
 
 > 版本：PySide6 版（三阶段 + Phase 4 + C 系列 + O 系列 + D 系列 + F 系列运维 + G/H/J 系列 + K/L/X/Y/Z 系列 + 架构加深 C1~C3 + C4~C7 kickoff 批次 + BD 批次（2026-08-13）+ F-01 增强（2026-08-14）全部完成）  
 > 生成日期：2026-08-14  
-> 测试状态：<!--AUTO:tests_total:total-->643<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
+> 测试状态：<!--AUTO:tests_total:total-->695<!--/AUTO--> 项 pytest 全部通过（含 UI 烟测 + 制造产物推荐 + 兑换利润）
 
 ---
 
@@ -17,7 +17,7 @@
 | 图表库 | pyqtgraph（原生 Qt 渲染，高性能） |
 | 数据存储 | 本地 JSON 文件（原子写入 + 滚动备份） |
 | 打包方式 | PyInstaller → onedir 目录（`dist/Delta Force Dashboard/`，O-20 起） |
-| 测试框架 | pytest（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项） |
+| 测试框架 | pytest（<!--AUTO:tests_total:total-->695<!--/AUTO--> 项） |
 | 开发阶段 | 三阶段 + Phase 4（T-01~T-05）+ C 系列（C1~C9）+ O 系列（O-01~O-22，O-07 YAGNI 关闭）+ D 系列（D-01~D-08）+ F 系列运维（F-01 文档同步 / F-02 迁移源清理标记）+ J 系列（J-01 保留上限 30 / J-02 视图 7/30 切换，ADR-0003）+ K/L/X/Y/Z 系列 + 架构加深 C1~C3（2026-08-11）+ C4~C7 kickoff 批次（2026-08-12）+ BD 批次（2026-08-13，密码门第三模块）全部完成 |
 
 ---
@@ -99,7 +99,8 @@ Delta Force Dashboard/
 │   ├── input_panel.py       ← 输入面板：MoneyLineEdit + 校验 + 编辑模式
 │   ├── table_widget.py      ← 双栏数据表格（视图 7/30 按钮组切换，7 列）
 │   ├── chart_widget.py      ← pyqtgraph 双 Y 轴曲线图（单坐标系）+ PNG 导出 + 稀疏数据提示
-│   └── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
+│   ├── theme.py             ← QSS 样式表生成（从 config.py 复用 THEMES 色板）
+│   └── theme_dialog.py      ← 自定义主题对话框（base 下拉 + 6 锚点取色 + 实时预览 + 软提示，多主题 05）
 ├── calculator.py            ← [业务逻辑] DayRecord 数据类 + ProfitCalculatorLogic
 ├── account_store.py         ← [多账号（Y 系列）] AccountStore 账号目录管理 + 校验 + v2 迁移（ADR-0005）
 ├── signals.py               ← [领域信号] RateSignal + PnLSignal 共享叶子（零依赖，D-01 收敛点）
@@ -128,12 +129,14 @@ Delta Force Dashboard/
 │   ├── test_table_theme.py  ← <!--AUTO:tests:tests/test_table_theme.py-->8<!--/AUTO--> 个测试（C1 主题色实时解析 + D-01 零差值）
 │   ├── test_settings_store.py ← <!--AUTO:tests:tests/test_settings_store.py-->34<!--/AUTO--> 个测试（D-02 json_file seam + SettingsStore 容错 + on_error 回调/异常详情回归）
 │   ├── test_migration.py    ← <!--AUTO:tests:tests/test_migration.py-->14<!--/AUTO--> 个测试（O-22 数据目录迁移 + mkdir 顺序回归 + F-02 .migrated 标记/清理提示）
-│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->111<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
+│   ├── test_ui_smoke.py     ← <!--AUTO:tests:tests/test_ui_smoke.py-->127<!--/AUTO--> 个测试（C5 UI 烟测 + O-04/05/06/08/09/13/14，offscreen）
 │   ├── test_kkrb_client.py  ← <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> 个测试（数据模型 + 客户端会话/传输/缓存 + 解析收敛验证）
 │   ├── test_kkrb_parsing.py ← <!--AUTO:tests:tests/test_kkrb_parsing.py-->44<!--/AUTO--> 个测试（解析纯函数 + 畸形输入矩阵：非 dict/缺字段/类型异常/排序/回退 key）
 │   ├── test_load_state.py   ← <!--AUTO:tests:tests/test_load_state.py-->8<!--/AUTO--> 个测试（LoadState 四态转移矩阵：防重入/失败重试/loaded 手动刷新）
 │   ├── test_theme_qss.py    ← <!--AUTO:tests:tests/test_theme_qss.py-->4<!--/AUTO--> 个测试（主题双轨收敛：reuseBtn danger 属性选择器/button_style 删除守卫/属性切换）
-│   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->14<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
+│   ├── test_theme_roles.py  ← <!--AUTO:tests:tests/test_theme_roles.py-->15<!--/AUTO--> 个测试（U-03 色彩角色：键名如实/键引用完整/装饰≠语义/明度带/饱和度/两两色差/标签对比度）
+│   ├── test_theme_custom.py ← <!--AUTO:tests:tests/test_theme_custom.py-->22<!--/AUTO--> 个测试（多主题 01：resolve_palette 统一取色通路 + register_custom 自定义槽位 + 三入口合并取色 + theme_guard 恢复 CUSTOM）
+│   ├── test_theme_dialog.py ← <!--AUTO:tests:tests/test_theme_dialog.py-->13<!--/AUTO--> 个测试（多主题 05：ThemeDialog 结果契约 + 预填 + 取色 + 预览 + 软提示 + 取消无副作用）
 │   ├── test_fetch_pages.py  ← <!--AUTO:tests:tests/test_fetch_pages.py-->36<!--/AUTO--> 个测试（T-01 FetchWorker 安全关闭/逃生舱托管 + T-02 preload 幂等/失败日志 + T-03 基类提炼回归）
 │   ├── test_dashboard_page.py ← <!--AUTO:tests:tests/test_dashboard_page.py-->4<!--/AUTO--> 个测试（C4/C5 DashboardPage：bundle 契约/布局层级/公开标签属性/装配不接线）
 │   ├── test_no_registry.py    ← <!--AUTO:tests:tests/test_no_registry.py-->2<!--/AUTO--> 个测试（C6 守卫：全库零 WidgetRegistry/AppWidget 引用 + registry.py 已删）
@@ -174,7 +177,7 @@ Delta Force Dashboard/
 
 ---
 
-### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~651 行<!--/AUTO-->）
+### 4.2 `app/main_window.py` — 主窗口（<!--AUTO:lines:app/main_window.py-->~702 行<!--/AUTO-->）
 
 **核心类**：`MainWindow(QMainWindow)`
 
@@ -195,7 +198,8 @@ Delta Force Dashboard/
 | <!--AUTO:sig:app/main_window.py:MainWindow._start_edit-->`_start_edit(date_str, record)`<!--/AUTO--> | 进入编辑模式，回填数据到输入面板 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._cancel_edit-->`_cancel_edit()`<!--/AUTO--> | 退出编辑模式，清空输入框 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._delete_record-->`_delete_record(date_str)`<!--/AUTO--> | 确认对话框 → 删除数据 → 持久化 → 刷新 |
-| <!--AUTO:sig:app/main_window.py:MainWindow._toggle_theme-->`_toggle_theme()`<!--/AUTO--> | 切换亮/暗主题，增量更新 QSS + 图表颜色 |
+| <!--AUTO:sig:app/main_window.py:MainWindow._select_theme-->`_select_theme(name)`<!--/AUTO--> | 切换主题（预设 light/dark/nord 或已注册 custom），全链路换色并落盘（多主题 04；原 `_toggle_theme` 二值翻转移除，主题菜单经 `theme_selected` 信号接此） |
+| <!--AUTO:sig:app/main_window.py:MainWindow._open_custom_theme_dialog-->`_open_custom_theme_dialog()`<!--/AUTO--> | 打开自定义主题对话框（多主题 06）：预填当前派生源，accept 后 `register_custom` + `_select_theme("custom")`，cancel 无副作用 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._toggle_pin-->`_toggle_pin()`<!--/AUTO--> | 切换窗口置顶状态 |
 | <!--AUTO:sig:app/main_window.py:MainWindow._save_settings-->`_save_settings()`<!--/AUTO--> | 编码窗口状态（geometry/theme/pinned）→ 委托 `settings_store.save()`（D-02）；Y-03：注入模式外合并 `current_account` 落盘（Y-03，重启回到当前账号） |
 | <!--AUTO:sig:app/main_window.py:MainWindow._update_account_title-->`_update_account_title()`<!--/AUTO--> | 记账页标题栏显示「Delta Force Dashboard · <账号名>」（Y-03；注入模式保持原标题） |
@@ -370,7 +374,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~650 行<!--/AUTO-->）
+### 4.6 `app/theme.py` — 主题系统（<!--AUTO:lines:app/theme.py-->~823 行<!--/AUTO-->）
 
 主题数据的单一真实来源：内联定义 `THEMES` 色板字典与 `get_color`/`set_theme`（T-02 迁入，不再从 config.py 导入），并生成 QSS 样式表，专供 `app/` 内的 PySide6 组件使用；D-01 起还负责「收益率信号 → 主题色」映射（`signal_color`）。
 
@@ -379,6 +383,8 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 | <!--AUTO:sig:app/theme.py:generate_qss-->`generate_qss(theme_name)`<!--/AUTO--> | 根据主题名生成完整 QSS 样式表（全局/标签/输入框/按钮/表格/卡片/滚动条/提示框） |
 | <!--AUTO:sig:app/theme.py:set_theme-->`set_theme(name)`<!--/AUTO--> | 切换当前主题（"light" \| "dark"） |
 | <!--AUTO:sig:app/theme.py:get_color-->`get_color(key)`<!--/AUTO--> | 取当前主题下指定颜色值（渲染期实时解析，C1；**禁止 import 期调用**）；未知键 `logger.warning`（含键名）后返回 `""`，不 raise（C1-06，`generate_qss` 的 `t[...]` 直接索引语义不变） |
+| <!--AUTO:sig:app/theme.py:resolve_palette-->`resolve_palette(name)`<!--/AUTO--> | 统一取色通路（多主题 01）：内置直返 / 自定义合并 `{**THEMES[base], **overrides}` / 其余回退 `THEMES["light"]`，永不 raise；`get_color` / `generate_qss` 均经此取色 |
+| <!--AUTO:sig:app/theme.py:register_custom-->`register_custom(name, base, overrides)`<!--/AUTO--> | 注册自定义主题槽位（多主题 01）：name 与内置重名或 base 非内置 → 拒绝写入 + warning（不 raise，`CUSTOM` 原状）；合法写入 `{"base", "overrides"}` |
 | <!--AUTO:sig:app/theme.py:signal_color-->`signal_color(signal)`<!--/AUTO--> | 收益率信号 `RateSignal` → 当前主题颜色：经 `_SIGNAL_TO_KEY` 映射后由 `get_color` 实时解析（D-01；`RateSignal` 定义于 `signals.py`） |
 
 **QSS 覆盖范围**：QMainWindow, QLabel, QLineEdit, QPushButton, QTableWidget, QHeaderView, QFrame, QStatusBar, QScrollBar, QToolTip。
@@ -522,7 +528,7 @@ ViewBox 的 `linkToView` 同步在 `_create` 的 `_sync` 闭包内维护，resiz
 
 ---
 
-### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~110 行<!--/AUTO-->）
+### 4.13 `settings_store.py` — 设置持久化（D-02，<!--AUTO:lines:settings_store.py-->~111 行<!--/AUTO-->）
 
 #### 类：`SettingsStore`
 
@@ -709,6 +715,17 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 
 ---
 
+### 4.27 `app/theme_dialog.py` — 自定义主题对话框（多主题 05，<!--AUTO:lines:app/theme_dialog.py-->~141 行<!--/AUTO-->）
+
+独立自定义主题对话框：base 下拉（`light` / `dark` / `nord`）+ 6 锚点取色（经 `QColorDialog`）+ 实时预览（按 `resolve_palette` 合并范式渲染示例控件）+ 对比度软提示（复用 `contrast_hints`，3 组文字对 <4.5:1 时非阻断提示、不硬拒）。只收集并暴露结果契约 `(base, overrides)`，不持有全局主题状态、不直接 `set_theme`（应用到整窗由 06 接上）；预览为瞬态、不进刷新器登记列表（C7 保持）。
+
+| 方法 | 说明 |
+|------|------|
+| <!--AUTO:sig:app/theme_dialog.py:ThemeDialog.__init__-->`__init__(base, overrides=None, parent=None)`<!--/AUTO--> | 预填 base 与 6 锚点（overrides 覆盖 base 默认值），构建 UI 并首帧预览 |
+| <!--AUTO:sig:app/theme_dialog.py:ThemeDialog.result-->`result()`<!--/AUTO--> | 结果契约：返回 `(base, overrides)`，overrides 仅含与 base 默认值不同的 6 锚点 |
+
+---
+
 ## 五、依赖关系
 
 ### 5.1 外部依赖
@@ -718,7 +735,7 @@ CraftingPage / ExchangePage 共享基类（模块 docstring 见文件头）：sh
 | PySide6 | ==6.11.1 | Qt 官方 Python 绑定，UI 框架 |
 | pyqtgraph | ==0.14.0 | 高性能 Qt 原生图表渲染 |
 | numpy | (pyqtgraph 的传递依赖) | 数值计算（图表数据） |
-| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->643<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
+| pytest | ==9.1.1（requirements-dev.txt） | 单元测试框架（<!--AUTO:tests_total:total-->695<!--/AUTO--> 项，含制造产物推荐 + 兑换利润） |
 
 ### 5.2 模块间依赖关系图
 
@@ -820,6 +837,8 @@ main.py
 | `tests/test_motion.py` | <!--AUTO:tests:tests/test_motion.py-->11<!--/AUTO--> | C1 在途动画注册表与控制动词：工厂返回 bool/同目标替换丢弃旧动画/finish 落终帧 vs stop 丢弃/关动效落终态/不可弱引用宿主防御/弱键宿主销毁出表/fade effect 两条路径摘除 |
 | `tests/test_qt_teardown.py` | <!--AUTO:tests:tests/test_qt_teardown.py-->1<!--/AUTO--> | DFD-7 回归：子进程单独运行 `tests/test_fetch_pages.py` 断言退出码 0（Qt 对象在解释器关闭期析构 → Windows 堆损坏 `0xC0000374`；修复见 conftest `qt_teardown`） |
 | `tests/test_bonus_door_page.py` | <!--AUTO:tests:tests/test_bonus_door_page.py-->15<!--/AUTO--> | BD-02 密码门页面：懒加载三态/空态占位/错误态占位（C2-05）/动态卡片重建/apply_theme super() 刷新基类图标（IC-03）/内联无颜色字面量/双主题 QSS 选择器/密码色随主题/构造注入 stub client |
+| `tests/test_theme_custom.py` | <!--AUTO:tests:tests/test_theme_custom.py-->22<!--/AUTO--> | 多主题（01）：resolve_palette 内置直返/自定义合并 base+overrides/未知回退 light/畸形槽位永不 raise；register_custom 合法写入与非法拒绝（name 重名/非内置 base，不 raise、CUSTOM 原状）；set_theme 接受 THEMES∪CUSTOM；get_color/generate_qss/signal_color/summary_style 经 resolve_palette 取色；theme_guard 恢复 CUSTOM 槽位 |
+| `tests/test_theme_dialog.py` | <!--AUTO:tests:tests/test_theme_dialog.py-->13<!--/AUTO--> | 多主题（05）：ThemeDialog 构造/base 下拉三预设/预填（overrides 覆盖 base）/base 变更重置锚点/6 锚点取色/实时预览/对比度软提示/结果契约 (base, overrides) 仅 6 锚点/reject 无副作用/不污染全局主题状态（monkeypatch QColorDialog 防阻塞） |
 
 **运行方式**：在项目根目录执行 `pytest`
 
@@ -830,7 +849,7 @@ offscreen 模式下覆盖原 14 个模块中的 UI 部分：
 
 | 测试文件 | 用例数 | 覆盖范围 |
 |----------|--------|----------|
-| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->111<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
+| `tests/test_ui_smoke.py` | <!--AUTO:tests:tests/test_ui_smoke.py-->127<!--/AUTO--> | UI 启动/渲染、保存、编辑、删除（确认/取消）、主题切换、窗口置顶、设置持久化、几何恢复（兼容旧 Tkinter 格式）、输入校验联动（D-04 真实事件链路）、快捷键（Enter/Esc）、CSV 导出按钮、今日未录入提醒、图表稀疏提示（O-06）、编辑态关窗确认（O-13）、自动清理提示（O-14）；Y 系列账号（Y-03 解析链路/兜底/落盘回读、Y-04 账号区初始态/新建/非法名拒绝/注入隐藏、Y-05 切换刷新/重启回读/编辑复用态取消/保存删除 CSV 落新账号/同账号 no-op） |
 | `tests/test_kkrb_client.py` | <!--AUTO:tests:tests/test_kkrb_client.py-->35<!--/AUTO--> | 数据模型 + OV 响应解析 |
 | `tests/test_fetch_pages.py` | <!--AUTO:tests:tests/test_fetch_pages.py-->36<!--/AUTO--> | T-01 FetchWorker shutdown/超时逃生舱托管/关窗不崩溃 + T-02 preload 幂等/构造注入 stub client（C2 删 offscreen 哨兵）/失败日志 + T-03 基类提炼后懒加载/渲染/主题色收敛/_error 死状态移除；C2 起：共享 client 并发、_render_error 错误态 |
 | `tests/test_input_panel.py` | <!--AUTO:tests:tests/test_input_panel.py-->24<!--/AUTO--> | InputPanel getter 语义 / raw getter / 校验真实事件链路与焦点链路（D-04：聚焦反格式化护栏、失焦立即校验、失焦格式化）/ refresh_validity 同步 seam 契约 / 编辑状态归属 / C9 静态守卫 / save_today 走公开 API / cash≤warehouse 不变式警告与保存拦截（O-08） |

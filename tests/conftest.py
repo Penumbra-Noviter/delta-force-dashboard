@@ -119,13 +119,20 @@ def type_and_settle(qapp):
 
 @pytest.fixture
 def theme_guard():
-    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值（C3 收敛，防状态泄漏）。"""
+    """隔离模块级主题状态：测试前复位为 light，测试后恢复原值（C3 收敛，防状态泄漏）。
+
+    多主题（01）：同时恢复自定义槽位 CUSTOM（浅拷贝）——自定义槽位是
+    跨用例新的泄漏面，测试注册后须还原，否则污染后续用例。
+    """
     import app.theme as theme_mod
 
     saved = theme_mod._current_theme
+    saved_custom = theme_mod.CUSTOM.copy()
     theme_mod.set_theme("light")
     yield
     theme_mod._current_theme = saved
+    theme_mod.CUSTOM.clear()
+    theme_mod.CUSTOM.update(saved_custom)
 
 
 @pytest.fixture(autouse=True)
