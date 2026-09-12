@@ -22,7 +22,6 @@
 
 | Ticket | 标题 | 依赖 | 状态 |
 |--------|------|------|------|
-| DFD-8 | 预设主题名单单源化：`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES` 三处散落 → 收敛为 `theme.PRESET_NAMES`/`PRESET_LABELS` 单一来源 + set 守卫 | — | 🔄 进行中 |
 
 ---
 
@@ -52,6 +51,16 @@
 ## 已完成归档
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文由 git 历史承担）。
+
+### DFD-8 技术债消费批次（2026-09-09，kickoff 轻量档，基线 523dd52，分支 kickoff/dfd-8）
+
+> 来源：消费多主题批次技术债候选 DFD-8（期末四轴 Architecture A1）。叙述见 DEV_LOG〈滚动摘要 2026-09-09〉；本表只承载工单事实。
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| DFD-8 | 预设主题名单单源化：`PRESET_NAMES`/`PRESET_LABELS` 收敛到 `theme.py`，sidebar/theme_dialog/main_window 改引用，+2 set 守卫 | ✅ 2026-09-09 | `8fb2cda` |
+
+期末验证：697/697 全绿（+2 守卫）、doc_sync 双绿、迁移零残留、覆盖率 96%。
 
 ### 多主题批次（2026-09-09，kickoff 标准档快速档，基线 5d6a29d，分支 kickoff/multi-theme）
 

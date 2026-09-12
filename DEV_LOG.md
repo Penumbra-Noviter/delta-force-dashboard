@@ -16,6 +16,11 @@
   - **避坑 2（二值切换是测试契约）**：`test_ui_smoke` 13 处 `theme_btn.click()` + 2 处 `_toggle_theme()` 迁移到 `theme_selected.emit` / `_select_theme`，绕开 `QMenu.exec()` 阻塞 offscreen。
   - **验收**：695/695 全绿（+52，70.54s）；全局覆盖率 95%（`theme.py`/`theme_dialog.py` 100%）；doc_sync 双绿；冒烟 SMOKE OK（三预设切换 + 自定义应用 + 对话框契约）；期末四轴审核通过无阻断，4 项非阻断落盘 TECH_DEBT（DFD-8~11）。
 
+- **DFD-8 技术债消费（2026-09-09，kickoff 轻量档，基线 523dd52）——预设主题名单单源化**：
+  - **问题**：预设名单三处散落（`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES`），新增预设需三处同步（期末四轴 Architecture A1）。
+  - **变更**：`theme.py` 新增 `PRESET_NAMES`/`PRESET_LABELS` 单一来源并纳入 `__all__`；sidebar/theme_dialog/main_window 删散落定义改引用；+2 条 set 守卫（`set(PRESET_NAMES)==set(THEMES)` / `set(PRESET_LABELS)==set(PRESET_NAMES)`）。
+  - **验收**：697/697 全绿（+2）、doc_sync 双绿、迁移 grep 零残留、覆盖率 96%。
+
 ## 滚动摘要（2026-09-08 — 架构评审 C1：动画句柄生命周期回归 motion）
 
 - **打包验证（2026-09-09，C1~C7 + DFD-7 批次后重建，基线 643/643）**：PyInstaller 6.21.0 `delta_force_dashboard.spec --noconfirm` 重建 onedir（`dist/Delta Force Dashboard/` 66.4M，exe 6.9MB，UPX 压缩；构建前全量 pytest 643/643 + doc_sync --check 双绿）；**避坑 1（bincache 沙箱拦截）**：本机沙箱只放行工作区/平台临时区，PyInstaller 6.21 全局 bincache（`%LOCALAPPDATA%\pyinstaller\bincache01py31264bit`）写入被拒（PermissionError on COLLECT）——`configure.py` 优先读 `PYINSTALLER_CONFIG_DIR` 环境变量，构建时重定向到 `%TEMP%` 下全新缓存目录绕开（不触碰全局缓存，产物与正常流程一致；两处 WARNING 均无害：`pyqtgraph.opengl` 可选子模块未收集（应用不 import）、`python3.dll` NotCompressible 被 UPX 跳过）；**避坑 2（沙箱拦截命名管道 → 单实例锁误判）**：沙箱内启动 exe 时 `QLocalServer.listen` 返回「拒绝访问」→ `_is_already_running` 误判「已有实例在运行」静默退出（非产物缺陷，源码态最小复现同款失败）——冒烟按历史惯例以完整权限真实启动：**PID 5196 存活 12s（172MB），crash.log 无新增（2184B 未变），日志新增今日启动行（kkrb_client CSRF token 已获取 = 预加载正常），回收后进程零残留**；release 资产 `dist/default.zip` 重建 41.3MB（290 条目，覆盖 08-29 旧版）；build/ 中间产物已生成（可随时清）；此构建含 C1~C7 重构与 DFD-7 测试基建修复，冒烟即对其启动路径的打包侧验收
