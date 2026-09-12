@@ -6,9 +6,12 @@
 
 ---
 
-## 滚动摘要（2026-09-13 — TECH_DEBT Speculative 复核关闭）
+## 滚动摘要（2026-09-13 — TECH_DEBT Speculative 复核关闭 + 打包发布）
 
 - **DFD-9/10/11 复核关闭（2026-09-13）**：多主题批次遗留的 3 条 Speculative 候选逐条 `git grep` 复核，现状均成立——DFD-9 `main_window.py:544` 无条件写 `self._theme` 而 `theme.py:395` 才有 `name in THEMES or name in CUSTOM` 守卫（未知名一次性不一致）；DFD-10 `theme.py:306` 仅 `isinstance(overrides, dict)` 不校验 overrides 值 hex（依赖 register_custom 隐式契约）；DFD-11 `theme.py:300/318/324` 无 `isinstance(str)` 运行时守卫（非 str 可触发 TypeError / None 可写入）。三者均属「签名已 str、生产调用链固定、不可触发」的协议表面加固，拍板关闭不折回（不做表面加固；压缩摘要入 TECH_DEBT「复核关闭」表，处置详情入「技术债处置记录」2026-09-13 节，处置记录滚动保留最近 2 节，2026-09-08 节转 git 历史）。
+
+- **打包发布（2026-09-13，基线 697/697，构建前全量 pytest + doc_sync --check 双绿）**：PyInstaller 6.21.0 `delta_force_dashboard.spec --noconfirm` 重建 onedir。**避坑（构建机环境污染 → 产物混入 .NET 程序集）**：本机无项目 venv、打包走全局 Python 3.12，全局 site-packages 装了 `pyreadline3`，Windows 下 `platform` / `importlib.metadata` 的条件 import 把它拉进分析图，连带 `pyreadline3.clipboard.ironpython_clipboard` → `clr` → `pythonnet` → `clr_loader` 收集 99 个 .NET 程序集（xref 交叉引用定源）；首轮产物 375 文件 / 70.92MB、exe 7.85MB，且 UPX 对这些 DLL 全部报 `unexpected value in PE header` ——spec `excludes` 增剔 `pyreadline3/clr/pythonnet/clr_loader/psutil/yaml` 后重建，产物回落 **265 文件 / 66.02MB、exe 6.27MB**（与历史 273 文件 / 66.4MB 同档，`_internal` 仅剩 PySide6/shiboken6/pyqtgraph/numpy/cryptography/charset_normalizer/win32/pywin32_system32）。bincache 仍重定向 `PYINSTALLER_CONFIG_DIR` 至 `%TEMP%` 新目录；残留 WARNING 仅三条且均无害——`pyqtgraph.opengl` 可选子模块未收集（应用不 import）、`python3.dll` 与 `api-ms-win-core-errorhandling-l1-1-0.dll` 被 UPX 按 CFG/不可压缩跳过。**冒烟**：真实启动 PID 25524 存活 12s（172.1MB），crash.log 无新增（2184B，mtime 2026-09-01 未变），taskkill 回收后进程零残留。**release 资产**：`dist/default.zip` 重建 40.84MB（282 条目，覆盖 09-09 旧版）。**交付**：`gh release upload default --clobber` 替换 release tag `default` 的 `default.zip`（新 40.84MB / 282 条目，sha256 `290f05ab…`，覆盖 09-09 旧版 41.25MB）；`git push origin main`（`5d6a29d..a6c83e3` 13 提交 + 本次 spec/文档提交）。
+  - **待办提示**：规范做法是在项目 venv 内构建（`python -m venv venv` + `requirements.txt`）使产物只含声明依赖；本次 spec `excludes` 是全局解释器下的兜底。
 
 ## 滚动摘要（2026-09-09 — 多主题切换 + 自定义主题）
 

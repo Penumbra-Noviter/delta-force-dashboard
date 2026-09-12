@@ -899,7 +899,7 @@ python -m PyInstaller delta_force_dashboard.spec --noconfirm
 
 **为什么是 onedir 而非单文件**（O-20）：单文件模式每次启动需把整包解压到 `%TEMP%\_MEI*`（实测 181MB），是启动慢（~2-4s）的根因；onedir 免解压，冷启动实测 ~1.5s。`config.APP_DIR`（`sys.executable`）与 `main._icon_path`（`sys._MEIPASS`）在 onedir 下行为一致；O-22 后运行态数据不再依赖 `APP_DIR`，改走 `DATA_DIR`（`Path.home()/Delta Force Dashboard`）。
 
-**体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件。`upx=False`（本机未装 UPX，此前为空转）。
+**体积瘦身**（O-20，80MB 单文件 → 117MB 目录）：spec 内 `excludes` 剔除 matplotlib/PIL 及其纯 Python 依赖（pyqtgraph 的 Matplotlib 导出器运行时从不加载，importtime 实测）；Qt 二进制白名单过滤（bindepend 校验依赖闭包后，仅保留 Core/Gui/Widgets/Network/OpenGL/OpenGLWidgets/Svg/Test——后二者为 pyqtgraph import 时实际加载）；剔除全部 Qt translations（应用不装 QTranslator，文案硬编码中文）；剔除 opengl32sw.dll 软件渲染器（从不创建 GL 上下文）与 tls/networkinformation 插件；`upx=True`（UPX 5.2.0 压缩 exe/DLL，未装 UPX 时 PyInstaller 自动回退不压缩、产物仍正确）。**构建环境洁净性**：`excludes` 另剔除 `pyreadline3`→`clr`→`pythonnet`→`clr_loader` 链——全局 site-packages 若装了 `pyreadline3`，Windows 下 `platform`/`importlib.metadata` 的条件 import 会把它拉进分析图，连带 `pyreadline3.clipboard.ironpython_clipboard` 收集 99 个 .NET 程序集（+3.3MB）；同时剔除 `psutil`/`yaml`。应用是纯 PySide6 GUI，不用 readline 兼容层/.NET 互操作/psutil/PyYAML。规范做法是在项目 venv 内构建（产物只含声明依赖），本 excludes 是全局解释器下构建的兜底。
 
 **图标**：`delta_force_dashboard.spec` 中 `EXE(icon='app_icon.ico')` 设置 exe 文件图标；`datas=[('app_icon.ico', '.')]` 将图标随包内嵌，供 `main.py` 的 `setWindowIcon` 运行时加载（窗口/任务栏图标）。源码版从项目根目录读取同一文件（`_icon_path()`）。
 

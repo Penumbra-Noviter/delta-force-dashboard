@@ -98,6 +98,12 @@ a = Analysis(
         'matplotlib', 'PIL', 'pyparsing', 'dateutil',
         'cycler', 'contourpy', 'kiwisolver', 'fonttools', 'six',
         'pandas', 'scipy',
+        # 构建机环境污染剔除：全局 site-packages 若装了 pyreadline3，Windows 下
+        # platform / importlib.metadata 的条件 import 会把它拉进分析图，进而
+        # pyreadline3.clipboard.ironpython_clipboard → clr → pythonnet → clr_loader
+        # 连带收集 99 个 .NET 程序集（+3.3MB，且 UPX 对其全部报 PE header 异常）。
+        # 本应用是 PySide6 GUI，不用 readline 兼容层 / .NET 互操作 / psutil / PyYAML。
+        'pyreadline3', 'clr', 'pythonnet', 'clr_loader', 'psutil', 'yaml',
     ],
     noarchive=False,
     optimize=1,
