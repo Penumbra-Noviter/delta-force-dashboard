@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.icons import render_icon
+from app.theme import PRESET_LABELS, PRESET_NAMES
 
 # 导航图标渲染尺寸（IC-债2：与 app/icons.py render_icon 默认 size=16 解耦，
 # 图标默认尺寸变更时导航侧不会静默失效；沿用 _RENDER_DPR 私有常量先例）
@@ -49,13 +50,6 @@ class Sidebar(QWidget):
     theme_selected = Signal(str)
     # 多主题 06：主题菜单「自定义…」入口（打开对话框由 MainWindow 处理）
     custom_theme_requested = Signal()
-    # 预设主题名（菜单列出顺序）与显示标签（按钮文案 / 菜单项共用）
-    THEME_NAMES: ClassVar[tuple[str, ...]] = ("light", "dark", "nord")
-    THEME_LABELS: ClassVar[dict[str, str]] = {
-        "light": "亮色",
-        "dark": "暗色",
-        "nord": "Nord",
-    }
     # 导航项「(文本, 图标键)」元组列表（IC-债1：替代文本/图标键平行列表，
     # 消除 zip 按索引配对的数据团）。新增导航项必须带图标键——缺失即构造/
     # apply_theme 解包 ValueError 快速失败（比 render_icon 更早暴露）；
@@ -130,8 +124,8 @@ class Sidebar(QWidget):
         # 点击项经 theme_selected 信号交 MainWindow，.click() 不再走二值翻转）。
         self.theme_menu = QMenu(self.theme_btn)
         self._theme_actions: dict[str, QAction] = {}
-        for name in self.THEME_NAMES:
-            action = QAction(self.THEME_LABELS[name], self.theme_menu)
+        for name in PRESET_NAMES:
+            action = QAction(PRESET_LABELS[name], self.theme_menu)
             action.setCheckable(True)
             action.triggered.connect(
                 lambda checked=False, n=name: self.theme_selected.emit(n)

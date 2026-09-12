@@ -20,6 +20,19 @@ from app import theme as theme_mod
 __all__ = []
 
 
+# ── 预设主题名单单源化守卫（DFD-8）─────────────────────
+
+
+def test_preset_names_match_theme_keys() -> None:
+    """预设名单与 THEMES 键集合一致：新增预设漏改名单即红。"""
+    assert set(theme_mod.PRESET_NAMES) == set(theme_mod.THEMES)
+
+
+def test_preset_labels_match_preset_names() -> None:
+    """预设标签键与预设名单键集合一致：漏改标签即红。"""
+    assert set(theme_mod.PRESET_LABELS) == set(theme_mod.PRESET_NAMES)
+
+
 # ── resolve_palette：内置直返 / 未知回退 ──────────────────
 
 

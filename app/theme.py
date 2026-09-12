@@ -13,6 +13,8 @@ from signals import PnLSignal, RateSignal
 
 __all__ = [
     "THEMES",
+    "PRESET_NAMES",
+    "PRESET_LABELS",
     "CUSTOM",
     "ANCHOR_KEYS",
     "clean_overrides",
@@ -256,6 +258,16 @@ THEMES = {
         "DANGER_BORDER": "#4A2C33",
         "DANGER_HOVER_BG": "#BF616A",
     },
+}
+
+# ── 预设主题名单（单一来源，DFD-8）─────────────────────
+# 菜单顺序 / 显示标签 / base 下拉共用；新增预设需同步改 THEMES 与此处，
+# 由 tests/test_theme_custom.py 集合守卫兜底（漏改名单即红）。
+PRESET_NAMES: tuple[str, ...] = ("light", "dark", "nord")
+PRESET_LABELS: dict[str, str] = {
+    "light": "亮色",
+    "dark": "暗色",
+    "nord": "Nord",
 }
 
 # ── 自定义主题单槽位 + 六元锚点白名单 ─────────────────
