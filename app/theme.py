@@ -12,8 +12,12 @@ from signals import PnLSignal, RateSignal
 
 __all__ = [
     "THEMES",
+    "CUSTOM",
+    "ANCHOR_KEYS",
     "generate_qss",
     "get_color",
+    "register_custom",
+    "resolve_palette",
     "set_theme",
     "signal_color",
     "summary_style",
@@ -176,15 +180,63 @@ THEMES = {
     },
 }
 
+# ── 自定义主题单槽位 + 六元锚点白名单 ─────────────────
+# 自定义主题存「派生源 base + 锚点覆盖 overrides」，运行时合并为完整色板，
+# 其余键继承 base（不展开 50 键快照，见 resolve_palette）。
+CUSTOM: dict[str, dict[str, object]] = {}
+
+# 可覆写锚点白名单：仅这 6 键允许覆盖；装饰色 / 表格行底 / 边框 / 图表色 /
+# 图标色（FG_MUTED / FG_LABEL / BTN_FG）一律继承 base（spec · Implementation Decisions）。
+ANCHOR_KEYS = (
+    "BTN_BG",
+    "BTN_BG_HOVER",
+    "FG_TODAY",
+    "BG",
+    "FG_POS",
+    "FG_NEG",
+)
+
 
 # ── 当前主题名称（运行时由 UI 切换） ─────────────────
 _current_theme = "light"
 
 
-def set_theme(name: str) -> None:
-    """切换当前主题（"light" | "dark"）。"""
-    global _current_theme
+def resolve_palette(name: str) -> dict[str, str]:
+    """解析主题名 → 完整色板（只读视图语义，调用方不得原地改）。
+
+    内置命中直返；自定义命中合并 `{**THEMES[base], **overrides}`；
+    其余（含畸形自定义槽位）回退 `THEMES["light"]`。全函数永不 raise。
+    """
     if name in THEMES:
+        return THEMES[name]
+    entry = CUSTOM.get(name)
+    if isinstance(entry, dict):
+        base = entry.get("base")
+        overrides = entry.get("overrides")
+        if base in THEMES and isinstance(overrides, dict):
+            return {**THEMES[base], **overrides}
+    return THEMES["light"]
+
+
+def register_custom(name: str, base: str, overrides: dict[str, str]) -> None:
+    """注册自定义主题槽位（name → base 派生源 + 锚点覆盖）。
+
+    name 与内置主题重名、或 base 非内置主题时拒绝写入并记 warning
+    （CUSTOM 保持原状，不 raise）；合法时写入 `{"base", "overrides"}`。
+    """
+    if name in THEMES:
+        logger.warning("register_custom 拒绝：name %r 与内置主题重名", name)
+        return
+    if base not in THEMES:
+        logger.warning("register_custom 拒绝：base %r 非内置主题", base)
+        return
+    CUSTOM[name] = {"base": base, "overrides": overrides}
+
+
+def set_theme(name: str) -> None:
+    """切换当前主题（内置 THEMES 或已注册的自定义 CUSTOM）。"""
+    global _current_theme
+    if name in THEMES or name in CUSTOM:
         _current_theme = name
 
 
@@ -194,7 +246,7 @@ def get_color(key: str) -> str:
     未知键：记录 warning（含键名）后返回 ""（不 raise，防御语义保持）
     ——让「漏改键 → 静默失效」变成「漏改键 → 日志可见」（C1-06）。
     """
-    palette = THEMES[_current_theme]
+    palette = resolve_palette(_current_theme)
     value = palette.get(key, "")
     if value == "" and key not in palette:
         logger.warning("get_color 未知主题键: %r", key)
@@ -240,7 +292,7 @@ def summary_style(signal: RateSignal) -> str:
 
 def generate_qss(theme_name: str) -> str:
     """根据主题名称生成完整 QSS 样式表。"""
-    t = THEMES.get(theme_name, THEMES["light"])
+    t = resolve_palette(theme_name)
 
     bg = t["BG"]
     fg_label = t["FG_LABEL"]
