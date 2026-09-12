@@ -47,6 +47,8 @@ class Sidebar(QWidget):
     create_account_requested = Signal()
     # 多主题 04：主题菜单选中预设（切换由 MainWindow 处理）
     theme_selected = Signal(str)
+    # 多主题 06：主题菜单「自定义…」入口（打开对话框由 MainWindow 处理）
+    custom_theme_requested = Signal()
     # 预设主题名（菜单列出顺序）与显示标签（按钮文案 / 菜单项共用）
     THEME_NAMES: ClassVar[tuple[str, ...]] = ("light", "dark", "nord")
     THEME_LABELS: ClassVar[dict[str, str]] = {
@@ -136,6 +138,13 @@ class Sidebar(QWidget):
             )
             self.theme_menu.addAction(action)
             self._theme_actions[name] = action
+        # 多主题 06：分隔符 + 「自定义…」入口（普通 action，非 checkable）
+        self.theme_menu.addSeparator()
+        self._custom_theme_action = QAction("自定义…", self.theme_menu)
+        self._custom_theme_action.triggered.connect(
+            lambda checked=False: self.custom_theme_requested.emit()
+        )
+        self.theme_menu.addAction(self._custom_theme_action)
         self.theme_btn.setMenu(self.theme_menu)
 
         self.pin_btn = QPushButton("置顶")

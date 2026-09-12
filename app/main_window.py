@@ -16,6 +16,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
@@ -450,6 +451,7 @@ class MainWindow(QMainWindow):
 
         # 侧边栏按钮
         self.sidebar.theme_selected.connect(self._select_theme)
+        self.sidebar.custom_theme_requested.connect(self._open_custom_theme_dialog)
         self.sidebar.pin_btn.clicked.connect(self._toggle_pin)
         self.sidebar.export_btn.clicked.connect(self._export_csv)
         # Y-04：账号区——新建账号（命名对话框）；下拉选择切换（Y-05 接线）
@@ -514,8 +516,30 @@ class MainWindow(QMainWindow):
         for widget in self._theme_refreshers:
             widget.apply_theme()
 
+    def _open_custom_theme_dialog(self) -> None:
+        """打开自定义主题对话框；accept 后注册并应用 custom，cancel 无副作用。
+
+        预填当前自定义派生源（无自定义则以当前主题作 base）；对话框只收集
+        (base, overrides)，此处执行 register_custom + _select_theme("custom")。
+        """
+        from app.theme_dialog import ThemeDialog
+
+        custom = CUSTOM.get("custom")
+        if isinstance(custom, dict):
+            base = custom.get("base", "light")
+            overrides = custom.get("overrides", {})
+        else:
+            base = self._theme if self._theme in THEMES else "light"
+            overrides = {}
+
+        dlg = ThemeDialog(base, overrides, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            new_base, new_overrides = dlg.result()
+            register_custom("custom", new_base, new_overrides)
+            self._select_theme("custom")
+
     def _select_theme(self, name: str) -> None:
-        """切换预设主题（light/dark/nord），全链路换色并落盘（多主题 04）。"""
+        """切换主题（预设 light/dark/nord 或已注册 custom），全链路换色并落盘。"""
         self._theme = name
         set_theme(name)
         self.refresh_theme()

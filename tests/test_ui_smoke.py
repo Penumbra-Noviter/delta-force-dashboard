@@ -856,15 +856,29 @@ def test_theme_toggle(sample_window):
 
 
 def test_theme_menu_has_three_checkable_presets(sample_window):
-    """主题菜单列出 light/dark/nord 三预设，checkable 且初始勾选 light。"""
+    """主题菜单列出 light/dark/nord 三预设（checkable）+ 自定义入口（非 checkable）。"""
     win = sample_window
     actions = win.sidebar.theme_menu.actions()
 
-    assert [a.text() for a in actions] == ["亮色", "暗色", "Nord"]
-    assert all(a.isCheckable() for a in actions)
-    assert actions[0].isChecked() is True  # 初始 light
-    assert actions[1].isChecked() is False
-    assert actions[2].isChecked() is False
+    presets = [a for a in actions if a.isCheckable()]
+    assert [a.text() for a in presets] == ["亮色", "暗色", "Nord"]
+    assert presets[0].isChecked() is True  # 初始 light
+    assert presets[1].isChecked() is False
+    assert presets[2].isChecked() is False
+    # 自定义入口：普通 action（非 checkable）
+    assert win.sidebar._custom_theme_action.text() == "自定义…"
+    assert win.sidebar._custom_theme_action.isCheckable() is False
+
+
+def test_theme_menu_custom_entry_emits_requested(sample_window, monkeypatch):
+    """菜单「自定义…」action triggered → custom_theme_requested → _open_custom_theme_dialog。"""
+    win = sample_window
+    opened: list = []
+    monkeypatch.setattr(win, "_open_custom_theme_dialog", lambda: opened.append(True))
+
+    win.sidebar._custom_theme_action.trigger()
+
+    assert opened == [True]
 
 
 def test_theme_menu_emits_selected_signal(sample_window):
@@ -1319,6 +1333,209 @@ def test_custom_theme_non_dict_ignored(qapp, tmp_path, theme_guard):
     assert get_color("BTN_BG") == THEMES["light"]["BTN_BG"]  # custom 未注册，回退 light
     saved = json.loads(settings_file.read_text(encoding="utf-8"))
     assert saved.get("theme") == "light"  # 回退已持久化
+    win.close()
+
+
+def test_custom_theme_requested_applies(qapp, tmp_path, theme_guard, monkeypatch):
+    """端到端：菜单「自定义…」→ 对话框 accept → register_custom + 应用 custom。"""
+    from PySide6.QtWidgets import QDialog
+
+    from app.main_window import MainWindow
+    from app.theme import CUSTOM, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    import app.theme_dialog as td
+
+    captured = {}
+
+    class _StubDialog:
+        def __init__(self, base, overrides, parent=None):
+            captured["base"] = base
+            captured["overrides"] = overrides
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def result(self):
+            return "dark", {"BTN_BG": "#010203"}
+
+    monkeypatch.setattr(td, "ThemeDialog", _StubDialog)
+
+    settings_file = tmp_path / "settings.json"
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.sidebar.custom_theme_requested.emit()
+
+    assert CUSTOM.get("custom") == {"base": "dark", "overrides": {"BTN_BG": "#010203"}}
+    assert get_color("BTN_BG") == "#010203"
+    assert captured["base"] == "light"  # 预填：无自定义以当前主题作 base
+    win.close()
+
+
+def test_custom_theme_dialog_prefills_existing_custom(qapp, tmp_path, theme_guard, monkeypatch):
+    """已有自定义时打开对话框 → 预填当前派生源（base + overrides）。"""
+    from PySide6.QtWidgets import QDialog
+
+    from app.main_window import MainWindow
+    from app.theme import register_custom
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    import app.theme_dialog as td
+
+    captured = {}
+
+    class _StubDialog:
+        def __init__(self, base, overrides, parent=None):
+            captured["base"] = base
+            captured["overrides"] = overrides
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected  # cancel，不应用
+
+    monkeypatch.setattr(td, "ThemeDialog", _StubDialog)
+
+    register_custom("custom", "dark", {"BTN_BG": "#123456"})
+
+    settings_file = tmp_path / "settings.json"
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.sidebar.custom_theme_requested.emit()
+
+    assert captured["base"] == "dark"
+    assert captured["overrides"] == {"BTN_BG": "#123456"}
+    win.close()
+
+
+def test_custom_theme_requested_cancel_no_side_effect(qapp, tmp_path, theme_guard, monkeypatch):
+    """对话框 cancel → 无副作用（不 register_custom / 不切换主题）。"""
+    from PySide6.QtWidgets import QDialog
+
+    from app.main_window import MainWindow
+    from app.theme import CUSTOM, THEMES, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    import app.theme_dialog as td
+
+    class _StubDialog:
+        def __init__(self, base, overrides, parent=None):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Rejected
+
+        def result(self):
+            raise AssertionError("cancel 不应调用 result")
+
+    monkeypatch.setattr(td, "ThemeDialog", _StubDialog)
+
+    settings_file = tmp_path / "settings.json"
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.sidebar.custom_theme_requested.emit()
+
+    assert CUSTOM.get("custom") is None
+    assert get_color("BTN_BG") == THEMES["light"]["BTN_BG"]
+    win.close()
+
+
+def test_select_theme_custom_applies_registered(qapp, tmp_path, theme_guard):
+    """_select_theme("custom") 直接应用已注册自定义主题。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color, register_custom
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    register_custom("custom", "nord", {"FG_TODAY": "#abcdef"})
+
+    settings_file = tmp_path / "settings.json"
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win._select_theme("custom")
+
+    assert get_color("FG_TODAY") == "#abcdef"
+    assert get_color("BG") == THEMES["nord"]["BG"]
+    win.close()
+
+
+def test_custom_theme_applied_persists_across_restart(qapp, tmp_path, theme_guard, monkeypatch):
+    """端到端：对话框应用 custom → 关窗 → 重新构造 → 仍为 custom（跨重启回读）。"""
+    from PySide6.QtWidgets import QDialog
+
+    from app.main_window import MainWindow
+    from app.theme import CUSTOM, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    import app.theme_dialog as td
+
+    class _StubDialog:
+        def __init__(self, base, overrides, parent=None):
+            pass
+
+        def exec(self):
+            return QDialog.DialogCode.Accepted
+
+        def result(self):
+            return "light", {"BTN_BG": "#010203"}
+
+    monkeypatch.setattr(td, "ThemeDialog", _StubDialog)
+
+    settings_file = tmp_path / "settings.json"
+    win1 = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win1.sidebar.custom_theme_requested.emit()  # 应用 custom
+    win1.close()  # 落盘 theme=custom + custom_theme
+
+    CUSTOM.clear()  # 模拟进程重启：清空全局自定义槽位
+
+    win2 = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    assert get_color("BTN_BG") == "#010203"  # 启动重新 register_custom + set_theme(custom)
+    win2.close()
+
+
+def test_custom_theme_icon_color_inherits_base(qapp, tmp_path, theme_guard):
+    """图标色预期：仅 BTN_BG 锚点影响图标 accent，FG_MUTED/FG_LABEL/BTN_FG 继承 base。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color, register_custom
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    register_custom("custom", "light", {"BTN_BG": "#010203"})
+
+    settings_file = tmp_path / "settings.json"
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win._select_theme("custom")
+
+    assert get_color("BTN_BG") == "#010203"  # 锚点覆盖（图标 accent）
+    assert get_color("FG_MUTED") == THEMES["light"]["FG_MUTED"]  # 继承 base
+    assert get_color("FG_LABEL") == THEMES["light"]["FG_LABEL"]
+    assert get_color("BTN_FG") == THEMES["light"]["BTN_FG"]
     win.close()
 
 

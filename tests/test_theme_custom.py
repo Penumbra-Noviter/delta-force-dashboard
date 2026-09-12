@@ -290,3 +290,15 @@ def test_contrast_hints_ignores_non_hex() -> None:
         "FG_NEG": "#800000",
     }
     assert theme_mod.contrast_hints(palette) == []
+
+
+def test_custom_palette_inherits_icon_colors_from_base(theme_guard) -> None:
+    """图标色预期（多主题 06）：仅 BTN_BG 锚点覆盖，FG_MUTED/FG_LABEL/BTN_FG 继承 base。"""
+    theme_mod.register_custom("custom", "light", {"BTN_BG": "#010203"})
+
+    merged = theme_mod.resolve_palette("custom")
+
+    assert merged["BTN_BG"] == "#010203"  # 锚点覆盖（侧边栏图标 accent）
+    assert merged["FG_MUTED"] == theme_mod.THEMES["light"]["FG_MUTED"]  # 继承 base
+    assert merged["FG_LABEL"] == theme_mod.THEMES["light"]["FG_LABEL"]
+    assert merged["BTN_FG"] == theme_mod.THEMES["light"]["BTN_FG"]
