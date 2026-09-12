@@ -22,6 +22,7 @@
 
 | Ticket | 标题 | 依赖 | 状态 |
 |--------|------|------|------|
+| DFD-8 | 预设主题名单单源化：`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES` 三处散落 → 收敛为 `theme.PRESET_NAMES`/`PRESET_LABELS` 单一来源 + set 守卫 | — | 🔄 进行中 |
 
 ---
 

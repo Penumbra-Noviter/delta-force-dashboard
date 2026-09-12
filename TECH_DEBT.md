@@ -52,7 +52,7 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-8 | 预设主题名单三处散落（`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES`），未来新增预设需三处同步 | 期末四轴 Architecture A1 | Worth exploring | 📝 待立项 | GUI |
+| DFD-8 | 预设主题名单三处散落（`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES`），未来新增预设需三处同步 | 期末四轴 Architecture A1 | Worth exploring | 🔄 进行中 | GUI |
 | DFD-9 | `MainWindow._select_theme` 未校验 `name`，未知名时窗口 `_theme` 已更新但 `theme._current_theme` 未变，一次性不一致（信号源只发预设名，不可触发） | 期末四轴 Falsify F3 | Speculative | 📝 待立项 | GUI |
 | DFD-10 | `resolve_palette` 只查 `CUSTOM` 形状不查 overrides 值 hex，依赖「只能经 `register_custom` 写」隐式契约 | 期末四轴 Architecture A2 | Speculative | 📝 待立项 | GUI |
 | DFD-11 | `resolve_palette`/`register_custom` 未运行时校验非 str 输入（unhashable 抛 TypeError、`None` 可写入），签名已 str、生产调用链不可触发 | 期末四轴 Falsify F1/F2 | Speculative | 📝 待立项 | GUI |
