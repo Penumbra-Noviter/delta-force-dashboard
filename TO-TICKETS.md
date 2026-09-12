@@ -52,6 +52,21 @@
 
 > 完整批次（最近 6 批）见下方；更早批次已折叠为「历史归档索引」表（2026-08-27 首次压缩执行，原文由 git 历史承担）。
 
+### 多主题批次（2026-09-09，kickoff 标准档快速档，基线 5d6a29d，分支 kickoff/multi-theme）
+
+> 来源：多主题切换 + 自定义主题功能（预设扩展 light/dark/nord + 单槽位自定义继承派生）。叙述见 DEV_LOG〈滚动摘要 2026-09-09〉；本表只承载工单事实。
+
+| Ticket | 标题 | 完成 | 提交 |
+|--------|------|------|------|
+| 01 | 统一主题解析通路：`resolve_palette` + `CUSTOM` + `ANCHOR_KEYS` + `register_custom`，`set_theme`/`get_color`/`generate_qss` 改走 `resolve_palette` | ✅ 2026-09-09 | `c78c060` |
+| 02 | Nord 第三预设：60 键色板（装饰色重调饱和过 U-03 角色门槛）+ `NORD_BAND` + 键集一致性测试 | ✅ 2026-09-09 | `368e55a` |
+| 03 | 持久化 + 校验：`custom_theme` 往返 + `is_hex_color`/`clean_overrides`/`contrast_hints` + 启动手改坏回退 light | ✅ 2026-09-09 | `ca43e15` |
+| 04 | 预设主题菜单：`theme_btn` → QMenu 三预设 + `theme_selected` 信号 + 迁移 13 处 click / 2 处 `_toggle_theme` | ✅ 2026-09-09 | `3147277` |
+| 05 | 自定义主题对话框：`ThemeDialog` + 结果契约 `(base, overrides)` + 预览 / 软提示 | ✅ 2026-09-09 | `2cf4183` |
+| 06 | 应用接线 + 端到端：自定义入口 → 对话框 → `register_custom` + `_select_theme("custom")`，跨重启保留 | ✅ 2026-09-09 | `ddc2c88` |
+
+期末验证：695/695 全绿（70.54s）、全局覆盖率 95%、doc_sync 双绿、冒烟 SMOKE OK、期末四轴审核通过无阻断；4 项非阻断落盘 TECH_DEBT（DFD-8~11）。
+
 ### 架构评审批次（2026-09-08，improve-codebase-architecture，基线 a53c102）
 
 > 来源：全库架构审查（`improve-codebase-architecture` skill，7 项候选）+ 用户拍板「按强度顺序逐个推进」。候选池见 [TECH_DEBT.md](TECH_DEBT.md)；叙述见 DEV_LOG〈滚动摘要 2026-09-08〉；本表只承载工单事实。
