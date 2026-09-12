@@ -35,6 +35,7 @@ from config import (
 )
 from app.theme import (
     CUSTOM,
+    PRESET_LABELS,
     THEMES,
     generate_qss,
     get_color,
@@ -429,7 +430,7 @@ class MainWindow(QMainWindow):
 
     def _update_theme_btn(self) -> None:
         # 多主题 04：按钮文案显示当前主题名；light=太阳、dark/nord=月亮。
-        label = Sidebar.THEME_LABELS.get(self._theme, self._theme)
+        label = PRESET_LABELS.get(self._theme, self._theme)
         icon_name = "sun" if self._theme == "light" else "moon"
         self.sidebar.theme_btn.setText(label)
         self.sidebar.theme_btn.setIcon(render_icon(icon_name, get_color("FG_MUTED")))

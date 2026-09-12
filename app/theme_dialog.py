@@ -25,10 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from app.theme import ANCHOR_KEYS, THEMES, contrast_hints
-
-# 预设主题名（base 下拉顺序）
-_PRESET_NAMES = ("light", "dark", "nord")
+from app.theme import ANCHOR_KEYS, PRESET_NAMES, THEMES, contrast_hints
 
 # 锚点显示标签（中文，供表单与 QColorDialog 标题共用）
 _ANCHOR_LABELS = {
@@ -69,11 +66,11 @@ class ThemeDialog(QDialog):
         form = QFormLayout()
 
         self._base_combo = QComboBox()
-        for name in _PRESET_NAMES:
+        for name in PRESET_NAMES:
             self._base_combo.addItem(name, name)
         # 构造期设置当前 base 不触发 _on_base_changed（保留预填 overrides）
         self._base_combo.blockSignals(True)
-        self._base_combo.setCurrentIndex(_PRESET_NAMES.index(self._base))
+        self._base_combo.setCurrentIndex(PRESET_NAMES.index(self._base))
         self._base_combo.blockSignals(False)
         self._base_combo.currentIndexChanged.connect(self._on_base_changed)
         form.addRow("基础主题", self._base_combo)
