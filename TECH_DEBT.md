@@ -52,35 +52,30 @@
 
 | 编号 | 遗留项 | 来源 | 强度 | 状态 | 归属方向 |
 |------|--------|------|------|------|----------|
-| DFD-9 | `MainWindow._select_theme` 未校验 `name`，未知名时窗口 `_theme` 已更新但 `theme._current_theme` 未变，一次性不一致（信号源只发预设名，不可触发） | 期末四轴 Falsify F3 | Speculative | 📝 待立项 | GUI |
-| DFD-10 | `resolve_palette` 只查 `CUSTOM` 形状不查 overrides 值 hex，依赖「只能经 `register_custom` 写」隐式契约 | 期末四轴 Architecture A2 | Speculative | 📝 待立项 | GUI |
-| DFD-11 | `resolve_palette`/`register_custom` 未运行时校验非 str 输入（unhashable 抛 TypeError、`None` 可写入），签名已 str、生产调用链不可触发 | 期末四轴 Falsify F1/F2 | Speculative | 📝 待立项 | GUI |
 
 ### 复核关闭（Speculative 类，防重复提议）
 
 | 编号 | 遗留项（压缩摘要） | 来源 | 强度 | 状态 |
 |------|--------|------|------|------|
+| DFD-9 | `_select_theme` 未校验 name（未知名时 `_theme` 已更新但 `_current_theme` 未变，一次性不一致） | 期末四轴 Falsify F3 | Speculative | ❌ 复核关闭 2026-09-13 |
+| DFD-10 | `resolve_palette` 只查 CUSTOM 形状不查 overrides hex（依赖 register_custom 隐式契约） | 期末四轴 Architecture A2 | Speculative | ❌ 复核关闭 2026-09-13 |
+| DFD-11 | `resolve_palette`/`register_custom` 未运行时校验非 str（签名已 str、生产调用链不可触发） | 期末四轴 Falsify F1/F2 | Speculative | ❌ 复核关闭 2026-09-13 |
 
 ## 技术债处置记录
+
+### 2026-09-13（Speculative 复核关闭）
+
+| 编号 | 遗留项 | 处置 | 提交 |
+|------|--------|------|------|
+| DFD-9 | `_select_theme` 未校验 `name`（未知名时 `_theme` 已更新但 `_current_theme` 未变） | ❌ 复核关闭（`git grep` 现状成立：`main_window.py:544` 无条件写 `self._theme`，`theme.py:395` 才有 `name in THEMES or name in CUSTOM` 守卫；信号源只发预设名、不可触发，表面加固不做） | 本提交 |
+| DFD-10 | `resolve_palette` 只查 `CUSTOM` 形状不查 overrides 值 hex | ❌ 复核关闭（`git grep` 现状成立：`theme.py:306` 仅 `isinstance(overrides, dict)` 不校验 hex；只能经 `register_custom`（含 `clean_overrides`）写，生产调用链固定，表面加固不做） | 本提交 |
+| DFD-11 | `resolve_palette`/`register_custom` 未运行时校验非 str 输入 | ❌ 复核关闭（`git grep` 现状成立：`theme.py:300/318` 直接 `name in THEMES`、`:324` 直接 `CUSTOM[name]`，无 `isinstance(str)` 守卫；签名已 str、生产调用链不可触发，表面加固不做） | 本提交 |
 
 ### 2026-09-09（多主题批次技术债消费）
 
 | 编号 | 遗留项 | 处置 | 提交 |
 |------|--------|------|------|
 | DFD-8 | 预设主题名单三处散落（`THEMES` keys / `Sidebar.THEME_NAMES`+`THEME_LABELS` / `theme_dialog._PRESET_NAMES`），未来新增预设需三处同步 | ✅ 已修（立项 → TO-TICKETS DFD-8 → 收敛为 `theme.PRESET_NAMES`/`PRESET_LABELS` 单源 + set 守卫） | `8fb2cda` |
-
-### 2026-09-08（架构评审批次）
-
-| 编号 | 遗留项 | 处置 | 提交 |
-|------|--------|------|------|
-| C1 | 动画生命周期知识复制 4 处（`motion.fade_in_widget` / `_shake` / `_countup_anims` / `_draw_anim`），C4-债 同族 bug 反复修 ≥5 次 | ✅ 已修（立项 → TO-TICKETS C1 → 在途注册表深化 + 落点迁移） | `1508728` |
-| C2 | `_kpi_signal` 1 行转发 + main_window ↔ kpi_presenter 循环依赖（调用期延迟导入） | ✅ 已修（立项 → TO-TICKETS C2 → 判定归位 presenter 私有 `_window_signal`） | `266faaf` |
-| C3 | `fetch_page_base._data` 只写不读 + 基类空/错态不可分 + 占位文案字面量散落 | ✅ 已修（立项 → TO-TICKETS C3 → 删 `_data` + 文案单源类常量 + exchange 补错误态） | `327c07b` |
-| C4 | `kpi_presenter` 按展示文案字面量决定动画分支（改文案即静默改变行为）+ 加载中文案两处各写 | ✅ 已修（立项 → TO-TICKETS C4 → 纯语义判据 + `_LOADING_TEXT` 单源 + 源码守卫） | `c8514b0` |
-| C5 | `build_dashboard(mw)` 反向依赖宿主（7 私有槽 + `_build_card` + 高度 + today）+ 副作用写回 + MainWindow 私读页面标签 | ✅ 已修（立项 → TO-TICKETS C5 → `DashboardPage` 页族同构 + 接线归 MainWindow） | `bfa01dd` |
-| C6 | 视图窗口同一事实两份（`MainWindow._view_n` 镜像 `TableWidget._view_days`），靠一条信号维持相等 | ✅ 已修（立项 → TO-TICKETS C6 → 删镜像，查询 `current_view()` 单一来源） | `3022e6a` |
-| C7 | 主题刷新约定制（`hasattr` 树遍历 + 隐式「父有则不下钻」）+ `table.apply_theme` 整表重绘的隐藏代价 | ✅ 已修（立项 → TO-TICKETS C7 → 显式登记列表 + 代价显式声明） | `89042a4` |
-| DFD-7 | 测试基建：`test_fetch_pages.py` 单独运行进程退出码 `0xC0000374`（Qt 引用环在解释器关闭期回收 → Qt 对象在 QApplication 析构后析构） | ✅ 已修（立项 → TO-TICKETS DFD-7 → conftest 每例 gen-0 回收 + qapp 模块末全量收尾 + main.py 退出加固 + 子进程回归锁） | 本提交 |
 
 ---
 

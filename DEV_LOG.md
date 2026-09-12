@@ -6,6 +6,10 @@
 
 ---
 
+## 滚动摘要（2026-09-13 — TECH_DEBT Speculative 复核关闭）
+
+- **DFD-9/10/11 复核关闭（2026-09-13）**：多主题批次遗留的 3 条 Speculative 候选逐条 `git grep` 复核，现状均成立——DFD-9 `main_window.py:544` 无条件写 `self._theme` 而 `theme.py:395` 才有 `name in THEMES or name in CUSTOM` 守卫（未知名一次性不一致）；DFD-10 `theme.py:306` 仅 `isinstance(overrides, dict)` 不校验 overrides 值 hex（依赖 register_custom 隐式契约）；DFD-11 `theme.py:300/318/324` 无 `isinstance(str)` 运行时守卫（非 str 可触发 TypeError / None 可写入）。三者均属「签名已 str、生产调用链固定、不可触发」的协议表面加固，拍板关闭不折回（不做表面加固；压缩摘要入 TECH_DEBT「复核关闭」表，处置详情入「技术债处置记录」2026-09-13 节，处置记录滚动保留最近 2 节，2026-09-08 节转 git 历史）。
+
 ## 滚动摘要（2026-09-09 — 多主题切换 + 自定义主题）
 
 - **多主题 + 自定义主题（2026-09-09，kickoff 标准档快速档，基线 5d6a29d，6 票串行）**：
