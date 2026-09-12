@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from signals import PnLSignal, RateSignal
 
@@ -14,8 +15,11 @@ __all__ = [
     "THEMES",
     "CUSTOM",
     "ANCHOR_KEYS",
+    "clean_overrides",
+    "contrast_hints",
     "generate_qss",
     "get_color",
+    "is_hex_color",
     "register_custom",
     "resolve_palette",
     "set_theme",
@@ -24,6 +28,9 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+# 6 位 hex 颜色字面量（#RRGGBB，大小写均可，含 # 前缀）
+_HEX_COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}")
 
 # ── 主题色板 ──────────────────────────────────────────
 # 护眼配色：暖纸白底 + 温润青色（teal）主色调，降低蓝光刺激
@@ -293,7 +300,8 @@ def register_custom(name: str, base: str, overrides: dict[str, str]) -> None:
     """注册自定义主题槽位（name → base 派生源 + 锚点覆盖）。
 
     name 与内置主题重名、或 base 非内置主题时拒绝写入并记 warning
-    （CUSTOM 保持原状，不 raise）；合法时写入 `{"base", "overrides"}`。
+    （CUSTOM 保持原状，不 raise）；合法时写入 `{"base", "overrides"}`，
+    overrides 经 `clean_overrides` 清洗（非法 hex / 非锚点键注册前剔除）。
     """
     if name in THEMES:
         logger.warning("register_custom 拒绝：name %r 与内置主题重名", name)
@@ -301,7 +309,72 @@ def register_custom(name: str, base: str, overrides: dict[str, str]) -> None:
     if base not in THEMES:
         logger.warning("register_custom 拒绝：base %r 非内置主题", base)
         return
-    CUSTOM[name] = {"base": base, "overrides": overrides}
+    CUSTOM[name] = {"base": base, "overrides": clean_overrides(overrides)}
+
+
+def is_hex_color(value: object) -> bool:
+    """判断是否为 6 位 hex 颜色（`#RRGGBB`，大小写均可，含 # 前缀）。"""
+    return isinstance(value, str) and bool(_HEX_COLOR_RE.fullmatch(value))
+
+
+def clean_overrides(overrides: dict[str, str]) -> dict[str, str]:
+    """清洗 override 覆盖：仅保留锚点白名单内且值为 6 位 hex 的键。
+
+    非 dict 输入 / 非法 hex 值 / 非锚点键均被剔除（防手改坏 settings，
+    不 raise）；返回新 dict，不原地改输入。
+    """
+    if not isinstance(overrides, dict):
+        return {}
+    return {
+        key: value
+        for key, value in overrides.items()
+        if key in ANCHOR_KEYS and is_hex_color(value)
+    }
+
+
+def _lin(c: float) -> float:
+    """sRGB 分量 → 线性光分量（WCAG 反 gamma）。"""
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(color: str) -> float:
+    """sRGB（#RRGGBB）→ WCAG 相对亮度（0~1）。"""
+    c = color.lstrip("#")
+    r, g, b = (int(c[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    r, g, b = (_lin(x) for x in (r, g, b))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contrast_ratio(a: str, b: str) -> float:
+    """两色 WCAG 对比度（(L1+0.05)/(L2+0.05)）。"""
+    la, lb = _relative_luminance(a), _relative_luminance(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def contrast_hints(palette: dict[str, str]) -> list[str]:
+    """计算 3 组文字对的 WCAG 对比度软提示（不硬拒）。
+
+    检查 `BTN_BG` vs `BTN_FG`、`FG_TODAY` vs `BG`、`FG_POS` / `FG_NEG` vs
+    `BG`；任一 <4.5:1 返回对应提示。非 6 位 hex 值跳过。返回提示列表
+    （空列表 = 全部达标），由调用方决定如何展示。
+    """
+    hints: list[str] = []
+    pairs = (
+        ("BTN_BG", "BTN_FG", "按钮文字"),
+        ("FG_TODAY", "BG", "今日高亮"),
+        ("FG_POS", "BG", "涨色"),
+        ("FG_NEG", "BG", "跌色"),
+    )
+    for fg_key, bg_key, label in pairs:
+        fg = palette.get(fg_key, "")
+        bg = palette.get(bg_key, "")
+        if not is_hex_color(fg) or not is_hex_color(bg):
+            continue
+        ratio = _contrast_ratio(fg, bg)
+        if ratio < 4.5:
+            hints.append(f"{label}对比度 {ratio:.2f}:1 低于 4.5:1")
+    return hints
 
 
 def set_theme(name: str) -> None:

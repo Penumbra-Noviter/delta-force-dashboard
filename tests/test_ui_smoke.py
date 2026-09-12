@@ -1145,6 +1145,166 @@ def test_unknown_settings_key_survives_theme_toggle_and_close(qapp, tmp_path):
     assert saved.get("theme") == "dark"
 
 
+def test_custom_theme_preset_applies_at_startup(qapp, tmp_path, theme_guard):
+    """多主题 03：预置 theme="custom" + 合法 custom_theme → 构造后 get_color 返回 override。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "theme": "custom",
+                "custom_theme": {"base": "light", "overrides": {"BTN_BG": "#010203"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+
+    assert get_color("BTN_BG") == "#010203"  # override 生效
+    assert get_color("BG") == THEMES["light"]["BG"]  # 未覆盖键继承 base
+    win.close()
+
+
+def test_custom_theme_corrupt_base_falls_back_to_light(qapp, tmp_path, theme_guard):
+    """手改坏 base 非法 → 启动不崩、theme 回退 light 并持久化。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "theme": "custom",
+                "custom_theme": {"base": "nope", "overrides": {"BTN_BG": "#010203"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+
+    assert get_color("BTN_BG") == THEMES["light"]["BTN_BG"]  # custom 未注册，回退 light
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("theme") == "light"  # 回退已持久化
+    win.close()
+
+
+def test_custom_theme_bad_overrides_dropped(qapp, tmp_path, theme_guard):
+    """overrides 非 hex → 清洗剔除，base 完整继承（丢弃非法覆盖，不崩）。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "theme": "custom",
+                "custom_theme": {"base": "dark", "overrides": {"BTN_BG": "not-a-color"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+
+    assert get_color("BTN_BG") == THEMES["dark"]["BTN_BG"]  # 非法 override 被丢弃
+    win.close()
+
+
+def test_custom_theme_roundtrip_through_close(qapp, tmp_path, theme_guard):
+    """关窗回读：custom_theme 仍落盘且 theme=="custom"（派生源不展开 50 键）。"""
+    from app.main_window import MainWindow
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "theme": "custom",
+                "custom_theme": {"base": "light", "overrides": {"BTN_BG": "#010203"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+    win.close()
+
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("theme") == "custom"
+    assert saved.get("custom_theme") == {
+        "base": "light",
+        "overrides": {"BTN_BG": "#010203"},
+    }
+
+
+def test_custom_theme_non_dict_ignored(qapp, tmp_path, theme_guard):
+    """custom_theme 非 dict → 跳过注册，theme="custom" 回退 light，不崩。"""
+    from app.main_window import MainWindow
+    from app.theme import THEMES, get_color
+    from settings_store import SettingsStore
+    from tests.conftest import make_stub_client
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps({"theme": "custom", "custom_theme": "not-a-dict"}),
+        encoding="utf-8",
+    )
+
+    win = MainWindow(
+        store=make_store(tmp_path),
+        settings_store=SettingsStore(settings_file),
+        client=make_stub_client(),
+    )
+
+    assert get_color("BTN_BG") == THEMES["light"]["BTN_BG"]  # custom 未注册，回退 light
+    saved = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert saved.get("theme") == "light"  # 回退已持久化
+    win.close()
+
+
+def test_save_unparseable_input_shows_warning(sample_window, monkeypatch):
+    """无法识别的金额输入保存 → 缺字段提示分支（QMessageBox + return，不崩）。"""
+    from PySide6.QtWidgets import QMessageBox
+
+    win = sample_window
+    warnings: list = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args, **kwargs: warnings.append(args)
+    )
+
+    win.input_panel.cash_entry.setText("abc")
+    win.save_today()
+
+    assert warnings, "无法识别的金额应触发缺字段提示"
+
+
 # ── 11. 窗口几何恢复 ─────────────────────────────────────
 
 

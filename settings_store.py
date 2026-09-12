@@ -38,6 +38,7 @@ DEFAULTS: dict[str, Any] = {
     "pinned": False,
     "theme": "light",
     "animations": True,
+    "custom_theme": {},
 }
 
 #: 已知键全集：DEFAULTS 全部键 + 窗口层扩展键（current_account 由 Y-03 写入）。

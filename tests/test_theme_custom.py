@@ -214,3 +214,79 @@ def test_summary_style_both_branches(theme_guard) -> None:
     assert "16px" in none_style
     assert "22px" in pos_style
     assert theme_mod.get_color("FG_POS") in pos_style
+
+
+# ── 03. 6 位 hex 校验 / override 清洗 / 对比度软提示 ──────
+
+
+def test_is_hex_color() -> None:
+    """6 位 hex 校验：仅 #RRGGBB（大小写均可），其余 false。"""
+    assert theme_mod.is_hex_color("#123456") is True
+    assert theme_mod.is_hex_color("#abcdef") is True
+    assert theme_mod.is_hex_color("#ABCDEF") is True
+    assert theme_mod.is_hex_color("#12345") is False
+    assert theme_mod.is_hex_color("#1234567") is False
+    assert theme_mod.is_hex_color("123456") is False
+    assert theme_mod.is_hex_color("red") is False
+    assert theme_mod.is_hex_color("#gggggg") is False
+    assert theme_mod.is_hex_color("") is False
+    assert theme_mod.is_hex_color(123456) is False
+
+
+def test_clean_overrides_keeps_only_valid_anchor_hex() -> None:
+    """清洗：仅保留锚点白名单内且值为 6 位 hex 的键；非 hex / 非锚点 / 非 dict 剔除。"""
+    assert theme_mod.clean_overrides({"BTN_BG": "#010203"}) == {"BTN_BG": "#010203"}
+    assert theme_mod.clean_overrides({"BTN_BG": "red"}) == {}
+    assert theme_mod.clean_overrides({"PACKAGE_COLOR_0": "#010203"}) == {}
+    assert theme_mod.clean_overrides({"TABLE_TEXT": "#ffffff"}) == {}
+    assert theme_mod.clean_overrides(
+        {
+            "BTN_BG": "#010203",
+            "FG_POS": "bad",
+            "BG": "#112233",
+            "CHART_CASH": "#445566",
+        }
+    ) == {"BTN_BG": "#010203", "BG": "#112233"}
+    assert theme_mod.clean_overrides("not-a-dict") == {}
+    assert theme_mod.clean_overrides(None) == {}
+    assert theme_mod.clean_overrides({}) == {}
+
+
+def test_register_custom_cleans_overrides(theme_guard) -> None:
+    """register_custom 注册前清洗 overrides（非法 hex / 非锚点键剔除，不 raise）。"""
+    theme_mod.register_custom("custom", "light", {"BTN_BG": "#010203", "FG_POS": "bad"})
+
+    assert theme_mod.CUSTOM["custom"] == {
+        "base": "light",
+        "overrides": {"BTN_BG": "#010203"},
+    }
+
+
+def test_contrast_hints_reports_low_contrast() -> None:
+    """对比度软提示：<4.5:1 的对返回提示，达标对不提示（不硬拒）。"""
+    ok_palette = {
+        "BTN_BG": "#000000",
+        "BTN_FG": "#ffffff",
+        "FG_TODAY": "#000000",
+        "BG": "#ffffff",
+        "FG_POS": "#008000",
+        "FG_NEG": "#800000",
+    }
+    assert theme_mod.contrast_hints(ok_palette) == []
+
+    bad_palette = {**ok_palette, "BTN_BG": "#ffffff"}  # 白底白字
+    hints = theme_mod.contrast_hints(bad_palette)
+    assert any("按钮文字" in h for h in hints), f"低对比应提示按钮文字：{hints}"
+
+
+def test_contrast_hints_ignores_non_hex() -> None:
+    """对比度软提示跳过非 6 位 hex 值（防手改坏 rgba/空值不 crash）。"""
+    palette = {
+        "BTN_BG": "rgba(255,255,255,.5)",
+        "BTN_FG": "#ffffff",
+        "FG_TODAY": "#000000",
+        "BG": "#ffffff",
+        "FG_POS": "#008000",
+        "FG_NEG": "#800000",
+    }
+    assert theme_mod.contrast_hints(palette) == []

@@ -33,8 +33,11 @@ from config import (
     SETTINGS_FILE,
 )
 from app.theme import (
+    CUSTOM,
+    THEMES,
     generate_qss,
     get_color,
+    register_custom,
     set_theme,
 )
 from app.dashboard_page import DashboardPage
@@ -66,6 +69,7 @@ _KEY_PINNED = "pinned"
 _KEY_THEME = "theme"
 _KEY_ANIMATIONS = "animations"
 _KEY_CURRENT_ACCOUNT = "current_account"
+_KEY_CUSTOM_THEME = "custom_theme"
 
 # DPI scaling on Windows
 if platform.system() == "Windows":
@@ -90,7 +94,9 @@ class MainWindow(QMainWindow):
         self.settings_store = settings_store or SettingsStore(SETTINGS_FILE)
         self._settings = self.settings_store.load()
         self._theme = self._settings.get(_KEY_THEME, "light")
-        set_theme(self._theme)
+        # 多主题（03）：启动先注册自定义槽位，非法主题名回退 light（双保险——
+        # theme 层 resolve_palette 未知回退 light，此处显式校验并持久化）。
+        theme_corrected = self._resolve_startup_theme()
         # U-06：动效开关（settings `animations=false` 时全部动效失效，功能不受影响）
         set_animations_enabled(self._settings.get(_KEY_ANIMATIONS, True))
 
@@ -152,6 +158,10 @@ class MainWindow(QMainWindow):
 
         self.input_panel.focus_cash()
 
+        # 启动期非法主题名已回退 light：持久化纠正结果（多主题 03）。
+        if theme_corrected:
+            self._save_settings()
+
     # ═══════════════════════════════════════════════════════
     # 窗口设置
     # ═══════════════════════════════════════════════════════
@@ -209,6 +219,34 @@ class MainWindow(QMainWindow):
     # 设置持久化
     # ═══════════════════════════════════════════════════════
 
+    def _register_custom_theme(self) -> None:
+        """读 settings.custom_theme 注册自定义槽位（多主题 03）。
+
+        custom_theme 非 dict / base 非 str / overrides 非 dict 均跳过不注册；
+        register_custom 内部拒绝非法 base，clean_overrides 剔除非法覆盖——
+        全程不 raise，手改坏 settings 不崩。
+        """
+        custom = self._settings.get(_KEY_CUSTOM_THEME, {})
+        if not isinstance(custom, dict):
+            return
+        base = custom.get("base")
+        overrides = custom.get("overrides")
+        if isinstance(base, str) and isinstance(overrides, dict):
+            register_custom("custom", base, overrides)
+
+    def _resolve_startup_theme(self) -> bool:
+        """启动主题解析：注册 custom 后切主题，非法名回退 light。
+
+        返回是否纠正了非法主题名（True 时调用方持久化纠正结果）。
+        """
+        self._register_custom_theme()
+        corrected = False
+        if self._theme not in THEMES and self._theme not in CUSTOM:
+            self._theme = "light"
+            corrected = True
+        set_theme(self._theme)
+        return corrected
+
     def _save_settings(self) -> None:
         """合并更新设置并原子落盘（C3-11：走 settings_store.update，未知键保留）。
 
@@ -223,6 +261,8 @@ class MainWindow(QMainWindow):
         patch[_KEY_ANIMATIONS] = self._settings.get(_KEY_ANIMATIONS, True)
         if self.current_account is not None:
             patch[_KEY_CURRENT_ACCOUNT] = self.current_account
+        # 多主题（03）：custom_theme 一并落盘（存派生源 base+overrides，不展开 50 键）。
+        patch[_KEY_CUSTOM_THEME] = CUSTOM.get("custom", {})
         self._settings = self.settings_store.update(patch)
 
     def _update_account_title(self) -> None:
