@@ -17,7 +17,7 @@
 - **编辑 / 删除** — 可随时修改或删除任意日期的记录
 - **CSV 导出** — 一键导出全部记录为 CSV（Excel 可直接打开），便于外部查看/备份
 - **今日未录入提醒** — 今日尚未记录时标题栏常驻状态 pill，保存后自动消失
-- **亮 / 暗双主题** — 亮色 Sage Ledger 青绿暖纸 + 暗色 Midnight & Amber 琥珀午夜，降低长时间使用疲劳；图标为内嵌 SVG 矢量（Material 系风格），颜色随主题切换
+- **多主题 + 自定义主题** — 三套预设：亮色 Sage Ledger 青绿暖纸、暗色 Midnight & Amber 琥珀午夜、Nord 冷调；另支持自定义主题（从任一预设派生，微调按钮/背景/盈利与亏损等 6 个关键色，实时预览），降低长时间使用疲劳；图标为内嵌 SVG 矢量（Material 系风格），颜色随主题切换
 - **窗口置顶** — 可将窗口固定在最前，方便边操作其他软件边录入
 - **数据安全** — JSON 原子写入 + 滚动备份 + 损坏自动恢复 + 运行日志（`delta_force_dashboard.log`，1MB 轮转 ×3）+ 崩溃现场捕获（`crash.log`）
 - **利润速查（kkrb.net）** — 制造产物页（4 台位最新推荐产物，按利润降序）+ 兑换利润页（7 种子弹自选包利润最高的兑换方案），60 秒缓存，启动后台预加载
@@ -60,7 +60,7 @@
 | 图标 | 内嵌 SVG 矢量（Material 系，24×24 单色路径 + 主题色注入，HiDPI 2x 渲染） |
 | 数据存储 | 本地 JSON（原子写入 + 滚动备份） |
 | 打包工具 | PyInstaller（onedir） |
-| 测试框架 | pytest（643 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
+| 测试框架 | pytest（697 项测试，含 offscreen UI 烟测 + kkrb.net API 单元测试） |
 
 ---
 
@@ -117,20 +117,21 @@ delta-force-dashboard/
 │   ├── main_window.py       # 主窗口（组件协调与数据流）
 │   ├── dashboard_page.py    # 记账仪表盘装配（build_dashboard 直构，C4）
 │   ├── kpi_presenter.py     # KPI 双磁贴渲染（count-up + 主题只换色，C4）
-│   ├── sidebar.py           # 左侧导航栏（记账/利润/密码门 + 账号区 + 底部操作按钮）
+│   ├── sidebar.py           # 左侧导航栏（记账/利润/密码门 + 账号区 + 底部主题菜单/置顶/导出）
 │   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
 │   ├── exchange_page.py     # 兑换利润页面（7 种子弹自选包）
 │   ├── bonus_door_page.py   # 密码门页面（地图密码大字卡片）
 │   ├── fetch_page_base.py   # 数据页公共基类（懒加载四态 + 后台取数 + 错误重试）
 │   ├── fetch_worker.py      # 后台请求 worker（QThread，网络调用移出 UI 线程）
 │   ├── profit_page.py       # 利润页面（纵向堆叠：制造产物 + 兑换利润）
-│   ├── motion.py            # 反馈型动效（fade_in_widget / animate_property）
+│   ├── motion.py            # 反馈型动效（工厂 + 在途注册表：fade_in_widget / shake / animate_property）
 │   ├── load_state.py        # 数据页四态状态机（idle/loading/loaded/failed）
 │   ├── icons.py             # SVG 矢量图标（ICONS 表 + render_icon，主题色注入，ADR-0006）
 │   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
 │   ├── table_widget.py      # 7/30 视图可切换数据表格
 │   ├── chart_widget.py      # 双曲线图 + PNG 导出
-│   └── theme.py             # 主题色板 + QSS 样式表生成
+│   ├── theme.py             # 主题色板 + 预设名单 + 自定义槽位 + QSS 样式表生成
+│   └── theme_dialog.py      # 自定义主题对话框（base 派生 + 6 锚点取色 + 实时预览）
 ├── calculator.py            # 业务逻辑（DayRecord + 盈亏计算）
 ├── account_store.py         # 多账号存储层（账号目录管理 + 校验 + 旧数据迁移）
 ├── config.py                # 路径、日期格式、数据保留条数（RETENTION_LIMIT=30）
@@ -144,7 +145,7 @@ delta-force-dashboard/
 ├── settings_store.py        # 设置持久化（SettingsStore，D-02）
 ├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
 ├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（643 项，含 offscreen UI 烟测）
+├── tests/                   # 测试（697 项，含 offscreen UI 烟测）
 ├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
 ├── delta_force_dashboard.spec           # PyInstaller 打包配置
 ├── requirements.txt         # 运行时依赖（版本锁定）
@@ -167,7 +168,7 @@ python -m pytest tests/ -q
 python -m PyInstaller delta_force_dashboard.spec --noconfirm
 ```
 
-打包产物位于 `dist/Delta Force Dashboard/`（onedir：`Delta Force Dashboard.exe` + `_internal/`，整目录分发或 zip 压缩，约 67MB）。O-20 起由单文件改为 onedir——免去每次启动把 80MB 包解压成 181MB 的开销，启动从 ~2-4s 降至 ~1.5s；体积经 excludes（matplotlib/PIL）+ Qt 模块白名单 + 翻译文件剔除瘦身。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
+打包产物位于 `dist/Delta Force Dashboard/`（onedir：`Delta Force Dashboard.exe` + `_internal/`，整目录分发或 zip 压缩，约 66MB / 265 文件）。O-20 起由单文件改为 onedir——免去每次启动把 80MB 包解压成 181MB 的开销，启动从 ~2-4s 降至 ~1.5s；体积经 excludes（matplotlib/PIL/pyreadline3→pythonnet 环境污染链）+ Qt 模块白名单 + 翻译文件剔除瘦身。exe 文件图标与运行窗口图标均来自 `app_icon.ico`（spec `icon=` + `datas=` 内嵌）。
 
 ---
 
