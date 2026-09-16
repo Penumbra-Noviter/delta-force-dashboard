@@ -109,48 +109,40 @@ python main.py
 
 ## 项目结构
 
-```
-delta-force-dashboard/
-├── main.py                  # 程序入口（单实例 + 崩溃现场捕获 + 日志轮转）
-├── app/
-│   ├── __init__.py          # app 包标记
-│   ├── main_window.py       # 主窗口（组件协调与数据流）
-│   ├── dashboard_page.py    # 记账仪表盘装配（build_dashboard 直构，C4）
-│   ├── kpi_presenter.py     # KPI 双磁贴渲染（count-up + 主题只换色，C4）
-│   ├── sidebar.py           # 左侧导航栏（记账/利润/密码门 + 账号区 + 底部主题菜单/置顶/导出）
-│   ├── crafting_page.py     # 制造产物推荐页面（4 台位卡片）
-│   ├── exchange_page.py     # 兑换利润页面（7 种子弹自选包）
-│   ├── bonus_door_page.py   # 密码门页面（地图密码大字卡片）
-│   ├── fetch_page_base.py   # 数据页公共基类（懒加载四态 + 后台取数 + 错误重试）
-│   ├── fetch_worker.py      # 后台请求 worker（QThread，网络调用移出 UI 线程）
-│   ├── profit_page.py       # 利润页面（纵向堆叠：制造产物 + 兑换利润）
-│   ├── motion.py            # 反馈型动效（工厂 + 在途注册表：fade_in_widget / shake / animate_property）
-│   ├── load_state.py        # 数据页四态状态机（idle/loading/loaded/failed）
-│   ├── icons.py             # SVG 矢量图标（ICONS 表 + render_icon，主题色注入，ADR-0006）
-│   ├── input_panel.py       # 输入面板（校验 + 编辑模式）
-│   ├── table_widget.py      # 7/30 视图可切换数据表格
-│   ├── chart_widget.py      # 双曲线图 + PNG 导出
-│   ├── theme.py             # 主题色板 + 预设名单 + 自定义槽位 + QSS 样式表生成
-│   └── theme_dialog.py      # 自定义主题对话框（base 派生 + 6 锚点取色 + 实时预览）
-├── calculator.py            # 业务逻辑（DayRecord + 盈亏计算）
-├── account_store.py         # 多账号存储层（账号目录管理 + 校验 + 旧数据迁移）
-├── config.py                # 路径、日期格式、数据保留条数（RETENTION_LIMIT=30）
-├── data_store.py            # JSON 持久化（原子写入 + 备份）
-├── formatting.py            # 金额格式化与输入解析
-├── presentation.py          # 展示纯函数（format_* 文案/信号，C5 边界）
-├── json_file.py             # JSON 原子写 seam（atomic_write_json / try_load_json，D-02）
-├── kkrb_client.py           # kkrb.net API 客户端（纯 stdlib，零外部依赖）
-├── kkrb_models.py           # kkrb.net 数据模型（CraftingProduct/AmmoPackageItem/BonusDoorItem）
-├── kkrb_parsing.py          # kkrb.net 响应解析纯函数（畸形输入容错）
-├── settings_store.py        # 设置持久化（SettingsStore，D-02）
-├── signals.py               # 共享信号叶子（RateSignal / PnLSignal，D-08）
-├── scripts/                 # F-01 文档同步工具链（doc_sync.py + pre-commit 钩子源）
-├── tests/                   # 测试（697 项，含 offscreen UI 烟测）
-├── app_icon.ico             # 应用图标（exe 文件 + 运行窗口）
-├── delta_force_dashboard.spec           # PyInstaller 打包配置
-├── requirements.txt         # 运行时依赖（版本锁定）
-└── requirements-dev.txt     # 开发依赖（pytest）
-```
+整体分三层：`app/`（PySide6 界面层）、根级业务与持久化模块、工程辅助文件。
+
+### 界面层 `app/`
+
+| 文件 | 职责 |
+|------|------|
+| `main_window.py` | 主窗口：组件协调与数据流 |
+| `sidebar.py` | 左侧导航栏（记账/利润/密码门 + 账号区 + 底部主题菜单/置顶/导出） |
+| `dashboard_page.py` / `kpi_presenter.py` | 记账仪表盘装配 / KPI 双磁贴（count-up 动画 + 主题换色） |
+| `input_panel.py` / `table_widget.py` / `chart_widget.py` | 每日录入面板（校验 + 编辑）/ 7/30 视图表格 / 双曲线图 + PNG 导出 |
+| `crafting_page.py` / `exchange_page.py` / `profit_page.py` | 利润页三件套：制造产物（4 台位）/ 兑换利润（7 种子弹包）/ 容器页 |
+| `bonus_door_page.py` | 密码门页面（6 张地图密码大字卡片） |
+| `fetch_page_base.py` / `fetch_worker.py` / `load_state.py` | 数据页公共基类 + 后台取数 worker + 四态状态机（网络调用移出 UI 线程） |
+| `theme.py` / `theme_dialog.py` | 主题色板与 QSS 生成 / 自定义主题对话框（6 锚点取色 + 实时预览） |
+| `motion.py` / `icons.py` | 反馈型动效（淡入/抖动/数值动画）/ 内嵌 SVG 图标渲染 |
+
+### 根级模块
+
+| 文件 | 职责 |
+|------|------|
+| `main.py` | 程序入口（单实例 + 崩溃现场捕获 + 日志轮转） |
+| `calculator.py` / `presentation.py` / `formatting.py` | 业务纯函数：盈亏计算 / 展示文案 / 金额格式化与输入解析 |
+| `kkrb_client.py` / `kkrb_models.py` / `kkrb_parsing.py` | kkrb.net 数据层：API 客户端（纯 stdlib）/ 数据模型 / 响应解析 |
+| `json_file.py` / `data_store.py` / `settings_store.py` / `account_store.py` | 持久化：JSON 原子写 / 记账存储 / 设置 / 多账号目录 |
+| `config.py` / `signals.py` | 路径与常量 / 共享信号 |
+
+### 工程文件
+
+| 路径 | 说明 |
+|------|------|
+| `scripts/` | 文档同步工具链（doc_sync.py + pre-commit 钩子源） |
+| `tests/` | 697 项测试（含 offscreen UI 烟测） |
+| `delta_force_dashboard.spec` | PyInstaller 打包配置 |
+| `app_icon.ico` / `requirements.txt` / `requirements-dev.txt` | 应用图标 / 运行时依赖 / 开发依赖 |
 
 ---
 
