@@ -166,4 +166,4 @@ python -m PyInstaller delta_force_dashboard.spec --noconfirm
 
 ## 许可证
 
-本项目为个人使用工具，未发布开源许可证。
+本项目采用 [GNU General Public License v3.0](LICENSE)（GPL-3.0）发布：你可自由使用、修改与分发，但任何衍生作品必须同样以 GPL-3.0 开源。
